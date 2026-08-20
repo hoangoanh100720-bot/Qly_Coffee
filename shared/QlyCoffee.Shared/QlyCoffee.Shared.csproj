@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Hợp đồng dữ liệu dùng chung: CẢ backend và frontend đều tham chiếu dự án này.
+       Đổi tên trường ở đây thì cả hai phía cùng lỗi biên dịch ngay,
+       thay vì lỗi âm thầm lúc chạy. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,391 @@
+/* =============================================================================
+   QLY COFFEE — STYLE CHO TỪNG TRANG
+   =============================================================================
+   File này xây trên design-system.css. Mọi giá trị đều tham chiếu token,
+   không có mã màu thô hay số pixel tùy tiện.
+
+   MỤC LỤC
+   §1  Tiện ích chữ & hiển thị theo màn hình
+   §2  Khung trang bán hàng
+   §3  Thanh lọc & ô tìm kiếm
+   §4  Bảng lãi lỗ (dùng chung ở kế hoạch AI và soạn công thức)
+   §5  Trang kế hoạch AI
+   §6  Thẻ đề xuất
+   §7  Trang soạn công thức
+   §8  Chọn màu
+============================================================================= */
+
+/* =============================================================================
+   §1  TIỆN ÍCH
+============================================================================= */
+.text-danger { color: var(--danger); }
+.text-warn   { color: var(--warn); }
+.text-ok     { color: var(--ok); }
+
+.plain-link { color: inherit; text-decoration: none; }
+.plain-link:hover { color: var(--accent); }
+
+.product-link { display: block; text-decoration: none; color: inherit; }
+
+.section-sm { padding-block: clamp(var(--space-8), 5vw, var(--space-16)); }
+
+/* Ẩn/hiện theo bề rộng — dùng lớp thay vì kiểm tra JS để tránh nhấp nháy */
+.show-md-down { display: none; }
+@media (max-width: 900px) {
+  .show-md-down { display: inline-flex; }
+  .hide-md-down { display: none; }
+}
+@media (max-width: 560px) {
+  .hide-sm { display: none; }
+}
+
+/* =============================================================================
+   §2  KHUNG TRANG BÁN HÀNG
+============================================================================= */
+.shop-root { display: flex; flex-direction: column; min-height: 100dvh; }
+.shop-root main { flex: 1; }
+
+.menu-header { margin-bottom: var(--space-8); }
+
+.shop-footer {
+  margin-top: var(--space-20);
+  padding-block: var(--space-12) var(--space-8);
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--border);
+}
+
+.footer-grid {
+  display: grid;
+  gap: var(--space-8);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  padding-bottom: var(--space-8);
+}
+.footer-grid a { color: var(--text-2); text-decoration: none; }
+.footer-grid a:hover { color: var(--accent); text-decoration: underline; }
+
+.footer-bottom {
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-3);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+/* Lớp phủ khi mở thanh bên trên màn hình hẹp */
+.sidebar-overlay {
+  position: fixed; inset: 0; z-index: 35;
+  background: hsl(26 30% 8% / .45);
+  backdrop-filter: blur(2px);
+  animation: fadeIn var(--dur) var(--ease-out);
+}
+
+/* =============================================================================
+   §3  THANH LỌC & Ô TÌM KIẾM
+============================================================================= */
+.filter-bar {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+
+/* Trên màn hình hẹp, chip cuộn ngang thay vì xuống dòng lộn xộn */
+@media (max-width: 640px) {
+  .filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-bar .grow { display: none; }
+}
+
+.search-box {
+  position: relative;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding-left: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  min-width: 240px;
+}
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.search-input {
+  border: none; background: transparent; padding-left: 0;
+}
+.search-input:focus { outline: none; box-shadow: none; border-color: transparent; }
+
+/* =============================================================================
+   §4  BẢNG LÃI LỖ
+   Dùng ở hai nơi: thẻ đề xuất AI và trang soạn công thức.
+   Thiết kế cố ý giống bảng kế toán: nhãn trái, số phải, dòng tổng có kẻ trên.
+============================================================================= */
+.pl-table {
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-1);
+}
+
+/* Nhãn nhắc rằng đây là số hệ thống tính, không phải AI đoán */
+.pl-caption {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px dashed var(--border);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pl-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-1);
+  font-size: var(--text-sm);
+}
+.pl-label {
+  color: var(--text-2);
+  display: inline-flex; align-items: center; gap: var(--space-1);
+}
+.pl-value { font-weight: 600; white-space: nowrap; }
+.pl-positive { color: var(--ok); }
+.pl-negative { color: var(--danger); }
+
+.pl-total {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+  font-size: var(--text-base);
+}
+.pl-total .pl-label { color: var(--text); font-weight: 700; }
+.pl-total .pl-value { font-weight: 800; font-size: var(--text-lg); }
+
+/* =============================================================================
+   §5  TRANG KẾ HOẠCH AI
+============================================================================= */
+
+/* Khối diễn giải của AI — viền trái accent để phân biệt rõ với khối số liệu */
+.ai-summary {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(100deg, var(--accent-soft) 0%, var(--surface) 55%);
+}
+.ai-avatar {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.ai-headline {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* --- Biểu đồ rủi ro ---------------------------------------------------------
+   Thanh ngang thay vì cột dọc: nhãn đọc được mà không phải nghiêng đầu,
+   và thêm bao nhiêu nhóm cũng không vỡ bố cục.                                */
+.risk-chart { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.risk-bar-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 110px 56px;
+  align-items: center;
+  gap: var(--space-3);
+}
+.risk-bar-label { font-size: var(--text-sm); font-weight: 600; }
+.risk-bar-track {
+  height: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.risk-bar-fill {
+  height: 100%;
+  border-radius: calc(var(--radius-sm) - 1px);
+  transition: width var(--dur-slow) var(--ease-out);
+  min-width: 2px;
+}
+.risk-bar-value {
+  text-align: right; font-weight: 700; font-size: var(--text-sm);
+}
+.risk-bar-count { text-align: right; }
+
+@media (max-width: 640px) {
+  .risk-bar-row { grid-template-columns: 80px 1fr 92px; }
+  .risk-bar-count { display: none; }
+}
+
+/* =============================================================================
+   §6  THẺ ĐỀ XUẤT
+============================================================================= */
+.suggestion {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  transition: border-color var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out);
+}
+.suggestion:hover { box-shadow: var(--shadow); }
+
+/* Sọc trái mã hóa mức ưu tiên — nhận ra bằng ngoại vi mắt khi cuộn nhanh */
+.priority-critical { border-left-color: var(--danger); }
+.priority-high     { border-left-color: var(--warn); }
+.priority-medium   { border-left-color: var(--accent); }
+.priority-low      { border-left-color: var(--border-strong); }
+
+/* Đề xuất đã xử lý thì lùi về sau, nhưng vẫn đọc được (không dùng opacity thấp) */
+.suggestion.is-decided { background: var(--surface-2); }
+.suggestion.is-decided .suggestion-title { color: var(--text-2); }
+
+.suggestion-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-3);
+}
+.suggestion-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+.suggestion-reason {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  max-width: 72ch;
+}
+
+/* Chỉ số phụ trợ xếp thành hàng ngang, ngăn cách bằng đường kẻ dọc mảnh */
+.suggestion-metrics {
+  display: flex; flex-wrap: wrap;
+  gap: var(--space-6);
+  padding: var(--space-3) 0;
+}
+.metric { display: flex; flex-direction: column; gap: 2px; }
+.metric-label {
+  font-size: var(--text-2xs); font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+.metric-value { font-size: var(--text-sm); font-weight: 700; }
+
+/* Xem trước banner — nền pha từ màu của chính món được giảm giá */
+.banner-preview {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px dashed color-mix(in srgb, var(--drink, var(--accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--drink, var(--accent)) 10%, var(--surface));
+}
+.banner-text { font-size: var(--text-base); font-weight: 600; }
+
+.suggestion-actions {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.suggestion-edit {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* =============================================================================
+   §7  TRANG SOẠN CÔNG THỨC
+============================================================================= */
+.recipe-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-6);
+  align-items: start;
+}
+/* Cột phải dính theo cuộn: bảng lợi nhuận luôn trong tầm mắt khi sửa định lượng */
+.recipe-sidebar { position: sticky; top: calc(var(--shell-topbar) + var(--space-6)); }
+
+@media (max-width: 1080px) {
+  .recipe-layout { grid-template-columns: 1fr; }
+  .recipe-sidebar { position: static; }
+}
+
+.recipe-table { display: flex; flex-direction: column; gap: 2px; }
+
+.recipe-head {
+  display: grid;
+  grid-template-columns: auto 1fr 118px 88px 64px 40px;
+  align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.recipe-row {
+  grid-template-columns: auto 1fr 118px 88px 64px 40px;
+}
+
+@media (max-width: 720px) {
+  .recipe-head { display: none; }
+  .recipe-row {
+    grid-template-columns: auto 1fr auto;
+    row-gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+}
+
+.recipe-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--border-strong);
+}
+
+.checkbox-cell { display: grid; place-items: center; cursor: pointer; }
+.checkbox-cell input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+.add-ingredient {
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.add-ingredient legend { margin-bottom: var(--space-1); }
+
+/* =============================================================================
+   §8  CHỌN MÀU
+   Ô màu gốc của trình duyệt xấu và khác nhau giữa các hệ điều hành,
+   nên bọc lại để đồng nhất và ghép cùng ô nhập mã hex.
+============================================================================= */
+.color-field { display: flex; align-items: stretch; gap: var(--space-2); }
+
+.color-input {
+  width: 42px; height: 38px; flex: none;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+.color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.color-input::-webkit-color-swatch { border: none; border-radius: calc(var(--radius) - 3px); }
+.color-input::-moz-color-swatch { border: none; border-radius: calc(var(--radius) - 3px); }
+
+/* =============================================================================
+   §9  IN ẤN — bản kế hoạch thường được in ra dán ở quầy
+============================================================================= */
+@media print {
+  .suggestion-actions, .filter-bar, .search-box { display: none !important; }
+  .suggestion { break-inside: avoid; border-left-width: 4px; }
+  .card, .table-wrap { break-inside: avoid; }
+}

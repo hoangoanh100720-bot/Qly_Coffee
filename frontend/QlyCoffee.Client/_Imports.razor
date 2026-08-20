@@ -1,0 +1,26 @@
+@* =============================================================================
+   IMPORT DÙNG CHUNG CHO MỌI FILE .RAZOR
+   Khai báo ở đây thì từng trang không phải lặp lại @using.
+   ============================================================================= *@
+
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
+
+@* --- Của dự án -------------------------------------------------------------- *@
+@using QlyCoffee.Client
+@using QlyCoffee.Client.Layout
+@using QlyCoffee.Client.Services
+@using QlyCoffee.Client.Components.Visual
+@using QlyCoffee.Client.Components.Shop
+@using QlyCoffee.Client.Components.Admin
+@using QlyCoffee.Client.Components.Common
+
+@* --- Hợp đồng dữ liệu dùng chung với backend -------------------------------- *@
+@using QlyCoffee.Shared

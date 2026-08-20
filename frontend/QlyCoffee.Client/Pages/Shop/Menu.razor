@@ -1,0 +1,199 @@
+@*
+    =============================================================================
+    TRANG THỰC ĐƠN
+    =============================================================================
+    Bốn trạng thái đều được xử lý: đang tải (khung xương), rỗng, lỗi, và có dữ liệu.
+    Bộ lọc danh mục dùng chip tô đúng màu danh mục lấy từ database.
+    =============================================================================
+*@
+@page "/menu"
+@page "/menu/danh-muc/{CategorySlug}"
+@layout ShopLayout
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Thực đơn — Qly Coffee</PageTitle>
+
+<div class="container section-sm">
+
+    @* ── TIÊU ĐỀ TRANG ───────────────────────────────────────────────────── *@
+    <header class="stack stack-3 menu-header">
+        <h1>Thực đơn</h1>
+        <p class="lead prose">
+            Cà phê pha phin, trà trái cây và đá xay. Mỗi ly làm tươi theo công thức
+            định lượng chuẩn — không ước lượng bằng mắt.
+        </p>
+    </header>
+
+    @* ── BỘ LỌC DANH MỤC ─────────────────────────────────────────────────── *@
+    @if (_categories is not null)
+    {
+        <div class="filter-bar" role="group" aria-label="Lọc theo danh mục">
+            <button class="chip @(_activeCategory is null ? "is-active" : "")"
+                    @onclick="() => SelectCategory(null)"
+                    aria-pressed="@(_activeCategory is null)">
+                Tất cả
+                <span class="xs muted num">@(_allProducts?.Count ?? 0)</span>
+            </button>
+
+            @foreach (var cat in _categories)
+            {
+                var isActive = _activeCategory == cat.Slug;
+                <button class="chip @(isActive ? "is-active" : "")"
+                        @onclick="() => SelectCategory(cat.Slug)"
+                        aria-pressed="@isActive">
+                    @* Chấm màu = màu đại diện danh mục, đọc từ DB *@
+                    <span class="swatch" style="--swatch-color: @cat.ColorHex"></span>
+                    @cat.Name
+                    <span class="xs muted num">@cat.ProductCount</span>
+                </button>
+            }
+        </div>
+    }
+
+    @* ── LƯỚI MÓN ────────────────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        @* Khung xương thay vì vòng xoay: đã biết hình dạng nội dung nên trang
+           không bị nhảy khi dữ liệu về *@
+        <div class="grid grid-cards" aria-busy="true" aria-label="Đang tải thực đơn">
+            @for (int i = 0; i < 8; i++)
+            {
+                <div class="stack stack-3">
+                    <div class="skeleton skeleton-card"></div>
+                    <div class="skeleton skeleton-title"></div>
+                    <div class="skeleton skeleton-text" style="width: 40%;"></div>
+                </div>
+            }
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <WarnIcon Size="20" />
+            <div class="stack stack-2">
+                <span class="alert-title">Không tải được thực đơn</span>
+                <span>@_error</span>
+                <button class="btn btn-secondary btn-sm" style="align-self: flex-start;"
+                        @onclick="LoadAsync">Thử lại</button>
+            </div>
+        </div>
+    }
+    else if (_visibleProducts.Count == 0)
+    {
+        <div class="empty">
+            <CupIcon Size="52" CssClass="empty-icon" />
+            <span class="empty-title">Chưa có món nào ở danh mục này</span>
+            <span class="empty-text">
+                Thử chọn danh mục khác, hoặc xem toàn bộ thực đơn.
+            </span>
+            <button class="btn btn-secondary" @onclick="() => SelectCategory(null)">
+                Xem tất cả
+            </button>
+        </div>
+    }
+    else
+    {
+        @* Thông báo cho trình đọc màn hình khi số kết quả thay đổi *@
+        <p class="sr-only" aria-live="polite">
+            Hiển thị @_visibleProducts.Count món.
+        </p>
+
+        <div class="grid grid-cards fade-in">
+            @foreach (var p in _visibleProducts)
+            {
+                <ProductCard Product="p" @key="p.Id" />
+            }
+        </div>
+
+        @* Nhóm món tạm hết xuống cuối để không chiếm chỗ đẹp của món đang bán *@
+        @if (_unavailableProducts.Count > 0)
+        {
+            <div class="divider" style="margin-top: var(--space-12);">
+                Tạm hết hôm nay (@_unavailableProducts.Count)
+            </div>
+            <div class="grid grid-cards" style="margin-top: var(--space-4);">
+                @foreach (var p in _unavailableProducts)
+                {
+                    <ProductCard Product="p" @key="p.Id" />
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public string? CategorySlug { get; set; }
+
+    private List<CategoryDto>? _categories;
+    private List<ProductCardDto>? _allProducts;
+    private string? _activeCategory;
+    private bool _loading = true;
+    private string? _error;
+
+    /// <summary>Món còn bán được, thuộc danh mục đang lọc.</summary>
+    private List<ProductCardDto> _visibleProducts = new();
+
+    /// <summary>Món tạm hết — hiển thị riêng ở cuối trang.</summary>
+    private List<ProductCardDto> _unavailableProducts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _activeCategory = CategorySlug;
+        await LoadAsync();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Người dùng bấm nút Back của trình duyệt — cập nhật lại bộ lọc
+        if (_activeCategory != CategorySlug)
+        {
+            _activeCategory = CategorySlug;
+            ApplyFilter();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        var result = await Api.GetMenuAsync();
+        if (result.Success && result.Data is not null)
+        {
+            _categories = result.Data.Categories.ToList();
+            _allProducts = result.Data.Products.ToList();
+            ApplyFilter();
+        }
+        else
+        {
+            _error = result.Error?.Message ?? "Đã có lỗi xảy ra. Vui lòng thử lại.";
+        }
+
+        _loading = false;
+    }
+
+    private void SelectCategory(string? slug)
+    {
+        _activeCategory = slug;
+        ApplyFilter();
+        // Đổi URL nhưng không tải lại trang, để người dùng chia sẻ được liên kết đã lọc
+        Nav.NavigateTo(slug is null ? "/menu" : $"/menu/danh-muc/{slug}", replace: true);
+    }
+
+    private void ApplyFilter()
+    {
+        if (_allProducts is null) return;
+
+        var filtered = _activeCategory is null
+            ? _allProducts
+            : _allProducts.Where(p => CategorySlugOf(p) == _activeCategory).ToList();
+
+        _visibleProducts = filtered.Where(p => p.IsAvailable).ToList();
+        _unavailableProducts = filtered.Where(p => !p.IsAvailable).ToList();
+    }
+
+    private string CategorySlugOf(ProductCardDto p) =>
+        _categories?.FirstOrDefault(c => c.Name == p.CategoryName)?.Slug ?? "";
+}

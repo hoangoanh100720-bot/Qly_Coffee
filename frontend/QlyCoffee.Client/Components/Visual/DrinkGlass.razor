@@ -1,0 +1,250 @@
+@*
+    =============================================================================
+    DRINK GLASS — Minh họa ly đồ uống bằng SVG, tô đúng màu thật của món
+    =============================================================================
+
+    Ly nước được dựng từ HAI màu lưu trong database:
+        products.color_primary_hex  → màu thân nước (cà phê nâu, matcha xanh...)
+        products.color_accent_hex   → màu lớp trên (kem muối, foam, sữa)
+
+    Nhờ vậy mỗi món trên menu có hình riêng, đúng sắc thật, mà không cần chụp ảnh.
+    Khi quán đã có ảnh chụp thật thì truyền ImageUrl vào ProductCard — component
+    này chỉ hiện khi chưa có ảnh.
+
+    CÁCH DÙNG:
+        <DrinkGlass DrinkColor="#4A2C17" FoamColor="#F7F2E8"
+                    Style="DrinkGlass.GlassStyle.IcedTall" HasIce="true" Size="150" />
+    =============================================================================
+*@
+
+<svg width="@Size" height="@Size" viewBox="0 0 120 140" fill="none"
+     role="img" aria-label="@AriaLabel" class="@CssClass"
+     xmlns="http://www.w3.org/2000/svg">
+
+    <defs>
+        @* Mặt cắt của ly — mọi lớp nước bên trong đều bị cắt theo hình này,
+           nhờ vậy nước không bao giờ tràn ra ngoài thành ly. *@
+        <clipPath id="@ClipId">
+            @if (Style == GlassStyle.HotCup)
+            {
+                <path d="M28 42h64l-6 62a10 10 0 0 1-10 9H44a10 10 0 0 1-10-9L28 42Z" />
+            }
+            else if (Style == GlassStyle.Blended)
+            {
+                <path d="M26 38h68l-7 68a10 10 0 0 1-10 9H43a10 10 0 0 1-10-9L26 38Z" />
+            }
+            else
+            {
+                <path d="M30 30h60l-7 78a10 10 0 0 1-10 9H47a10 10 0 0 1-10-9L30 30Z" />
+            }
+        </clipPath>
+
+        @* Ánh sáng phản chiếu trên mặt kính — làm ly trông có khối, không phẳng *@
+        <linearGradient id="@GlossId" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.34" />
+            <stop offset="22%"  stop-color="#FFFFFF" stop-opacity="0.06" />
+            <stop offset="70%"  stop-color="#000000" stop-opacity="0" />
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.12" />
+        </linearGradient>
+
+        @* Chuyển sắc dọc trong thân nước — đáy đậm hơn mặt, giống nước thật *@
+        <linearGradient id="@BodyId" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stop-color="@DrinkColor" stop-opacity="0.88" />
+            <stop offset="100%" stop-color="@Darken(DrinkColor, 0.22)" stop-opacity="1" />
+        </linearGradient>
+    </defs>
+
+    @* ── ỐNG HÚT (chỉ với ly lạnh) ─────────────────────────────────────────── *@
+    @if (Style is GlassStyle.IcedTall or GlassStyle.Boba)
+    {
+        <path d="M74 18L64 96" stroke="@StrawColor" stroke-width="7" stroke-linecap="round" />
+        <path d="M74 18L64 96" stroke="@Darken(StrawColor, 0.28)" stroke-width="1.2"
+              stroke-linecap="round" fill="none" opacity="0.5" />
+    }
+
+    @* ── NƯỚC BÊN TRONG LY ─────────────────────────────────────────────────── *@
+    <g clip-path="url(#@ClipId)">
+
+        @* Lớp nước chính *@
+        <rect x="20" y="@LiquidTop" width="80" height="140" fill="url(#@BodyId)" />
+
+        @* Trân châu lắng dưới đáy — vẽ trước lớp foam để nằm dưới cùng *@
+        @if (Style == GlassStyle.Boba)
+        {
+            <g>
+                @foreach (var (cx, cy, r) in BobaPositions)
+                {
+                    <circle cx="@cx" cy="@cy" r="@r" fill="@BobaColor" />
+                    <circle cx="@(cx - r * 0.32)" cy="@(cy - r * 0.34)" r="@(r * 0.26)"
+                            fill="#FFFFFF" opacity="0.28" />
+                }
+            </g>
+        }
+
+        @* Đá viên — hình bình hành mờ, xoay nhẹ mỗi viên để trông tự nhiên *@
+        @if (HasIce && Style is GlassStyle.IcedTall or GlassStyle.Boba)
+        {
+            <g opacity="0.34">
+                <rect x="38" y="@(LiquidTop + 10)" width="20" height="20" rx="4"
+                      fill="#FFFFFF" transform="rotate(16 48 @(LiquidTop + 20))" />
+                <rect x="62" y="@(LiquidTop + 26)" width="18" height="18" rx="4"
+                      fill="#FFFFFF" transform="rotate(-12 71 @(LiquidTop + 35))" />
+                <rect x="44" y="@(LiquidTop + 44)" width="22" height="21" rx="4"
+                      fill="#FFFFFF" transform="rotate(28 55 @(LiquidTop + 54))" />
+            </g>
+        }
+
+        @* Lớp trên: kem muối, foam sữa, kem cheese *@
+        @if (HasFoam)
+        {
+            <rect x="20" y="@LiquidTop" width="80" height="@FoamHeight" fill="@FoamColor" />
+            @* Đường lượn sóng ở ranh giới hai lớp — foam thật không bao giờ phẳng *@
+            <path d="M20 @(LiquidTop + FoamHeight) q10 -5 20 0 t20 0 t20 0 t20 0 v14 H20 Z"
+                  fill="@FoamColor" opacity="0.75" />
+        }
+
+        @* Đá xay — hạt lấm tấm mờ khắp thân *@
+        @if (Style == GlassStyle.Blended)
+        {
+            <g opacity="0.24">
+                @foreach (var (cx, cy, r) in BlendSpecks)
+                {
+                    <circle cx="@cx" cy="@cy" r="@r" fill="#FFFFFF" />
+                }
+            </g>
+        }
+
+        @* Phản sáng trên mặt kính *@
+        <rect x="20" y="0" width="80" height="140" fill="url(#@GlossId)" />
+    </g>
+
+    @* ── THÀNH LY ──────────────────────────────────────────────────────────── *@
+    @if (Style == GlassStyle.HotCup)
+    {
+        @* Cốc sứ có quai *@
+        <path d="M92 56c10 0 16 6 16 14s-6 14-16 14"
+              stroke="@GlassStroke" stroke-width="3.5" fill="none" stroke-linecap="round" />
+        <path d="M28 42h64l-6 62a10 10 0 0 1-10 9H44a10 10 0 0 1-10-9L28 42Z"
+              stroke="@GlassStroke" stroke-width="3" fill="none" stroke-linejoin="round" />
+        <ellipse cx="60" cy="42" rx="32" ry="7" stroke="@GlassStroke" stroke-width="3" fill="none" />
+        @* Hơi nóng bốc lên *@
+        <g stroke="@GlassStroke" stroke-width="2.4" stroke-linecap="round" opacity="0.4" fill="none">
+            <path d="M48 26c4-5-4-9 0-14" />
+            <path d="M60 22c4-5-4-9 0-14" />
+            <path d="M72 26c4-5-4-9 0-14" />
+        </g>
+    }
+    else if (Style == GlassStyle.Blended)
+    {
+        @* Ly nhựa có nắp vòm cho đá xay *@
+        <path d="M26 38h68l-7 68a10 10 0 0 1-10 9H43a10 10 0 0 1-10-9L26 38Z"
+              stroke="@GlassStroke" stroke-width="3" fill="none" stroke-linejoin="round" />
+        <path d="M22 38c0-14 17-22 38-22s38 8 38 22" stroke="@GlassStroke" stroke-width="3"
+              fill="@FoamColor" fill-opacity="0.22" stroke-linejoin="round" />
+        <ellipse cx="60" cy="38" rx="38" ry="6" stroke="@GlassStroke" stroke-width="2.5" fill="none" />
+        <path d="M72 16V6" stroke="@StrawColor" stroke-width="7" stroke-linecap="round" />
+    }
+    else
+    {
+        @* Ly thủy tinh cao cho đồ uống lạnh *@
+        <path d="M30 30h60l-7 78a10 10 0 0 1-10 9H47a10 10 0 0 1-10-9L30 30Z"
+              stroke="@GlassStroke" stroke-width="3" fill="none" stroke-linejoin="round" />
+        <ellipse cx="60" cy="30" rx="30" ry="6.5" stroke="@GlassStroke" stroke-width="3" fill="none" />
+    }
+</svg>
+
+@code {
+    /// <summary>Kiểu ly — quyết định hình dáng và các chi tiết đi kèm.</summary>
+    public enum GlassStyle
+    {
+        /// <summary>Ly thủy tinh cao — cà phê đá, trà trái cây, soda.</summary>
+        IcedTall,
+        /// <summary>Cốc sứ có quai và hơi nóng — cà phê nóng, latte nóng.</summary>
+        HotCup,
+        /// <summary>Ly trà sữa có trân châu lắng đáy.</summary>
+        Boba,
+        /// <summary>Ly nhựa nắp vòm — đá xay, sinh tố.</summary>
+        Blended
+    }
+
+    /// <summary>Màu thân nước, lấy từ <c>products.color_primary_hex</c>.</summary>
+    [Parameter] public string DrinkColor { get; set; } = "#4A2C17";
+
+    /// <summary>Màu lớp trên (kem, foam, sữa), lấy từ <c>products.color_accent_hex</c>.</summary>
+    [Parameter] public string FoamColor { get; set; } = "#F7F2E8";
+
+    /// <summary>Màu trân châu — chỉ dùng khi <see cref="Style"/> là Boba.</summary>
+    [Parameter] public string BobaColor { get; set; } = "#2A1F1A";
+
+    [Parameter] public GlassStyle Style { get; set; } = GlassStyle.IcedTall;
+
+    /// <summary>Có lớp kem/foam phủ mặt không.</summary>
+    [Parameter] public bool HasFoam { get; set; } = true;
+
+    /// <summary>Có đá viên trong ly không.</summary>
+    [Parameter] public bool HasIce { get; set; } = true;
+
+    /// <summary>
+    /// Mức nước trong ly, từ 0 tới 1. Mặc định 0.82.
+    /// Giảm giá trị này để vẽ ly vơi — dùng ở màn hình kho khi minh họa lô sắp hết.
+    /// </summary>
+    [Parameter] public double FillLevel { get; set; } = 0.82;
+
+    [Parameter] public int Size { get; set; } = 140;
+    [Parameter] public string? CssClass { get; set; }
+    [Parameter] public string AriaLabel { get; set; } = "Hình minh họa đồ uống";
+
+    // --- Giá trị dẫn xuất -----------------------------------------------------
+
+    /// <summary>Mỗi thực thể SVG cần id riêng, nếu trùng thì các ly sẽ dùng chung clipPath và vỡ hình.</summary>
+    private readonly string _uid = Guid.NewGuid().ToString("N")[..8];
+    private string ClipId  => $"clip-{_uid}";
+    private string GlossId => $"gloss-{_uid}";
+    private string BodyId  => $"body-{_uid}";
+
+    /// <summary>Tọa độ Y của mặt nước. FillLevel càng nhỏ thì mặt nước càng thấp.</summary>
+    private double LiquidTop => Style switch
+    {
+        GlassStyle.HotCup  => 48 + (1 - FillLevel) * 55,
+        GlassStyle.Blended => 44 + (1 - FillLevel) * 60,
+        _                  => 36 + (1 - FillLevel) * 70
+    };
+
+    private double FoamHeight => Style == GlassStyle.HotCup ? 14 : 18;
+
+    /// <summary>Nét viền ly — nâu xám nhạt, đủ đậm để thấy trên cả nền sáng và nền tối.</summary>
+    private string GlassStroke => "#9A8A78";
+
+    private string StrawColor => Darken(FoamColor, 0.08) == FoamColor ? "#C46A52" : "#C46A52";
+
+    /// <summary>Vị trí các viên trân châu — cố định để hình không nhảy mỗi lần render lại.</summary>
+    private static readonly (double cx, double cy, double r)[] BobaPositions =
+    {
+        (46, 104, 6.5), (60, 108, 7), (74, 104, 6),
+        (52, 94, 6),    (68, 95, 6.5), (60, 88, 5.5)
+    };
+
+    /// <summary>Hạt lấm tấm cho đá xay.</summary>
+    private static readonly (double cx, double cy, double r)[] BlendSpecks =
+    {
+        (42, 62, 3), (58, 54, 2.4), (72, 66, 3.2), (50, 78, 2.6),
+        (66, 84, 3), (40, 92, 2.2), (78, 50, 2.6), (56, 100, 3)
+    };
+
+    private static string Darken(string hex, double amount)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return "#000000";
+        hex = hex.TrimStart('#');
+        if (hex.Length == 3)
+            hex = $"{hex[0]}{hex[0]}{hex[1]}{hex[1]}{hex[2]}{hex[2]}";
+        if (hex.Length < 6) return "#000000";
+        try
+        {
+            int r = Convert.ToInt32(hex[..2], 16);
+            int g = Convert.ToInt32(hex.Substring(2, 2), 16);
+            int b = Convert.ToInt32(hex.Substring(4, 2), 16);
+            return $"#{(int)(r * (1 - amount)):X2}{(int)(g * (1 - amount)):X2}{(int)(b * (1 - amount)):X2}";
+        }
+        catch { return "#000000"; }
+    }
+}

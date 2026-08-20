@@ -1,0 +1,165 @@
+@*
+    =============================================================================
+    TRANG CHỦ
+    =============================================================================
+    Archetype: trang thương mại. Chữ lớn được phép, nhịp dọc rộng.
+
+    Banner khuyến mãi do AI đề xuất đặt ngay dưới hero — đây là chỗ dễ thấy nhất
+    và cũng chính là mục đích cuối cùng của tính năng xả hàng cận hạn: đưa món
+    cần đẩy tới trước mắt khách.
+    =============================================================================
+*@
+@page "/"
+@layout ShopLayout
+@inject ApiClient Api
+
+<PageTitle>Qly Coffee — Cà phê &amp; Trà</PageTitle>
+
+<div class="container">
+
+    @* ── HERO ────────────────────────────────────────────────────────────── *@
+    <section class="hero">
+        <div class="hero-text stack stack-6">
+            <div class="stack stack-4">
+                <span class="label">Mở cửa 07:00 – 22:00 mỗi ngày</span>
+                <h1 class="hero-title">
+                    Cà phê pha phin,<br />trà trái cây tươi.
+                </h1>
+                <p class="lead" style="max-width: 46ch;">
+                    Mỗi ly làm theo công thức định lượng chuẩn — đong bằng cân,
+                    không ước lượng bằng mắt. Đặt trước, tới lấy là có.
+                </p>
+            </div>
+
+            <div class="row row-3 row-wrap">
+                <a href="/menu" class="btn btn-primary btn-lg">Xem thực đơn</a>
+                <a href="/tra-cuu-don" class="btn btn-secondary btn-lg">Tra cứu đơn</a>
+            </div>
+        </div>
+
+        @* Ba ly minh họa xếp so le, màu lấy từ ba món đặc trưng của quán *@
+        <div class="hero-visual" aria-hidden="true">
+            <div class="hero-glass hero-glass-1">
+                <DrinkGlass DrinkColor="#3D2415" FoamColor="#F7F2E8"
+                            Style="DrinkGlass.GlassStyle.IcedTall" Size="150" />
+            </div>
+            <div class="hero-glass hero-glass-2">
+                <DrinkGlass DrinkColor="#E8944A" FoamColor="#F7D9B4"
+                            Style="DrinkGlass.GlassStyle.IcedTall" Size="180" />
+            </div>
+            <div class="hero-glass hero-glass-3">
+                <DrinkGlass DrinkColor="#8E6647" FoamColor="#EFE3D2"
+                            BobaColor="#2A1F1A"
+                            Style="DrinkGlass.GlassStyle.Boba" Size="150" />
+            </div>
+        </div>
+    </section>
+
+    @* ── BANNER KHUYẾN MÃI DO AI ĐỀ XUẤT ─────────────────────────────────── *@
+    @if (_promoProducts.Count > 0)
+    {
+        <section class="stack stack-4" style="margin-bottom: var(--space-16);">
+            @foreach (var p in _promoProducts.Take(2))
+            {
+                <div class="promo-banner" style="--drink: @p.ColorPrimaryHex">
+                    <DrinkGlass DrinkColor="@p.ColorPrimaryHex" FoamColor="@p.ColorAccentHex"
+                                Size="64" AriaLabel="" />
+                    <div class="stack stack-1 grow">
+                        <span class="badge badge-danger">Giảm @p.DiscountPercent%</span>
+                        <span style="font-weight: 700; font-size: var(--text-lg);">@p.Name</span>
+                        <span class="small muted">
+                            <span class="price-sale">@Money.Format(p.EffectivePrice)</span>
+                            <span class="price-old">@Money.Format(p.BasePrice)</span>
+                        </span>
+                    </div>
+                    <a href="/menu/@p.Slug" class="btn btn-primary">Đặt ngay</a>
+                </div>
+            }
+        </section>
+    }
+
+    @* ── MÓN NỔI BẬT ─────────────────────────────────────────────────────── *@
+    <section class="section">
+        <div class="row row-between" style="margin-bottom: var(--space-6);">
+            <h2>Món được gọi nhiều nhất</h2>
+            <a href="/menu" class="btn btn-ghost btn-sm">
+                Xem tất cả <ArrowIcon Size="14" />
+            </a>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="grid grid-cards" aria-busy="true">
+                @for (int i = 0; i < 4; i++)
+                {
+                    <div class="skeleton skeleton-card"></div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cards">
+                @foreach (var p in _featured)
+                {
+                    <ProductCard Product="p" @key="p.Id" />
+                }
+            </div>
+        }
+    </section>
+
+    @* ── CAM KẾT ─────────────────────────────────────────────────────────── *@
+    <section class="section">
+        <div class="grid grid-3">
+            <div class="card">
+                <CalcIcon Size="24" />
+                <h3 class="card-title">Định lượng chuẩn</h3>
+                <p class="small muted">
+                    Mỗi món có công thức cân đong cụ thể. Ly hôm nay giống ly hôm qua.
+                </p>
+            </div>
+            <div class="card">
+                <ClockIcon Size="24" />
+                <h3 class="card-title">Nguyên liệu tươi</h3>
+                <p class="small muted">
+                    Hệ thống theo dõi hạn dùng từng lô hàng. Không dùng nguyên liệu quá hạn.
+                </p>
+            </div>
+            <div class="card">
+                <CupIcon Size="24" />
+                <h3 class="card-title">Biết trước còn hay hết</h3>
+                <p class="small muted">
+                    Thực đơn hiện đúng món còn làm được, không để bạn đặt rồi mới báo hết.
+                </p>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private List<ProductCardDto> _featured = new();
+    private List<ProductCardDto> _promoProducts = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var res = await Api.GetMenuAsync();
+
+        if (res.Success && res.Data is not null)
+        {
+            var all = res.Data.Products.Where(p => p.IsAvailable).ToList();
+
+            _featured = all.Where(p => p.Tags.Contains("best-seller")).Take(8).ToList();
+
+            // Quán mới chưa gắn nhãn bán chạy thì lấy tạm 8 món đầu
+            if (_featured.Count == 0) _featured = all.Take(8).ToList();
+
+            // Món đang giảm giá — thường do kế hoạch AI đề xuất xả hàng cận hạn
+            _promoProducts = all
+                .Where(p => p.DiscountPercent > 0)
+                .OrderByDescending(p => p.DiscountPercent)
+                .ToList();
+        }
+
+        _loading = false;
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Qly Coffee",
+  "short_name": "Qly Coffee",
+  "description": "Cà phê pha phin, trà trái cây và đá xay",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F1F4F4",
+  "theme_color": "#0A6E63",
+  "lang": "vi",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

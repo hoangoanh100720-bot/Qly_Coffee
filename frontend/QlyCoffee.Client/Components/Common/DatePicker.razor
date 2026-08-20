@@ -1,0 +1,51 @@
+@*
+    =============================================================================
+    DATE PICKER — Chọn ngày kinh doanh cho trang kế hoạch
+    =============================================================================
+    Dùng <input type="date"> gốc của trình duyệt thay vì thư viện lịch riêng:
+    nhẹ hơn, hoạt động sẵn với bàn phím, và trên di động hiện lịch gốc của hệ
+    điều hành mà người dùng đã quen.
+    =============================================================================
+*@
+
+<div class="date-picker">
+    <button class="btn btn-ghost btn-icon" @onclick="() => Shift(-1)"
+            aria-label="Ngày trước">‹</button>
+
+    <input type="date" class="input date-input"
+           value="@Value"
+           max="@DateTime.Today.ToString("yyyy-MM-dd")"
+           @onchange="OnDateChanged"
+           aria-label="Chọn ngày kinh doanh" />
+
+    <button class="btn btn-ghost btn-icon" @onclick="() => Shift(1)"
+            disabled="@IsToday"
+            aria-label="Ngày sau">›</button>
+</div>
+
+@code {
+    /// <summary>Ngày đang chọn, dạng yyyy-MM-dd.</summary>
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+
+    [Parameter] public EventCallback<string> OnChanged { get; set; }
+
+    private bool IsToday => Value == DateTime.Today.ToString("yyyy-MM-dd");
+
+    private async Task OnDateChanged(ChangeEventArgs e)
+    {
+        var newValue = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(newValue))
+            await OnChanged.InvokeAsync(newValue);
+    }
+
+    private async Task Shift(int days)
+    {
+        if (!DateTime.TryParse(Value, out var d)) return;
+
+        var next = d.AddDays(days);
+        // Không cho xem kế hoạch của tương lai — chưa có dữ liệu
+        if (next > DateTime.Today) return;
+
+        await OnChanged.InvokeAsync(next.ToString("yyyy-MM-dd"));
+    }
+}

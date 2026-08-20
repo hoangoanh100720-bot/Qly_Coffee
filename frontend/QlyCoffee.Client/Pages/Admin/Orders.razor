@@ -1,0 +1,507 @@
+@*
+    =============================================================================
+    TRANG XỬ LÝ ĐƠN HÀNG
+    =============================================================================
+
+    Đây là màn hình nhân viên mở suốt ca. Ba nguyên tắc thiết kế:
+
+    1. ĐƠN CHỜ XÁC NHẬN LÊN ĐẦU
+       Mặc định lọc theo trạng thái "Chờ xác nhận" vì đó là việc cần làm ngay.
+
+    2. NÚT XÁC NHẬN PHẢI CẢNH BÁO RÕ
+       Bấm "Xác nhận" là TRỪ KHO thật. Nút ghi rõ điều đó, và nếu thiếu nguyên
+       liệu thì báo đúng tên nguyên liệu nào thiếu, thiếu bao nhiêu.
+
+    3. TỰ LÀM MỚI MỖI 15 GIÂY
+       Khách đặt online liên tục nên danh sách phải tự cập nhật, nhân viên
+       không phải nhớ bấm nút làm mới.
+    =============================================================================
+*@
+@page "/admin/don-hang"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+@implements IDisposable
+
+<PageTitle>Đơn hàng — Qly Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    @* ── HÀNG TIÊU ĐỀ ────────────────────────────────────────────────────── *@
+    <div class="row row-between row-wrap" style="gap: var(--space-4);">
+        <div class="stack stack-1">
+            <h2>Đơn hàng</h2>
+            <span class="xs muted">
+                Xác nhận đơn là lúc hệ thống trừ nguyên liệu khỏi kho
+            </span>
+        </div>
+
+        <div class="row row-2">
+            <label class="row row-2 xs muted" style="cursor: pointer;">
+                <input type="checkbox" checked="@_autoRefresh"
+                       @onchange="ToggleAutoRefresh"
+                       style="accent-color: var(--accent);" />
+                Tự làm mới
+            </label>
+            <button class="btn btn-secondary btn-sm" @onclick="LoadAsync" disabled="@_loading">
+                <RefreshIcon Size="14" /> Làm mới
+            </button>
+        </div>
+    </div>
+
+    @* ── LỌC THEO TRẠNG THÁI ─────────────────────────────────────────────── *@
+    <div class="filter-bar" role="group" aria-label="Lọc theo trạng thái">
+        @foreach (var f in StatusFilters)
+        {
+            <button class="chip @(_activeStatus == f.Value ? "is-active" : "")"
+                    @onclick="() => SetStatus(f.Value)"
+                    aria-pressed="@(_activeStatus == f.Value)">
+                @if (f.Color is not null)
+                {
+                    <span class="swatch" style="--swatch-color: @f.Color"></span>
+                }
+                @f.Label
+                <span class="xs muted num">@CountFor(f.Value)</span>
+            </button>
+        }
+    </div>
+
+    @* ── DANH SÁCH ĐƠN ───────────────────────────────────────────────────── *@
+    @if (_loading && _orders.Count == 0)
+    {
+        <div class="stack stack-3" aria-busy="true">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="skeleton" style="height: 130px; border-radius: var(--radius-lg);"></div>
+            }
+        </div>
+    }
+    else if (_filtered.Count == 0)
+    {
+        <div class="empty">
+            <ReceiptIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">
+                @(_activeStatus is null ? "Chưa có đơn nào hôm nay" : "Không có đơn nào ở trạng thái này")
+            </span>
+            <span class="empty-text">
+                Đơn khách đặt từ trang bán hàng sẽ hiện ở đây ngay lập tức.
+            </span>
+        </div>
+    }
+    else
+    {
+        <p class="sr-only" aria-live="polite">Hiển thị @_filtered.Count đơn hàng.</p>
+
+        <div class="stack stack-3">
+            @foreach (var order in _filtered)
+            {
+                <article class="order-card @StatusBorderClass(order.Status)" @key="order.Id">
+
+                    @* ── Đầu thẻ: mã đơn, khách, trạng thái ───────────────── *@
+                    <header class="order-card-head">
+                        <div class="stack stack-1">
+                            <div class="row row-2 row-wrap">
+                                <span class="mono" style="font-weight: 700;">@order.Code</span>
+                                <span class="badge @StatusBadgeClass(order.Status)">@order.StatusLabel</span>
+                                <span class="badge badge-neutral">
+                                    @(order.OrderType == 0 ? "Tại quán" : "Mang đi")
+                                </span>
+                                @if (order.PaymentStatus == 1)
+                                {
+                                    <span class="badge badge-ok">Đã thanh toán</span>
+                                }
+                            </div>
+
+                            <span class="xs muted">
+                                @order.CustomerName · <span class="num">@order.CustomerPhone</span>
+                                · @RelativeTime(order.PlacedAt)
+                            </span>
+                        </div>
+
+                        <div class="stack stack-1" style="align-items: flex-end;">
+                            <span class="price num" style="font-size: var(--text-lg);">
+                                @Money.Format(order.GrandTotal)
+                            </span>
+                            @* Lãi gộp chỉ hiện cho quản lý — nhân viên không cần biết giá vốn *@
+                            <AuthorizeView Roles="Manager,Owner" Context="auth">
+                                @if (order.CostTotal > 0)
+                                {
+                                    <span class="xs muted num">
+                                        lãi @Money.Format(order.GrandTotal - order.CostTotal)
+                                    </span>
+                                }
+                            </AuthorizeView>
+                        </div>
+                    </header>
+
+                    @* ── Danh sách món ────────────────────────────────────── *@
+                    <div class="order-items">
+                        @foreach (var item in order.Items)
+                        {
+                            <div class="order-item-row">
+                                <DrinkGlass DrinkColor="@item.ColorPrimaryHex"
+                                            FoamColor="@item.ColorAccentHex"
+                                            Size="32" AriaLabel="" />
+                                <span class="num" style="font-weight: 700; min-width: 24px;">
+                                    @item.Quantity×
+                                </span>
+                                <div class="stack stack-1 grow" style="min-width: 0;">
+                                    <span class="small" style="font-weight: 600;">@item.ProductName</span>
+                                    @if (!string.IsNullOrEmpty(item.VariantName) || !string.IsNullOrEmpty(item.Note))
+                                    {
+                                        <span class="xs muted truncate">
+                                            @item.VariantName
+                                            @if (!string.IsNullOrEmpty(item.Note))
+                                            {
+                                                <span style="color: var(--accent);"> · @item.Note</span>
+                                            }
+                                        </span>
+                                    }
+                                </div>
+                                <span class="small num muted">@Money.Format(item.LineTotal)</span>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(order.Note))
+                    {
+                        <div class="order-note">
+                            <span class="label">Ghi chú</span>
+                            <span class="small">@order.Note</span>
+                        </div>
+                    }
+
+                    @* ── Hành động theo trạng thái ────────────────────────── *@
+                    <footer class="order-actions">
+                        @switch (order.Status)
+                        {
+                            case 0: // Chờ xác nhận
+                                <button class="btn btn-primary btn-sm"
+                                        disabled="@(_busyOrderId == order.Id)"
+                                        @onclick="() => ConfirmAsync(order)">
+                                    @if (_busyOrderId == order.Id)
+                                    {
+                                        <SpinnerIcon Size="14" />
+                                    }
+                                    else
+                                    {
+                                        <CheckIcon Size="14" />
+                                    }
+                                    Xác nhận &amp; trừ kho
+                                </button>
+                                <button class="btn btn-ghost btn-sm"
+                                        @onclick="() => OpenCancel(order)">Hủy đơn</button>
+                                break;
+
+                            case 1: // Đã xác nhận
+                                <button class="btn btn-primary btn-sm"
+                                        disabled="@(_busyOrderId == order.Id)"
+                                        @onclick="() => UpdateAsync(order, 2)">
+                                    Bắt đầu pha
+                                </button>
+                                <button class="btn btn-secondary btn-sm"
+                                        @onclick="() => UpdateAsync(order, 3)">
+                                    Đã xong
+                                </button>
+                                <button class="btn btn-ghost btn-sm"
+                                        @onclick="() => OpenCancel(order)">Hủy</button>
+                                break;
+
+                            case 2: // Đang pha
+                                <button class="btn btn-primary btn-sm"
+                                        disabled="@(_busyOrderId == order.Id)"
+                                        @onclick="() => UpdateAsync(order, 3)">
+                                    <CheckIcon Size="14" /> Món đã xong
+                                </button>
+                                break;
+
+                            case 3: // Đã xong, chờ giao
+                                <button class="btn btn-primary btn-sm"
+                                        disabled="@(_busyOrderId == order.Id)"
+                                        @onclick="() => UpdateAsync(order, 4)">
+                                    Đã giao cho khách
+                                </button>
+                                break;
+
+                            case 4: // Hoàn tất
+                                <span class="xs muted">
+                                    Hoàn tất lúc @order.CompletedAt?.ToLocalTime().ToString("HH:mm")
+                                </span>
+                                break;
+
+                            case 5: // Đã hủy
+                                <span class="xs text-danger">Đã hủy</span>
+                                break;
+                        }
+                    </footer>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@* ── HỘP THOẠI HỦY ĐƠN ───────────────────────────────────────────────────── *@
+@if (_cancelTarget is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseCancel" aria-hidden="true"></div>
+
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cancel-title">
+        <h3 id="cancel-title">Hủy đơn @_cancelTarget.Code</h3>
+
+        @if (_cancelTarget.Status >= 1)
+        {
+            <div class="alert alert-warn">
+                <WarnIcon Size="18" />
+                <span class="small">
+                    Đơn này đã trừ kho. Hủy sẽ tự động hoàn nguyên liệu về đúng những lô đã trừ.
+                </span>
+            </div>
+        }
+
+        <div class="field">
+            <label class="field-label" for="cancel-reason">
+                Lý do hủy <span class="req" aria-hidden="true">*</span>
+            </label>
+            <input id="cancel-reason" type="text" class="input" maxlength="200"
+                   placeholder="VD: khách đổi ý, hết nguyên liệu, gọi nhầm món"
+                   @bind="_cancelReason" @bind:event="oninput" />
+            <span class="field-hint">
+                Lý do được lưu vĩnh viễn để phân tích nguyên nhân mất đơn.
+            </span>
+        </div>
+
+        <div class="row row-2" style="justify-content: flex-end;">
+            <button class="btn btn-ghost" @onclick="CloseCancel">Quay lại</button>
+            <button class="btn btn-danger"
+                    disabled="@(string.IsNullOrWhiteSpace(_cancelReason) || _busyOrderId is not null)"
+                    @onclick="ConfirmCancelAsync">
+                Xác nhận hủy
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<OrderDto> _orders = new();
+    private List<OrderDto> _filtered = new();
+    private bool _loading = true;
+    private int? _activeStatus = 0;      // mặc định lọc "Chờ xác nhận"
+    private Guid? _busyOrderId;
+    private bool _autoRefresh = true;
+    private Timer? _timer;
+
+    private OrderDto? _cancelTarget;
+    private string _cancelReason = "";
+
+    private record StatusFilter(int? Value, string Label, string? Color);
+
+    private static readonly StatusFilter[] StatusFilters =
+    {
+        new(0,    "Chờ xác nhận", "var(--info)"),
+        new(1,    "Đã xác nhận",  "var(--accent)"),
+        new(2,    "Đang pha",     "var(--warn)"),
+        new(3,    "Đã xong",      "var(--ok)"),
+        new(4,    "Đã giao",      null),
+        new(null, "Tất cả",       null)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        StartTimer();
+    }
+
+    public void Dispose() => _timer?.Dispose();
+
+    // ── Nạp dữ liệu ────────────────────────────────────────────────────────
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        // Nạp TẤT CẢ đơn rồi lọc phía client — số đơn một ngày của quán cà phê
+        // chỉ vài trăm, lọc ở client cho phép đổi bộ lọc tức thì không cần gọi lại API.
+        var res = await Api.GetOrdersAsync(null, 1);
+
+        if (res.Success && res.Data is not null)
+            _orders = res.Data.Items.ToList();
+
+        ApplyFilter();
+        _loading = false;
+    }
+
+    private void SetStatus(int? status)
+    {
+        _activeStatus = status;
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        _filtered = _activeStatus is null
+            ? _orders.ToList()
+            : _orders.Where(o => o.Status == _activeStatus).ToList();
+    }
+
+    private int CountFor(int? status)
+        => status is null ? _orders.Count : _orders.Count(o => o.Status == status);
+
+    // ── Tự làm mới ─────────────────────────────────────────────────────────
+
+    private void StartTimer()
+    {
+        _timer?.Dispose();
+        if (!_autoRefresh) return;
+
+        _timer = new Timer(async _ =>
+        {
+            // Không làm mới khi đang có thao tác dở hoặc đang mở hộp thoại —
+            // tránh dữ liệu nhảy dưới tay người dùng.
+            if (_busyOrderId is not null || _cancelTarget is not null) return;
+
+            var res = await Api.GetOrdersAsync(null, 1);
+            if (res.Success && res.Data is not null)
+            {
+                _orders = res.Data.Items.ToList();
+                ApplyFilter();
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
+    }
+
+    private void ToggleAutoRefresh(ChangeEventArgs e)
+    {
+        _autoRefresh = e.Value is bool b && b;
+        if (_autoRefresh) StartTimer();
+        else { _timer?.Dispose(); _timer = null; }
+    }
+
+    // ── Hành động ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Xác nhận đơn — backend sẽ trừ kho theo công thức trong một transaction.
+    /// Nếu thiếu nguyên liệu, toàn bộ được hoàn tác và ta báo đúng tên nguyên liệu thiếu.
+    /// </summary>
+    private async Task ConfirmAsync(OrderDto order)
+    {
+        _busyOrderId = order.Id;
+        var res = await Api.UpdateOrderStatusAsync(order.Id, 1);
+        _busyOrderId = null;
+
+        if (res.Success)
+        {
+            Alerts.Success($"Đã xác nhận {order.Code} và trừ nguyên liệu khỏi kho.");
+            await LoadAsync();
+        }
+        else if (res.Error?.Code == "INSUFFICIENT_STOCK")
+        {
+            // Backend trả kèm tên nguyên liệu, lượng cần và lượng còn
+            Alerts.Error(res.Error.Message);
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không xác nhận được đơn.");
+        }
+    }
+
+    private async Task UpdateAsync(OrderDto order, int status)
+    {
+        _busyOrderId = order.Id;
+        var res = await Api.UpdateOrderStatusAsync(order.Id, status);
+        _busyOrderId = null;
+
+        if (res.Success)
+        {
+            Alerts.Success($"{order.Code}: {StatusLabel(status)}");
+            await LoadAsync();
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không đổi được trạng thái.");
+        }
+    }
+
+    private void OpenCancel(OrderDto order)
+    {
+        _cancelTarget = order;
+        _cancelReason = "";
+    }
+
+    private void CloseCancel() => _cancelTarget = null;
+
+    private async Task ConfirmCancelAsync()
+    {
+        if (_cancelTarget is null || string.IsNullOrWhiteSpace(_cancelReason)) return;
+
+        var order = _cancelTarget;
+        _busyOrderId = order.Id;
+
+        var res = await Api.UpdateOrderStatusAsync(order.Id, 5, _cancelReason);
+
+        _busyOrderId = null;
+        _cancelTarget = null;
+
+        if (res.Success)
+        {
+            Alerts.Success(order.Status >= 1
+                ? $"Đã hủy {order.Code} và hoàn nguyên liệu về kho."
+                : $"Đã hủy {order.Code}.");
+            await LoadAsync();
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không hủy được đơn.");
+        }
+    }
+
+    // ── Trình bày ──────────────────────────────────────────────────────────
+
+    private static string StatusLabel(int status) => status switch
+    {
+        0 => "Chờ xác nhận",
+        1 => "Đã xác nhận",
+        2 => "Đang pha chế",
+        3 => "Đã xong",
+        4 => "Đã giao",
+        _ => "Đã hủy"
+    };
+
+    private static string StatusBadgeClass(int status) => status switch
+    {
+        0 => "badge-info",
+        1 => "badge-accent",
+        2 => "badge-warn",
+        3 => "badge-ok",
+        4 => "badge-neutral",
+        _ => "badge-danger"
+    };
+
+    /// <summary>Sọc màu bên trái thẻ — nhận ra trạng thái bằng ngoại vi mắt khi cuộn.</summary>
+    private static string StatusBorderClass(int status) => status switch
+    {
+        0 => "order-pending",
+        2 => "order-preparing",
+        3 => "order-ready",
+        5 => "order-cancelled",
+        _ => ""
+    };
+
+    /// <summary>
+    /// Thời gian tương đối. Nhân viên quan tâm "đơn này đợi bao lâu rồi"
+    /// hơn là giờ chính xác lúc đặt.
+    /// </summary>
+    private static string RelativeTime(DateTime placedAtUtc)
+    {
+        var minutes = (int)(DateTime.UtcNow - placedAtUtc).TotalMinutes;
+
+        if (minutes < 1) return "vừa xong";
+        if (minutes < 60) return $"{minutes} phút trước";
+
+        var hours = minutes / 60;
+        if (hours < 24) return $"{hours} giờ trước";
+
+        return placedAtUtc.ToLocalTime().ToString("HH:mm dd/MM");
+    }
+}

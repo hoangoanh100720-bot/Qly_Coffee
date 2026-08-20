@@ -1,0 +1,63 @@
+@*
+    =============================================================================
+    ALERT HOST — Nơi hiển thị thông báo nổi
+    =============================================================================
+    Đặt trong AdminLayout và ShopLayout. Mọi service muốn báo gì cho người dùng
+    đều gọi AlertService, không tự dựng UI riêng.
+
+    Trợ năng: dùng aria-live="polite" để trình đọc màn hình đọc thông báo khi
+    có kết quả bất đồng bộ, nhưng không cắt ngang thứ người dùng đang nghe.
+    Lỗi dùng role="alert" vì cần được đọc ngay.
+    =============================================================================
+*@
+@implements IDisposable
+@inject AlertService Alerts
+
+@if (Alerts.Alerts.Count > 0)
+{
+    <div class="alert-host" aria-live="polite">
+        @foreach (var alert in Alerts.Alerts)
+        {
+            <div class="toast toast-@LevelClass(alert.Level)"
+                 role="@(alert.Level == AlertLevel.Error ? "alert" : "status")"
+                 @key="alert.Id">
+
+                <span class="toast-icon">
+                    @switch (alert.Level)
+                    {
+                        case AlertLevel.Success: <CheckIcon Size="17" /> break;
+                        case AlertLevel.Error:   <WarnIcon Size="17" />  break;
+                        case AlertLevel.Warning: <WarnIcon Size="17" />  break;
+                        default:                 <InfoIcon Size="17" />  break;
+                    }
+                </span>
+
+                <span class="toast-message">@alert.Message</span>
+
+                <button class="toast-close"
+                        @onclick="() => Alerts.Dismiss(alert.Id)"
+                        aria-label="Đóng thông báo">
+                    ×
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Alerts.OnChange += OnAlertsChanged;
+
+    public void Dispose() => Alerts.OnChange -= OnAlertsChanged;
+
+    // AlertService bắn sự kiện từ luồng nền (do Task.Delay tự xóa thông báo)
+    // nên phải đưa về luồng giao diện bằng InvokeAsync, nếu không Blazor sẽ ném lỗi.
+    private void OnAlertsChanged() => InvokeAsync(StateHasChanged);
+
+    private static string LevelClass(AlertLevel level) => level switch
+    {
+        AlertLevel.Success => "ok",
+        AlertLevel.Error   => "danger",
+        AlertLevel.Warning => "warn",
+        _                  => "info"
+    };
+}

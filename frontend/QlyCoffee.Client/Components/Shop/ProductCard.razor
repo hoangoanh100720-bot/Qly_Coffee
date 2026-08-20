@@ -1,0 +1,150 @@
+@*
+    =============================================================================
+    PRODUCT CARD — Thẻ món trên lưới thực đơn
+    =============================================================================
+
+    Điểm thiết kế đáng chú ý:
+
+    1. NỀN THẺ PHA TỪ CHÍNH MÀU LY NƯỚC
+       Hai biến --drink và --foam được truyền qua style inline, lấy thẳng từ
+       database. CSS dùng color-mix để pha thành nền chuyển sắc. Kết quả:
+       thẻ cà phê ngả nâu, thẻ matcha ngả xanh, thẻ trà đào ngả cam —
+       lưới menu có nhịp màu thật thay vì một dãy thẻ trắng giống hệt nhau.
+
+    2. BA TRẠNG THÁI TỒN KHO ĐỀU ĐƯỢC XỬ LÝ
+       còn nhiều → bình thường
+       còn ít    → nhãn "Chỉ còn N ly" màu cảnh báo
+       hết       → làm mờ hình, chữ "Tạm hết", nút bị vô hiệu và có lý do
+
+    3. KHÔNG DÙNG MÀU ĐƠN THUẦN ĐỂ TRUYỀN TIN
+       Hết hàng vừa đổi màu, vừa có chữ, vừa vô hiệu nút — người mù màu
+       hoặc đọc màn hình vẫn nhận được thông tin.
+    =============================================================================
+*@
+
+<article class="product-card @(Product.IsAvailable ? "" : "is-unavailable")"
+         style="--drink: @Product.ColorPrimaryHex; --foam: @Product.ColorAccentHex;">
+
+    <a href="/menu/@Product.Slug" class="product-link"
+       aria-label="Xem chi tiết @Product.Name">
+
+        <div class="product-visual">
+
+            @* Nhãn góc: best-seller, món mới, đang giảm giá *@
+            <div class="product-tags">
+                @if (Product.DiscountPercent > 0)
+                {
+                    <span class="badge badge-danger">−@Product.DiscountPercent%</span>
+                }
+                @foreach (var tag in Product.Tags.Take(1))
+                {
+                    <span class="badge badge-neutral">@TagLabel(tag)</span>
+                }
+            </div>
+
+            @* Ảnh chụp thật nếu có; chưa có thì dựng ly nước bằng SVG từ màu trong DB *@
+            @if (!string.IsNullOrEmpty(Product.ImageUrl))
+            {
+                <img src="@Media.Resolve(Product.ImageUrl)" alt="@Product.Name" loading="lazy"
+                     width="320" height="240" />
+            }
+            else
+            {
+                <DrinkGlass DrinkColor="@Product.ColorPrimaryHex"
+                            FoamColor="@Product.ColorAccentHex"
+                            Style="@GuessGlassStyle()"
+                            Size="118"
+                            AriaLabel="@($"Minh họa {Product.Name}")" />
+            }
+
+            @if (!Product.IsAvailable)
+            {
+                <span class="unavailable-tag">Tạm hết</span>
+            }
+        </div>
+    </a>
+
+    <div class="product-body">
+        <h3 class="product-name">
+            <a href="/menu/@Product.Slug" class="plain-link">@Product.Name</a>
+        </h3>
+
+        @if (!string.IsNullOrEmpty(Product.Description))
+        {
+            <p class="product-desc">@Product.Description</p>
+        }
+
+        @* Cảnh báo tồn kho — chỉ hiện khi thực sự sắp hết, không làm nhiễu lúc bình thường *@
+        @if (Product.IsAvailable && Product.MaxServings <= LowStockThreshold)
+        {
+            <span class="low-stock">
+                <WarnIcon Size="13" />
+                Chỉ còn @Product.MaxServings ly
+            </span>
+        }
+        else if (!Product.IsAvailable && !string.IsNullOrEmpty(Product.UnavailableReason))
+        {
+            @* Lý do hết hàng chỉ hiện cho nhân viên, khách không cần biết thiếu nguyên liệu gì *@
+            <AuthorizeView Roles="Staff,Manager,Owner">
+                <span class="xs muted">@Product.UnavailableReason</span>
+            </AuthorizeView>
+        }
+
+        <div class="product-footer">
+            <div class="row row-2">
+                @if (Product.DiscountPercent > 0)
+                {
+                    <span class="price price-sale">@Money.Format(Product.EffectivePrice)</span>
+                    <span class="xs price-old">@Money.Format(Product.BasePrice)</span>
+                }
+                else
+                {
+                    <span class="price">@Money.Format(Product.BasePrice)</span>
+                }
+            </div>
+
+            @if (Product.IsAvailable)
+            {
+                <a href="/menu/@Product.Slug" class="btn btn-primary btn-sm">
+                    Chọn
+                </a>
+            }
+            else
+            {
+                <button class="btn btn-secondary btn-sm" disabled
+                        title="@(Product.UnavailableReason ?? "Món này tạm hết nguyên liệu")">
+                    Tạm hết
+                </button>
+            }
+        </div>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public ProductCardDto Product { get; set; } = default!;
+
+    /// <summary>Dưới mức này thì hiện cảnh báo "chỉ còn N ly".</summary>
+    private const int LowStockThreshold = 5;
+
+    /// <summary>
+    /// Đoán kiểu ly từ tên danh mục để hình minh họa hợp với món.
+    /// Khi quán đã upload ảnh thật thì phần này không còn được dùng tới.
+    /// </summary>
+    private DrinkGlass.GlassStyle GuessGlassStyle()
+    {
+        var c = Product.CategoryName.ToLowerInvariant();
+        if (c.Contains("trà sữa")) return DrinkGlass.GlassStyle.Boba;
+        if (c.Contains("đá xay") || c.Contains("sinh tố")) return DrinkGlass.GlassStyle.Blended;
+        if (Product.Name.Contains("nóng", StringComparison.OrdinalIgnoreCase))
+            return DrinkGlass.GlassStyle.HotCup;
+        return DrinkGlass.GlassStyle.IcedTall;
+    }
+
+    private static string TagLabel(string tag) => tag switch
+    {
+        "best-seller" => "Bán chạy",
+        "new" or "mới" => "Mới",
+        "signature" => "Đặc trưng",
+        _ => tag
+    };
+}

@@ -1,0 +1,315 @@
+@*
+    =============================================================================
+    SUGGESTION CARD — Thẻ đề xuất trong bản kế hoạch AI
+    =============================================================================
+
+    Bố cục của thẻ phản ánh đúng ranh giới trách nhiệm giữa hệ thống và AI:
+
+      ┌─ Sọc màu ưu tiên (khẩn cấp / cao / trung bình)
+      │
+      ├─ Tiêu đề + huy hiệu loại đề xuất        ← AI viết tiêu đề
+      ├─ Đoạn lý do                              ← AI viết
+      ├─ BẢNG PHÂN TÍCH LÃI LỖ                   ← HỆ THỐNG tính  ⭐
+      ├─ Nội dung banner đề xuất                 ← AI viết
+      └─ Ba nút quyết định                       ← con người quyết
+
+    Bảng lãi lỗ luôn hiện đủ ba dòng cộng trừ rồi mới tới dòng tổng, để người
+    quản lý thấy được vì sao con số cuối cùng lại như vậy — đặc biệt là dòng
+    "lãi mất trên phần vốn đã bán được", thứ mà người ta hay quên khi giảm giá.
+    =============================================================================
+*@
+@inject ApiClient Api
+@inject AlertService Alerts
+
+<article class="suggestion @PriorityClass @(IsDecided ? "is-decided" : "")"
+         style="--accent-tint: @(Suggestion.ProductColorHex ?? "var(--accent)")">
+
+    @* ── ĐẦU THẺ ─────────────────────────────────────────────────────────── *@
+    <header class="suggestion-head">
+        <div class="stack stack-2 grow">
+            <div class="row row-2 row-wrap">
+                <span class="badge @PriorityBadgeClass">@Suggestion.PriorityLabel</span>
+                <span class="badge badge-neutral">@Suggestion.TypeLabel</span>
+
+                @if (Suggestion.DaysUntilExpiry is int d)
+                {
+                    <span class="badge @(d <= 2 ? "badge-danger" : "badge-warn")">
+                        <ClockIcon Size="11" /> còn @d ngày
+                    </span>
+                }
+            </div>
+
+            <h4 class="suggestion-title">@Suggestion.Title</h4>
+        </div>
+
+        @if (IsDecided)
+        {
+            <span class="badge @DecisionBadgeClass">@DecisionLabel</span>
+        }
+    </header>
+
+    @* ── LÝ DO (AI viết) ─────────────────────────────────────────────────── *@
+    <p class="suggestion-reason">@Suggestion.Reasoning</p>
+
+    @* ── PHÂN TÍCH LÃI LỖ (hệ thống tính) ────────────────────────────────── *@
+    @if (Suggestion.ExpectedNetBenefit is not null)
+    {
+        <div class="pl-table" role="table" aria-label="Phân tích lãi lỗ">
+
+            <div class="pl-caption">
+                <CalcIcon Size="13" />
+                <span>Hệ thống tính — không phải AI ước lượng</span>
+            </div>
+
+            @if (Suggestion.ExpectedWasteAvoided is int saved)
+            {
+                <div class="pl-row" role="row">
+                    <span class="pl-label">Nguyên liệu cứu được</span>
+                    <span class="pl-value pl-positive num">+@Money.Format(saved)</span>
+                </div>
+            }
+
+            @if (MarginGivenUp is int lost)
+            {
+                <div class="pl-row" role="row">
+                    <span class="pl-label">
+                        Lãi mất trên phần vốn đã bán được
+                        <InfoTip Text="Số ly vốn dĩ vẫn bán được với giá gốc, nay bán rẻ hơn. Đây là chi phí thật của việc giảm giá." />
+                    </span>
+                    <span class="pl-value pl-negative num">−@Money.Format(lost)</span>
+                </div>
+            }
+
+            @if (ExtraMargin is int extra)
+            {
+                <div class="pl-row" role="row">
+                    <span class="pl-label">Lãi thêm từ ly bán thêm</span>
+                    <span class="pl-value pl-positive num">+@Money.Format(extra)</span>
+                </div>
+            }
+
+            <div class="pl-row pl-total" role="row">
+                <span class="pl-label">Lợi ích ròng</span>
+                <span class="pl-value num @(Suggestion.ExpectedNetBenefit > 0 ? "pl-positive" : "pl-negative")">
+                    @(Suggestion.ExpectedNetBenefit > 0 ? "+" : "")@Money.Format(Suggestion.ExpectedNetBenefit.Value)
+                </span>
+            </div>
+        </div>
+
+        @* Chỉ số phụ trợ *@
+        <div class="suggestion-metrics">
+            @if (Suggestion.DiscountPercent is int pct)
+            {
+                <div class="metric">
+                    <span class="metric-label">Mức giảm</span>
+                    <span class="metric-value num">@pct%</span>
+                </div>
+            }
+            @if (Suggestion.TargetUnits is int target)
+            {
+                <div class="metric">
+                    <span class="metric-label">Cần bán thêm</span>
+                    <span class="metric-value num">@target ly</span>
+                </div>
+            }
+            @if (Suggestion.QuantityAtRisk is double qty)
+            {
+                <div class="metric">
+                    <span class="metric-label">Lượng nguy cơ</span>
+                    <span class="metric-value num">@qty.ToString("0.##")</span>
+                </div>
+            }
+            @if (Suggestion.SuggestedFrom is not null && Suggestion.SuggestedTo is not null)
+            {
+                <div class="metric">
+                    <span class="metric-label">Áp dụng</span>
+                    <span class="metric-value">
+                        @Suggestion.SuggestedFrom.Value.ToString("dd/MM") –
+                        @Suggestion.SuggestedTo.Value.ToString("dd/MM")
+                    </span>
+                </div>
+            }
+        </div>
+    }
+
+    @* ── NỘI DUNG BANNER (AI viết) ───────────────────────────────────────── *@
+    @if (!string.IsNullOrEmpty(Suggestion.BannerCopy))
+    {
+        <div class="banner-preview" style="--drink: @(Suggestion.ProductColorHex ?? "var(--accent)")">
+            <span class="label">Banner hiển thị cho khách</span>
+            <span class="banner-text">@Suggestion.BannerCopy</span>
+        </div>
+    }
+
+    @* ── HÀNH ĐỘNG ───────────────────────────────────────────────────────── *@
+    @if (!IsDecided)
+    {
+        @if (_editing)
+        {
+            <div class="suggestion-edit">
+                <div class="row row-4 row-wrap">
+                    <div class="field" style="max-width: 140px;">
+                        <label class="field-label" for="@($"pct-{Suggestion.Id}")">Mức giảm</label>
+                        <div class="input-group">
+                            <input id="@($"pct-{Suggestion.Id}")" type="number" class="input input-num"
+                                   min="5" max="50" step="5" @bind="_overrideDiscount" />
+                            <span class="input-suffix">%</span>
+                        </div>
+                    </div>
+
+                    <div class="field" style="max-width: 180px;">
+                        <label class="field-label" for="@($"end-{Suggestion.Id}")">Kết thúc</label>
+                        <input id="@($"end-{Suggestion.Id}")" type="date" class="input"
+                               @bind="_overrideEnd" />
+                    </div>
+
+                    <div class="field grow">
+                        <label class="field-label" for="@($"note-{Suggestion.Id}")">Ghi chú</label>
+                        <input id="@($"note-{Suggestion.Id}")" type="text" class="input"
+                               placeholder="VD: giảm 15% thôi, 20% lỗ quá"
+                               @bind="_note" />
+                    </div>
+                </div>
+
+                <div class="row row-2">
+                    <button class="btn btn-primary btn-sm" @onclick="() => DecideAsync(2)" disabled="@_busy">
+                        Lưu &amp; tạo khuyến mãi
+                    </button>
+                    <button class="btn btn-ghost btn-sm" @onclick="() => _editing = false" disabled="@_busy">
+                        Hủy
+                    </button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="suggestion-actions">
+                <button class="btn btn-primary btn-sm" @onclick="() => DecideAsync(0)" disabled="@_busy">
+                    @if (_busy && _pendingAction == 0)
+                    {
+                        <SpinnerIcon Size="14" />
+                    }
+                    else
+                    {
+                        <CheckIcon Size="14" />
+                    }
+                    Duyệt &amp; tạo khuyến mãi
+                </button>
+
+                <button class="btn btn-secondary btn-sm" @onclick="StartEdit" disabled="@_busy">
+                    <EditIcon Size="14" /> Sửa
+                </button>
+
+                <button class="btn btn-ghost btn-sm" @onclick="() => DecideAsync(1)" disabled="@_busy">
+                    Bỏ qua
+                </button>
+            </div>
+        }
+    }
+    else if (!string.IsNullOrEmpty(Suggestion.DecisionNote))
+    {
+        <p class="xs muted">Ghi chú: @Suggestion.DecisionNote</p>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public PlanSuggestionDto Suggestion { get; set; } = default!;
+
+    /// <summary>Gọi lại sau khi quyết định để trang cha nạp lại dữ liệu.</summary>
+    [Parameter] public EventCallback OnDecided { get; set; }
+
+    private bool _busy;
+    private bool _editing;
+    private int? _pendingAction;
+    private int _overrideDiscount;
+    private DateTime? _overrideEnd;
+    private string? _note;
+
+    private bool IsDecided => Suggestion.DecisionAction is not null;
+
+    // ── Lãi lỗ: tách ngược từ hai số backend đã trả về ──────────────────────
+    // NetBenefit = WasteAvoided + ExtraMargin − MarginGivenUp
+    // Backend chỉ trả NetBenefit và WasteAvoided, nên hai dòng còn lại được
+    // suy ra để hiển thị. Nếu sau này backend trả đủ bốn số thì bỏ phần này đi.
+    private int? MarginGivenUp { get; set; }
+    private int? ExtraMargin { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _overrideDiscount = Suggestion.DiscountPercent ?? 15;
+        _overrideEnd = Suggestion.SuggestedTo ?? DateTime.Today.AddDays(2);
+    }
+
+    private void StartEdit() => _editing = true;
+
+    private async Task DecideAsync(int action)
+    {
+        _busy = true;
+        _pendingAction = action;
+
+        var req = new DecideSuggestionRequest
+        {
+            SuggestionId = Suggestion.Id,
+            Action = action,
+            Note = _note
+        };
+
+        if (action == 2)
+        {
+            req.OverrideDiscountPercent = _overrideDiscount;
+            req.OverrideStartsAt = DateTime.Today;
+            req.OverrideEndsAt = _overrideEnd;
+        }
+
+        var res = await Api.DecideSuggestionAsync(req);
+
+        _busy = false;
+        _pendingAction = null;
+        _editing = false;
+
+        if (res.Success)
+        {
+            Alerts.Success(action switch
+            {
+                1 => "Đã bỏ qua đề xuất.",
+                _ => "Đã tạo chương trình khuyến mãi và bật cho trang bán hàng."
+            });
+            await OnDecided.InvokeAsync();
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không lưu được quyết định.");
+        }
+    }
+
+    // ── Lớp CSS theo mức ưu tiên ────────────────────────────────────────────
+    private string PriorityClass => Suggestion.Priority switch
+    {
+        3 => "priority-critical",
+        2 => "priority-high",
+        1 => "priority-medium",
+        _ => "priority-low"
+    };
+
+    private string PriorityBadgeClass => Suggestion.Priority switch
+    {
+        3 => "badge-danger",
+        2 => "badge-warn",
+        1 => "badge-accent",
+        _ => "badge-neutral"
+    };
+
+    private string DecisionLabel => Suggestion.DecisionAction switch
+    {
+        0 => "Đã duyệt",
+        1 => "Đã bỏ qua",
+        2 => "Đã duyệt có sửa",
+        _ => ""
+    };
+
+    private string DecisionBadgeClass => Suggestion.DecisionAction switch
+    {
+        1 => "badge-neutral",
+        _ => "badge-ok"
+    };
+}

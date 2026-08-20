@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Toàn bộ LOGIC NGHIỆP VỤ nằm ở đây: trừ kho FEFO, phân rã công thức,
+       phân tích rủi ro hết hạn, sinh phương án khuyến mãi.
+       Controller chỉ được phép gọi vào đây, không tự viết logic. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QlyCoffee.Domain\QlyCoffee.Domain.csproj" />
+    <ProjectReference Include="..\QlyCoffee.Infrastructure\QlyCoffee.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\shared\QlyCoffee.Shared\QlyCoffee.Shared.csproj" />
+  </ItemGroup>
+</Project>

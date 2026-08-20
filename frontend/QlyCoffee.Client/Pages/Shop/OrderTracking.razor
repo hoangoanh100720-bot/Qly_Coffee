@@ -1,0 +1,278 @@
+@*
+    =============================================================================
+    TRA CỨU ĐƠN HÀNG
+    =============================================================================
+    Không cần đăng nhập — khách tra bằng mã đơn in trên biên lai.
+    Đơn chưa xong thì trang tự làm mới mỗi 20 giây để thấy trạng thái đổi
+    mà không phải bấm gì.
+    =============================================================================
+*@
+@page "/tra-cuu-don"
+@page "/don-hang/{Code}"
+@layout ShopLayout
+@inject ApiClient Api
+@implements IDisposable
+
+<PageTitle>Tra cứu đơn — Qly Coffee</PageTitle>
+
+<div class="container container-narrow section-sm">
+
+    <h1 style="margin-bottom: var(--space-6);">Tra cứu đơn hàng</h1>
+
+    <div class="row row-2" style="margin-bottom: var(--space-8);">
+        <div class="search-box grow">
+            <SearchIcon Size="16" />
+            <input type="search" class="input search-input"
+                   placeholder="Nhập mã đơn, ví dụ QC-260810-0042"
+                   @bind="_searchCode" @bind:event="oninput"
+                   @onkeydown="OnKeyDown"
+                   aria-label="Mã đơn hàng" />
+        </div>
+        <button class="btn btn-primary" @onclick="SearchAsync" disabled="@_loading">
+            Tra cứu
+        </button>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="stack stack-3" aria-busy="true">
+            <div class="skeleton skeleton-title"></div>
+            <div class="skeleton" style="height: 200px; border-radius: var(--radius-lg);"></div>
+        </div>
+    }
+    else if (_notFound)
+    {
+        <div class="empty">
+            <ReceiptIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">Không tìm thấy đơn này</span>
+            <span class="empty-text">
+                Kiểm tra lại mã đơn. Mã có dạng QC-YYMMDD-NNNN, in trên biên lai.
+            </span>
+        </div>
+    }
+    else if (_order is not null)
+    {
+        <div class="stack stack-6 fade-in">
+
+            @* ── TIẾN TRÌNH ĐƠN ─────────────────────────────────────────── *@
+            <section class="card">
+                <div class="row row-between row-wrap" style="gap: var(--space-3);">
+                    <div class="stack stack-1">
+                        <span class="mono small">@_order.Code</span>
+                        <span class="xs muted">
+                            Đặt lúc @_order.PlacedAt.ToLocalTime().ToString("HH:mm dd/MM/yyyy")
+                        </span>
+                    </div>
+                    <span class="badge @StatusBadgeClass(_order.Status)">@_order.StatusLabel</span>
+                </div>
+
+                @* Thanh tiến trình 4 bước.
+                   Trạng thái mã hóa bằng CẢ vị trí, hình dấu tích, VÀ chữ —
+                   không phụ thuộc riêng vào màu. *@
+                <ol class="order-steps">
+                    @foreach (var (label, step) in Steps)
+                    {
+                        var state = StepState(step);
+                        <li class="order-step order-step-@state">
+                            <span class="step-dot">
+                                @if (state == "done")
+                                {
+                                    <CheckIcon Size="12" />
+                                }
+                            </span>
+                            <span class="step-label">@label</span>
+                        </li>
+                    }
+                </ol>
+
+                @if (_order.Status == 5)
+                {
+                    <div class="alert alert-danger" role="status">
+                        <WarnIcon Size="18" />
+                        <span>Đơn này đã bị hủy.</span>
+                    </div>
+                }
+                else if (_order.Status == 3)
+                {
+                    <div class="alert alert-ok" role="status">
+                        <CheckIcon Size="18" />
+                        <span>Món đã xong, mời bạn tới quầy nhận.</span>
+                    </div>
+                }
+            </section>
+
+            @* ── CHI TIẾT MÓN ───────────────────────────────────────────── *@
+            <section class="card">
+                <h2 class="card-title">Món đã đặt</h2>
+                <div class="stack stack-3">
+                    @foreach (var item in _order.Items)
+                    {
+                        <div class="row row-3">
+                            <DrinkGlass DrinkColor="@item.ColorPrimaryHex"
+                                        FoamColor="@item.ColorAccentHex"
+                                        Size="44" AriaLabel="" />
+                            <div class="stack stack-1 grow">
+                                <span style="font-weight: 600;">
+                                    @item.ProductName
+                                    <span class="muted num">×@item.Quantity</span>
+                                </span>
+                                @if (!string.IsNullOrEmpty(item.VariantName) || item.Modifiers.Count > 0)
+                                {
+                                    <span class="xs muted">
+                                        @item.VariantName
+                                        @foreach (var m in item.Modifiers)
+                                        {
+                                            <span> · @m.Name</span>
+                                        }
+                                    </span>
+                                }
+                            </div>
+                            <span class="price num">@Money.Format(item.LineTotal)</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="card-footer">
+                    <div class="row row-between">
+                        <span style="font-weight: 700;">Tổng cộng</span>
+                        <span class="price num" style="font-size: var(--text-lg);">
+                            @Money.Format(_order.GrandTotal)
+                        </span>
+                    </div>
+                </div>
+            </section>
+
+            @* ── THÔNG TIN NHẬN ─────────────────────────────────────────── *@
+            <section class="card">
+                <h2 class="card-title">Thông tin nhận</h2>
+                <div class="stack stack-2 small">
+                    <div class="row row-between">
+                        <span class="muted">Người nhận</span>
+                        <span>@_order.CustomerName</span>
+                    </div>
+                    <div class="row row-between">
+                        <span class="muted">Điện thoại</span>
+                        <span class="num">@_order.CustomerPhone</span>
+                    </div>
+                    <div class="row row-between">
+                        <span class="muted">Hình thức</span>
+                        <span>@(_order.OrderType == 0 ? "Uống tại quán" : "Mang đi")</span>
+                    </div>
+                    <div class="row row-between">
+                        <span class="muted">Thanh toán</span>
+                        <span>@(_order.PaymentMethod == 0 ? "Tiền mặt tại quầy" : "Chuyển khoản")</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(_order.Note))
+                    {
+                        <div class="row row-between">
+                            <span class="muted">Ghi chú</span>
+                            <span>@_order.Note</span>
+                        </div>
+                    }
+                </div>
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Code { get; set; }
+
+    private OrderDto? _order;
+    private string _searchCode = "";
+    private bool _loading;
+    private bool _notFound;
+    private Timer? _refreshTimer;
+
+    /// <summary>Bốn bước hiển thị. Trạng thái 1 (đã xác nhận) gộp vào bước "đã nhận đơn".</summary>
+    private static readonly (string Label, int Step)[] Steps =
+    {
+        ("Đã nhận đơn", 0),
+        ("Đang pha",    2),
+        ("Món đã xong", 3),
+        ("Đã giao",     4)
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(Code))
+        {
+            _searchCode = Code;
+            await LoadAsync(Code);
+        }
+    }
+
+    private async Task LoadAsync(string code)
+    {
+        _loading = true;
+        _notFound = false;
+        StateHasChanged();
+
+        var res = await Api.GetOrderByCodeAsync(code.Trim().ToUpperInvariant());
+        _order = res.Success ? res.Data : null;
+        _notFound = !res.Success;
+        _loading = false;
+
+        // Đơn chưa giao xong thì bật tự làm mới
+        if (_order is not null && _order.Status >= 0 && _order.Status < 4)
+            StartAutoRefresh(code);
+        else
+            StopAutoRefresh();
+    }
+
+    private void StartAutoRefresh(string code)
+    {
+        StopAutoRefresh();
+
+        _refreshTimer = new Timer(async _ =>
+        {
+            var res = await Api.GetOrderByCodeAsync(code);
+            if (res.Success && res.Data is not null)
+            {
+                _order = res.Data;
+                // Timer chạy ở luồng nền — phải đưa về luồng giao diện
+                await InvokeAsync(StateHasChanged);
+                if (_order.Status >= 4) StopAutoRefresh();
+            }
+        }, null, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20));
+    }
+
+    private void StopAutoRefresh()
+    {
+        _refreshTimer?.Dispose();
+        _refreshTimer = null;
+    }
+
+    public void Dispose() => StopAutoRefresh();
+
+    private async Task SearchAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_searchCode))
+            await LoadAsync(_searchCode);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SearchAsync();
+    }
+
+    /// <summary>done = đã qua, active = đang ở bước này, todo = chưa tới.</summary>
+    private string StepState(int step)
+    {
+        if (_order is null || _order.Status == 5) return "todo";
+        if (_order.Status > step) return "done";
+        if (_order.Status == step) return "active";
+        // Trạng thái 1 (đã xác nhận) vẫn thuộc bước đầu tiên
+        if (step == 0 && _order.Status <= 1) return "active";
+        return "todo";
+    }
+
+    private static string StatusBadgeClass(int status) => status switch
+    {
+        0 => "badge-info",
+        1 => "badge-accent",
+        2 => "badge-warn",
+        3 or 4 => "badge-ok",
+        _ => "badge-danger"
+    };
+}

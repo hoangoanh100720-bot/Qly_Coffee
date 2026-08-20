@@ -1,0 +1,30 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Biến môi trường — KHÔNG BAO GIỜ commit khóa API và mật khẩu
+.env.local
+.env.production
+.env.*.local
+
+# Ghi chú: file .env gốc ĐƯỢC commit vì chỉ chứa giá trị mẫu cho môi trường dev.
+# Trước khi lên production phải thay JWT_SECRET, ANTHROPIC_API_KEY, DB_PASSWORD.
+
+# Cấu hình frontend sinh tự động từ .env
+frontend/QlyCoffee.Client/wwwroot/appsettings.json
+
+# Ảnh người dùng tải lên
+backend/QlyCoffee.Api/wwwroot/uploads/
+
+# Nhật ký
+logs/
+*.log
+
+# Chua mat khau that - khong bao gio commit
+.env
+
+# Ảnh món tải lên. Chạy lại scripts/ là có, không cần đưa vào lịch sử git.
+backend/QlyCoffee.Api/wwwroot/uploads/

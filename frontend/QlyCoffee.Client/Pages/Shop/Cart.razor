@@ -1,0 +1,330 @@
+@*
+    =============================================================================
+    TRANG GIỎ HÀNG & ĐẶT MÓN
+    =============================================================================
+    Gộp giỏ hàng và thông tin đặt món vào MỘT trang thay vì hai bước.
+    Đơn hàng quán cà phê chỉ có vài dòng và ba ô thông tin — tách hai trang
+    chỉ làm khách phải bấm thêm một lần mà không được lợi gì.
+
+    Khi vào trang, hệ thống đồng bộ lại tồn kho vì có thể đã đổi từ lúc khách
+    thêm món vào giỏ.
+    =============================================================================
+*@
+@page "/gio-hang"
+@page "/dat-mon"
+@layout ShopLayout
+@inject CartService CartSvc
+@inject ApiClient Api
+@inject AlertService Alerts
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Giỏ hàng — Qly Coffee</PageTitle>
+
+<div class="container container-narrow section-sm">
+
+    <h1 style="margin-bottom: var(--space-6);">Giỏ hàng</h1>
+
+    @if (CartSvc.Items.Count == 0)
+    {
+        <div class="empty">
+            <CartIcon Size="52" CssClass="empty-icon" />
+            <span class="empty-title">Giỏ hàng đang trống</span>
+            <span class="empty-text">Chọn vài món từ thực đơn để bắt đầu.</span>
+            <a href="/menu" class="btn btn-primary">Xem thực đơn</a>
+        </div>
+    }
+    else
+    {
+        <div class="stack stack-8">
+
+            @* ── DANH SÁCH MÓN ──────────────────────────────────────────── *@
+            <section class="stack stack-3">
+                @foreach (var item in CartSvc.Items)
+                {
+                    <article class="cart-line" @key="item.LineKey"
+                             style="--drink: @item.ColorPrimaryHex; --foam: @item.ColorAccentHex;">
+
+                        <div class="cart-thumb">
+                            @if (!string.IsNullOrEmpty(item.ImageUrl))
+                            {
+                                <img src="@Media.Resolve(item.ImageUrl)" alt="" width="72" height="72" />
+                            }
+                            else
+                            {
+                                <DrinkGlass DrinkColor="@item.ColorPrimaryHex"
+                                            FoamColor="@item.ColorAccentHex"
+                                            Size="56" AriaLabel="" />
+                            }
+                        </div>
+
+                        <div class="stack stack-1 grow">
+                            <span style="font-weight: 600;">@item.ProductName</span>
+
+                            <span class="xs muted">
+                                @if (!string.IsNullOrEmpty(item.VariantName))
+                                {
+                                    <span>@item.VariantName</span>
+                                }
+                                @foreach (var m in item.Modifiers)
+                                {
+                                    <span> · @m.Name</span>
+                                }
+                            </span>
+
+                            @if (!string.IsNullOrEmpty(item.Note))
+                            {
+                                <span class="xs" style="color: var(--accent);">“@item.Note”</span>
+                            }
+
+                            @* Cảnh báo khi tồn kho đã giảm từ lúc khách thêm món *@
+                            @if (item.Quantity >= item.MaxServings && item.MaxServings < 9999)
+                            {
+                                <span class="xs text-warn">Chỉ còn @item.MaxServings ly</span>
+                            }
+                        </div>
+
+                        <div class="qty-stepper qty-sm" role="group" aria-label="Số lượng @item.ProductName">
+                            <button class="qty-btn" @onclick="() => ChangeQty(item, -1)"
+                                    aria-label="Giảm">−</button>
+                            <span class="qty-value num">@item.Quantity</span>
+                            <button class="qty-btn" @onclick="() => ChangeQty(item, 1)"
+                                    disabled="@(item.Quantity >= item.MaxServings)"
+                                    aria-label="Tăng">+</button>
+                        </div>
+
+                        <div class="stack stack-1" style="align-items: flex-end; min-width: 90px;">
+                            <span class="price num">@Money.Format(item.LineTotal)</span>
+                            @if (item.OriginalUnitPrice > item.UnitPrice)
+                            {
+                                <span class="xs price-old num">
+                                    @Money.Format(item.OriginalUnitPrice * item.Quantity)
+                                </span>
+                            }
+                        </div>
+
+                        <button class="btn btn-ghost btn-icon"
+                                @onclick="() => Remove(item)"
+                                aria-label="Xóa @item.ProductName khỏi giỏ">
+                            <TrashIcon Size="16" />
+                        </button>
+                    </article>
+                }
+            </section>
+
+            @* ── THÔNG TIN NGƯỜI NHẬN ───────────────────────────────────── *@
+            <section class="card">
+                <h2 class="card-title">Thông tin nhận hàng</h2>
+
+                <div class="stack stack-4">
+                    <div class="field">
+                        <label class="field-label" for="name">
+                            Tên người nhận <span class="req" aria-hidden="true">*</span>
+                        </label>
+                        <input id="name" type="text" class="input" maxlength="100"
+                               placeholder="Nguyễn Văn A"
+                               aria-invalid="@(_touched && string.IsNullOrWhiteSpace(_name))"
+                               @bind="_name" @bind:event="oninput" />
+                        @if (_touched && string.IsNullOrWhiteSpace(_name))
+                        {
+                            <span class="field-error"><WarnIcon Size="12" /> Vui lòng nhập tên.</span>
+                        }
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label" for="phone">
+                            Số điện thoại <span class="req" aria-hidden="true">*</span>
+                        </label>
+                        <input id="phone" type="tel" class="input" maxlength="15"
+                               placeholder="0901234567" inputmode="numeric"
+                               aria-invalid="@(_touched && !IsPhoneValid)"
+                               @bind="_phone" @bind:event="oninput" />
+                        <span class="field-hint">Quán gọi khi món đã sẵn sàng.</span>
+                        @if (_touched && !IsPhoneValid)
+                        {
+                            <span class="field-error">
+                                <WarnIcon Size="12" /> Số điện thoại không hợp lệ. Nhập dạng 0901234567.
+                            </span>
+                        }
+                    </div>
+
+                    <fieldset class="field">
+                        <legend class="field-label">Hình thức</legend>
+                        <div class="choice-group">
+                            <button type="button" class="choice @(_orderType == 1 ? "is-selected" : "")"
+                                    aria-pressed="@(_orderType == 1)" @onclick="() => _orderType = 1">
+                                Mang đi
+                            </button>
+                            <button type="button" class="choice @(_orderType == 0 ? "is-selected" : "")"
+                                    aria-pressed="@(_orderType == 0)" @onclick="() => _orderType = 0">
+                                Uống tại quán
+                            </button>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="field">
+                        <legend class="field-label">Thanh toán</legend>
+                        <div class="choice-group">
+                            <button type="button" class="choice @(_payment == 0 ? "is-selected" : "")"
+                                    aria-pressed="@(_payment == 0)" @onclick="() => _payment = 0">
+                                Tiền mặt tại quầy
+                            </button>
+                            <button type="button" class="choice @(_payment == 1 ? "is-selected" : "")"
+                                    aria-pressed="@(_payment == 1)" @onclick="() => _payment = 1">
+                                Chuyển khoản
+                            </button>
+                        </div>
+                    </fieldset>
+
+                    <div class="field">
+                        <label class="field-label" for="order-note">Ghi chú cho cả đơn</label>
+                        <textarea id="order-note" class="textarea" rows="2" maxlength="300"
+                                  placeholder="VD: giao lên tầng 3 giúp em"
+                                  @bind="_note"></textarea>
+                    </div>
+                </div>
+            </section>
+
+            @* ── TỔNG TIỀN & ĐẶT MÓN ────────────────────────────────────── *@
+            <section class="card summary-card">
+                <div class="pl-table" style="background: transparent; border: none; padding: 0;">
+                    <div class="pl-row">
+                        <span class="pl-label">Tạm tính (@CartSvc.TotalQuantity ly)</span>
+                        <span class="pl-value num">@Money.Format(CartSvc.Subtotal)</span>
+                    </div>
+                    @if (CartSvc.TotalSaved > 0)
+                    {
+                        <div class="pl-row">
+                            <span class="pl-label">Đã tiết kiệm nhờ khuyến mãi</span>
+                            <span class="pl-value pl-positive num">−@Money.Format(CartSvc.TotalSaved)</span>
+                        </div>
+                    }
+                    <div class="pl-row pl-total">
+                        <span class="pl-label">Tổng cộng</span>
+                        <span class="pl-value num">@Money.Format(CartSvc.Subtotal)</span>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg btn-block"
+                        disabled="@(_submitting || !IsFormValid)"
+                        @onclick="SubmitAsync">
+                    @if (_submitting)
+                    {
+                        <SpinnerIcon Size="18" /> <span>Đang gửi đơn…</span>
+                    }
+                    else
+                    {
+                        <span>Đặt món · @Money.Format(CartSvc.Subtotal)</span>
+                    }
+                </button>
+
+                @if (!IsFormValid && _touched)
+                {
+                    <span class="xs text-warn" style="text-align: center;">
+                        Vui lòng điền đầy đủ tên và số điện thoại.
+                    </span>
+                }
+
+                <a href="/menu" class="btn btn-ghost btn-block">Chọn thêm món</a>
+            </section>
+        </div>
+    }
+</div>
+
+@code {
+    private string _name = "";
+    private string _phone = "";
+    private string? _note;
+    private int _orderType = 1;   // 1 = mang đi
+    private int _payment = 0;     // 0 = tiền mặt
+
+    private bool _submitting;
+    private bool _touched;
+
+    private bool IsPhoneValid
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(_phone)) return false;
+            var digits = new string(_phone.Where(char.IsDigit).ToArray());
+            if (digits.StartsWith("84")) digits = "0" + digits[2..];
+            return digits.Length == 10 && digits[0] == '0'
+                && digits[1] is '3' or '5' or '7' or '8' or '9';
+        }
+    }
+
+    private bool IsFormValid => !string.IsNullOrWhiteSpace(_name) && IsPhoneValid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CartSvc.OnChange += StateHasChanged;
+
+        // Đồng bộ tồn kho: món có thể đã hết từ lúc khách bỏ vào giỏ
+        if (CartSvc.Items.Count > 0)
+        {
+            var ids = CartSvc.Items.Select(i => i.ProductId).Distinct();
+            var res = await Api.CheckAvailabilityAsync(ids);
+
+            if (res.Success && res.Data is not null)
+            {
+                var before = CartSvc.Items.Count;
+                await CartSvc.SyncAvailabilityAsync(res.Data);
+
+                if (CartSvc.Items.Count < before)
+                    Alerts.Warning("Một số món đã hết và được bỏ khỏi giỏ hàng.");
+            }
+        }
+    }
+
+    public void Dispose() => CartSvc.OnChange -= StateHasChanged;
+
+    private async Task ChangeQty(CartItem item, int delta)
+        => await CartSvc.SetQuantityAsync(item.LineKey, item.Quantity + delta);
+
+    private async Task Remove(CartItem item)
+    {
+        await CartSvc.RemoveAsync(item.LineKey);
+        Alerts.Info($"Đã bỏ {item.ProductName} khỏi giỏ.");
+    }
+
+    private async Task SubmitAsync()
+    {
+        _touched = true;
+        if (!IsFormValid) return;
+
+        _submitting = true;
+
+        var res = await Api.CreateOrderAsync(new CreateOrderRequest
+        {
+            CustomerName  = _name.Trim(),
+            CustomerPhone = _phone.Trim(),
+            OrderType     = _orderType,
+            PaymentMethod = _payment,
+            Note          = _note,
+            Items         = CartSvc.ToOrderItems()
+        });
+
+        _submitting = false;
+
+        if (res.Success && res.Data is not null)
+        {
+            await CartSvc.ClearAsync();
+            Alerts.Success($"Đã nhận đơn {res.Data.Code}. Quán sẽ gọi khi món xong.");
+            Nav.NavigateTo($"/don-hang/{res.Data.Code}");
+        }
+        else if (res.Error?.Code == "INSUFFICIENT_STOCK")
+        {
+            // Backend trả danh sách món thiếu — báo cụ thể thay vì thông báo chung chung
+            Alerts.Error(res.Error.Message);
+
+            var ids = CartSvc.Items.Select(i => i.ProductId).Distinct();
+            var check = await Api.CheckAvailabilityAsync(ids);
+            if (check.Success && check.Data is not null)
+                await CartSvc.SyncAvailabilityAsync(check.Data);
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không gửi được đơn. Vui lòng thử lại.");
+        }
+    }
+}

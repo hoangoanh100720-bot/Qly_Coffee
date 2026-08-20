@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>Qly Coffee — Cà phê &amp; Trà</title>
+    <meta name="description" content="Cà phê pha phin, trà trái cây và đá xay. Đặt món online, biết trước món còn hay hết." />
+
+    <!-- Màu thanh trạng thái trên trình duyệt di động — khớp với nền của giao diện.
+         Khai báo cả hai chế độ để không bị lệch màu khi người dùng đổi sáng/tối. -->
+    <meta name="theme-color" content="#F1F4F4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B1413" media="(prefers-color-scheme: dark)" />
+
+    <base href="/" />
+
+    <!-- ĐẶT SCRIPT NÀY TRƯỚC CSS ĐỂ TRÁNH NHẤP NHÁY MÀU.
+         Nếu chờ Blazor khởi động rồi mới áp dụng chủ đề thì người dùng chọn nền tối
+         sẽ thấy một chớp trắng lúc tải trang. Đoạn script đồng bộ này chạy trước khi
+         trình duyệt vẽ khung hình đầu tiên nên không bao giờ nhấp nháy. -->
+    <script>
+        window.qlyTheme = {
+            apply: function (theme) {
+                if (theme === 'light' || theme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', theme);
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+            },
+            isSystemDark: function () {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches;
+            }
+        };
+        try {
+            var saved = localStorage.getItem('qly-theme');
+            if (saved) window.qlyTheme.apply(saved);
+        } catch (e) { /* chế độ riêng tư chặn localStorage — dùng theo hệ thống */ }
+    </script>
+
+    <link rel="stylesheet" href="css/design-system.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="stylesheet" href="css/pages.css" />
+    <link rel="stylesheet" href="css/admin.css" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="manifest" href="manifest.json" />
+</head>
+
+<body>
+    <!-- Liên kết bỏ qua điều hướng — người dùng bàn phím nhấn Tab một lần là tới nội dung -->
+    <a href="#main-content" class="skip-link">Bỏ qua, tới nội dung chính</a>
+
+    <div id="app">
+        <!-- Màn hình chờ trong lúc tải WebAssembly.
+             Dùng khung xương thay vì vòng xoay để trang không nhảy khi nội dung thật xuất hiện. -->
+        <div class="boot-screen">
+            <div class="boot-mark">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                    <path d="M12 16h24l-3 22a4 4 0 0 1-4 3.5H19a4 4 0 0 1-4-3.5L12 16Z"
+                          stroke="#0A6E63" stroke-width="2.5" stroke-linejoin="round"/>
+                    <path d="M36 20h4a5 5 0 0 1 0 10h-3" stroke="#0A6E63" stroke-width="2.5"/>
+                    <path d="M20 10c2-3-2-5 0-8M28 10c2-3-2-5 0-8"
+                          stroke="#C8791A" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <p class="boot-text">Đang tải Qly Coffee…</p>
+        </div>
+    </div>
+
+    <!-- Thông báo lỗi cấp ứng dụng của Blazor, dịch sang tiếng Việt -->
+    <div id="blazor-error-ui">
+        <span>Đã có lỗi xảy ra. Ứng dụng có thể không hoạt động đúng cho tới khi tải lại.</span>
+        <a href="" class="reload">Tải lại</a>
+        <a class="dismiss" aria-label="Đóng thông báo">×</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <style>
+        /* Kiểu cho màn hình chờ — viết inline vì phải hiển thị được TRƯỚC khi
+           file CSS bên ngoài tải xong. */
+        .boot-screen {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 16px;
+            background: #F1F4F4;
+            font-family: system-ui, "Segoe UI", sans-serif;
+        }
+        @media (prefers-color-scheme: dark) {
+            .boot-screen { background: #0B1413; }
+            .boot-text { color: #97A8A6 !important; }
+        }
+        .boot-mark { animation: boot-pulse 1.8s ease-in-out infinite; }
+        .boot-text { font-size: 14px; color: #7A8B89; margin: 0; }
+        @keyframes boot-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: .55; transform: scale(.96); }
+        }
+        @media (prefers-reduced-motion: reduce) { .boot-mark { animation: none; } }
+
+        /* Liên kết bỏ qua — ẩn cho tới khi nhận focus bằng bàn phím */
+        .skip-link {
+            position: absolute; left: -9999px; z-index: 999;
+            padding: 12px 20px; background: #0A6E63; color: white;
+            border-radius: 0 0 8px 0; text-decoration: none; font-weight: 600;
+        }
+        .skip-link:focus { left: 0; top: 0; }
+
+        #blazor-error-ui {
+            display: none;
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+            padding: 14px 20px;
+            background: #B23A34; color: white;
+            font-family: system-ui, sans-serif; font-size: 14px;
+            box-shadow: 0 -2px 12px rgba(0,0,0,.25);
+        }
+        #blazor-error-ui a { color: white; text-decoration: underline; margin-left: 12px; cursor: pointer; }
+        #blazor-error-ui .dismiss { float: right; font-size: 20px; text-decoration: none; }
+    </style>
+</body>
+</html>

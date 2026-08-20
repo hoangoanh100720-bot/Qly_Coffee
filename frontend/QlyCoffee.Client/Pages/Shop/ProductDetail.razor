@@ -1,0 +1,419 @@
+@*
+    =============================================================================
+    TRANG CHI TIẾT MÓN — chọn size, topping, số lượng
+    =============================================================================
+    Ba điểm thiết kế:
+    1. Giá cập nhật NGAY khi chọn size hoặc topping — không bắt bấm "tính giá".
+    2. Tồn kho ràng buộc theo TỪNG SIZE (size L tốn nhiều nguyên liệu hơn nên
+       số ly còn làm được ít hơn), và số lượng bị chặn ở trần đó.
+    3. Nhóm bắt buộc chưa chọn thì nút thêm vào giỏ bị vô hiệu KÈM LÝ DO,
+       không để nút xám im lặng.
+    =============================================================================
+*@
+@page "/menu/{Slug}"
+@layout ShopLayout
+@inject ApiClient Api
+@inject CartService Cart
+@inject AlertService Alerts
+@inject NavigationManager Nav
+
+<PageTitle>@(_product?.Name ?? "Món") — Qly Coffee</PageTitle>
+
+@if (_loading)
+{
+    <div class="container section-sm">
+        <div class="product-detail">
+            <div class="skeleton" style="aspect-ratio: 1; border-radius: var(--radius-lg);"></div>
+            <div class="stack stack-4">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton" style="height: 120px;"></div>
+            </div>
+        </div>
+    </div>
+}
+else if (_product is null)
+{
+    <div class="container section">
+        <div class="empty">
+            <CupIcon Size="52" CssClass="empty-icon" />
+            <span class="empty-title">Không tìm thấy món này</span>
+            <a href="/menu" class="btn btn-primary">Xem thực đơn</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container section-sm">
+
+        <nav class="breadcrumb" aria-label="Đường dẫn">
+            <a href="/menu">Thực đơn</a>
+            <span aria-hidden="true">›</span>
+            <span>@_product.CategoryName</span>
+        </nav>
+
+        <div class="product-detail">
+
+            @* ── HÌNH MINH HỌA ──────────────────────────────────────────── *@
+            <div class="detail-visual"
+                 style="--drink: @_product.ColorPrimaryHex; --foam: @_product.ColorAccentHex;">
+                @if (!string.IsNullOrEmpty(_product.ImageUrl))
+                {
+                    <img src="@Media.Resolve(_product.ImageUrl)" alt="@_product.Name" width="520" height="520" />
+                }
+                else
+                {
+                    <DrinkGlass DrinkColor="@_product.ColorPrimaryHex"
+                                FoamColor="@_product.ColorAccentHex"
+                                Style="@GuessGlassStyle()"
+                                Size="280"
+                                AriaLabel="@($"Minh họa {_product.Name}")" />
+                }
+            </div>
+
+            @* ── THÔNG TIN & LỰA CHỌN ───────────────────────────────────── *@
+            <div class="stack stack-6">
+
+                <div class="stack stack-3">
+                    <div class="row row-2 row-wrap">
+                        @foreach (var tag in _product.Tags)
+                        {
+                            <span class="badge badge-neutral">@TagLabel(tag)</span>
+                        }
+                        @if (_product.DiscountPercent > 0)
+                        {
+                            <span class="badge badge-danger">Giảm @_product.DiscountPercent%</span>
+                        }
+                    </div>
+
+                    <h1>@_product.Name</h1>
+
+                    @if (!string.IsNullOrEmpty(_product.Description))
+                    {
+                        <p class="lead">@_product.Description</p>
+                    }
+
+                    <div class="row row-3">
+                        <span class="price" style="font-size: var(--text-xl);">
+                            @Money.Format(CurrentUnitPrice)
+                        </span>
+                        @if (_product.DiscountPercent > 0)
+                        {
+                            <span class="price-old">@Money.Format(OriginalUnitPrice)</span>
+                        }
+                    </div>
+                </div>
+
+                @* ── CẢNH BÁO TỒN KHO ───────────────────────────────────── *@
+                @if (CurrentMaxServings == 0)
+                {
+                    <div class="alert alert-danger" role="status">
+                        <WarnIcon Size="18" />
+                        <span>
+                            Món này tạm hết.
+                            @if (!string.IsNullOrEmpty(_product.UnavailableReason))
+                            {
+                                <AuthorizeView Roles="Staff,Manager,Owner">
+                                    <span class="muted">(@_product.UnavailableReason)</span>
+                                </AuthorizeView>
+                            }
+                        </span>
+                    </div>
+                }
+                else if (CurrentMaxServings <= 5)
+                {
+                    <div class="alert alert-warn" role="status">
+                        <ClockIcon Size="18" />
+                        <span>Chỉ còn <strong>@CurrentMaxServings ly</strong> với size đang chọn.</span>
+                    </div>
+                }
+
+                @* ── CHỌN SIZE ──────────────────────────────────────────── *@
+                @if (_product.Variants.Count > 1)
+                {
+                    <fieldset class="field">
+                        <legend class="field-label">Kích cỡ</legend>
+                        <div class="choice-group">
+                            @foreach (var v in _product.Variants)
+                            {
+                                <button type="button"
+                                        class="choice @(_variantId == v.Id ? "is-selected" : "")"
+                                        aria-pressed="@(_variantId == v.Id)"
+                                        disabled="@(v.MaxServings == 0)"
+                                        @onclick="() => SelectVariant(v)">
+                                    @v.Name
+                                    @if (v.PriceDelta != 0)
+                                    {
+                                        <span class="xs">@(v.PriceDelta > 0 ? "+" : "")@Money.FormatShort(v.PriceDelta)</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </fieldset>
+                }
+
+                @* ── NHÓM TÙY CHỌN ──────────────────────────────────────── *@
+                @foreach (var group in _product.ModifierGroups)
+                {
+                    <fieldset class="field">
+                        <legend class="field-label">
+                            @group.Name
+                            @if (group.IsRequired)
+                            {
+                                <span class="req" aria-hidden="true">*</span>
+                            }
+                            @if (group.MaxSelect > 1)
+                            {
+                                <span class="xs muted" style="font-weight: 400;">
+                                    (chọn tối đa @group.MaxSelect)
+                                </span>
+                            }
+                        </legend>
+
+                        <div class="choice-group">
+                            @foreach (var m in group.Modifiers)
+                            {
+                                var selected = _selectedModifiers.Contains(m.Id);
+                                <button type="button"
+                                        class="choice @(selected ? "is-selected" : "")"
+                                        aria-pressed="@selected"
+                                        @onclick="() => ToggleModifier(group, m)">
+                                    @if (m.ColorHex != "#D9B368" && m.ColorHex != "#DCEAF2")
+                                    {
+                                        <span class="swatch" style="--swatch-color: @m.ColorHex"></span>
+                                    }
+                                    @m.Name
+                                    @if (m.PriceDelta > 0)
+                                    {
+                                        <span class="xs">+@Money.FormatShort(m.PriceDelta)</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+                    </fieldset>
+                }
+
+                @* ── GHI CHÚ ───────────────────────────────────────────── *@
+                <div class="field">
+                    <label class="field-label" for="note">Ghi chú cho quán</label>
+                    <input id="note" type="text" class="input"
+                           placeholder="VD: pha loãng giúp em, ít ngọt"
+                           maxlength="200" @bind="_note" />
+                </div>
+
+                @* ── SỐ LƯỢNG & THÊM VÀO GIỎ ───────────────────────────── *@
+                <div class="add-to-cart">
+                    <div class="qty-stepper" role="group" aria-label="Số lượng">
+                        <button class="qty-btn" @onclick="() => ChangeQty(-1)"
+                                disabled="@(_quantity <= 1)" aria-label="Giảm số lượng">−</button>
+                        <span class="qty-value num" aria-live="polite">@_quantity</span>
+                        <button class="qty-btn" @onclick="() => ChangeQty(1)"
+                                disabled="@(_quantity >= CurrentMaxServings)" aria-label="Tăng số lượng">+</button>
+                    </div>
+
+                    <button class="btn btn-primary btn-lg grow"
+                            disabled="@(!CanAddToCart)"
+                            @onclick="AddToCart">
+                        <CartIcon Size="18" />
+                        Thêm vào giỏ · @Money.Format(CurrentUnitPrice * _quantity)
+                    </button>
+                </div>
+
+                @* Nút bị vô hiệu thì PHẢI nói rõ vì sao *@
+                @if (!CanAddToCart && CurrentMaxServings > 0)
+                {
+                    <span class="xs text-warn">@BlockReason</span>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Slug { get; set; } = "";
+
+    private ProductDetailDto? _product;
+    private bool _loading = true;
+
+    private Guid? _variantId;
+    private readonly HashSet<Guid> _selectedModifiers = new();
+    private int _quantity = 1;
+    private string? _note;
+
+    // ── Giá tính lại mỗi lần render, không cần gọi API ────────────────────
+
+    private int OriginalUnitPrice
+    {
+        get
+        {
+            if (_product is null) return 0;
+            var variantDelta = _product.Variants.FirstOrDefault(v => v.Id == _variantId)?.PriceDelta ?? 0;
+            var modifierTotal = _product.ModifierGroups
+                .SelectMany(g => g.Modifiers)
+                .Where(m => _selectedModifiers.Contains(m.Id))
+                .Sum(m => m.PriceDelta);
+            return _product.BasePrice + variantDelta + modifierTotal;
+        }
+    }
+
+    private int CurrentUnitPrice => _product is null || _product.DiscountPercent == 0
+        ? OriginalUnitPrice
+        : (int)Math.Round(OriginalUnitPrice * (100 - _product.DiscountPercent) / 100.0);
+
+    /// <summary>Trần số lượng theo size đang chọn — size L tốn nhiều nguyên liệu hơn.</summary>
+    private int CurrentMaxServings =>
+        _product?.Variants.FirstOrDefault(v => v.Id == _variantId)?.MaxServings
+        ?? _product?.MaxServings
+        ?? 0;
+
+    private bool CanAddToCart =>
+        _product is not null && CurrentMaxServings > 0 && AllRequiredGroupsSelected;
+
+    private bool AllRequiredGroupsSelected =>
+        _product?.ModifierGroups
+            .Where(g => g.IsRequired)
+            .All(g => g.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)))
+        ?? false;
+
+    private string BlockReason
+    {
+        get
+        {
+            var missing = _product?.ModifierGroups
+                .Where(g => g.IsRequired && !g.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)))
+                .Select(g => g.Name)
+                .ToList();
+
+            return missing is { Count: > 0 }
+                ? $"Vui lòng chọn: {string.Join(", ", missing)}"
+                : "";
+        }
+    }
+
+    // ── Nạp dữ liệu ────────────────────────────────────────────────────────
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _selectedModifiers.Clear();
+        _quantity = 1;
+
+        var res = await Api.GetProductAsync(Slug);
+        _product = res.Success ? res.Data : null;
+
+        if (_product is not null)
+        {
+            // Chọn sẵn size mặc định
+            _variantId = _product.Variants.FirstOrDefault(v => v.IsDefault)?.Id
+                      ?? _product.Variants.FirstOrDefault()?.Id;
+
+            // Chọn sẵn lựa chọn đầu tiên của mỗi nhóm bắt buộc, để khách
+            // không phải bấm thêm nếu đồng ý mặc định
+            foreach (var g in _product.ModifierGroups.Where(g => g.IsRequired))
+            {
+                var first = g.Modifiers.FirstOrDefault();
+                if (first is not null) _selectedModifiers.Add(first.Id);
+            }
+        }
+
+        _loading = false;
+    }
+
+    // ── Tương tác ──────────────────────────────────────────────────────────
+
+    private void SelectVariant(VariantDto v)
+    {
+        _variantId = v.Id;
+        // Đổi sang size ít hàng hơn thì phải hạ số lượng cho khớp
+        if (_quantity > v.MaxServings) _quantity = Math.Max(1, v.MaxServings);
+    }
+
+    private void ToggleModifier(ModifierGroupDto group, ModifierDto modifier)
+    {
+        var isSelected = _selectedModifiers.Contains(modifier.Id);
+
+        if (group.MaxSelect == 1)
+        {
+            // Nhóm chọn một: bỏ hết lựa chọn cũ trong nhóm rồi chọn cái mới
+            foreach (var m in group.Modifiers) _selectedModifiers.Remove(m.Id);
+            if (!isSelected) _selectedModifiers.Add(modifier.Id);
+            // Nhóm bắt buộc thì không cho bỏ trống
+            else if (group.IsRequired) _selectedModifiers.Add(modifier.Id);
+        }
+        else
+        {
+            if (isSelected)
+            {
+                _selectedModifiers.Remove(modifier.Id);
+            }
+            else
+            {
+                var countInGroup = group.Modifiers.Count(m => _selectedModifiers.Contains(m.Id));
+                if (countInGroup >= group.MaxSelect)
+                {
+                    Alerts.Warning($"{group.Name} chỉ được chọn tối đa {group.MaxSelect} lựa chọn.");
+                    return;
+                }
+                _selectedModifiers.Add(modifier.Id);
+            }
+        }
+    }
+
+    private void ChangeQty(int delta)
+        => _quantity = Math.Clamp(_quantity + delta, 1, Math.Max(CurrentMaxServings, 1));
+
+    private async Task AddToCart()
+    {
+        if (_product is null || !CanAddToCart) return;
+
+        var variant = _product.Variants.FirstOrDefault(v => v.Id == _variantId);
+        var modifiers = _product.ModifierGroups
+            .SelectMany(g => g.Modifiers)
+            .Where(m => _selectedModifiers.Contains(m.Id))
+            .Select(m => new CartModifier
+            {
+                ModifierId = m.Id, Name = m.Name,
+                PriceDelta = m.PriceDelta, ColorHex = m.ColorHex
+            })
+            .ToList();
+
+        await Cart.AddAsync(new CartItem
+        {
+            ProductId         = _product.Id,
+            ProductName       = _product.Name,
+            ImageUrl          = _product.ImageUrl,
+            ColorPrimaryHex   = _product.ColorPrimaryHex,
+            ColorAccentHex    = _product.ColorAccentHex,
+            VariantId         = variant?.Id,
+            VariantName       = variant?.Name,
+            Modifiers         = modifiers,
+            Quantity          = _quantity,
+            UnitPrice         = CurrentUnitPrice,
+            OriginalUnitPrice = OriginalUnitPrice,
+            Note              = _note,
+            MaxServings       = CurrentMaxServings
+        });
+
+        Alerts.Success($"Đã thêm {_quantity} {_product.Name} vào giỏ.");
+        _quantity = 1;
+        _note = null;
+    }
+
+    private DrinkGlass.GlassStyle GuessGlassStyle()
+    {
+        var c = _product!.CategoryName.ToLowerInvariant();
+        if (c.Contains("trà sữa")) return DrinkGlass.GlassStyle.Boba;
+        if (c.Contains("đá xay") || c.Contains("sinh tố")) return DrinkGlass.GlassStyle.Blended;
+        if (_product.Name.Contains("nóng", StringComparison.OrdinalIgnoreCase))
+            return DrinkGlass.GlassStyle.HotCup;
+        return DrinkGlass.GlassStyle.IcedTall;
+    }
+
+    private static string TagLabel(string tag) => tag switch
+    {
+        "best-seller" => "Bán chạy",
+        "new" or "mới" => "Mới",
+        "signature" => "Đặc trưng",
+        _ => tag
+    };
+}

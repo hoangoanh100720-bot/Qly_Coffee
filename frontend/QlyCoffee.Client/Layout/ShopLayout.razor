@@ -1,0 +1,124 @@
+@*
+    =============================================================================
+    SHOP LAYOUT — Khung trang bán hàng (khối công khai)
+    =============================================================================
+    Archetype: trang thương mại. Chữ lớn được phép, nhịp dọc rộng rãi,
+    một lời kêu gọi hành động rõ ràng mỗi màn hình.
+    =============================================================================
+*@
+@inherits LayoutComponentBase
+@inject CartService Cart
+@inject NavigationManager Nav
+@inject ThemeService Theme
+@implements IDisposable
+
+<div class="shop-root">
+
+    @* ── THANH ĐIỀU HƯỚNG ────────────────────────────────────────────────── *@
+    <header class="topnav">
+        <div class="container topnav-inner">
+
+            <a href="/" class="brand" style="padding: 0; text-decoration: none; color: inherit;">
+                <LogoMark Size="34" />
+                <div class="stack" style="gap: 0;">
+                    <span class="brand-name">Qly Coffee</span>
+                    <span class="brand-sub">Cà phê &amp; Trà</span>
+                </div>
+            </a>
+
+            <nav class="topnav-links" aria-label="Điều hướng chính">
+                <NavLink href="/" Match="NavLinkMatch.All" class="topnav-link">Trang chủ</NavLink>
+                <NavLink href="/menu" class="topnav-link">Thực đơn</NavLink>
+                <NavLink href="/tra-cuu-don" class="topnav-link">Tra cứu đơn</NavLink>
+            </nav>
+
+            <div class="row row-2">
+                @* Nút đổi sáng/tối — người dùng chọn thủ công sẽ thắng cấu hình hệ thống *@
+                <button class="btn btn-ghost btn-icon" @onclick="ToggleTheme"
+                        aria-label="Đổi giao diện sáng/tối" title="Đổi giao diện sáng/tối">
+                    <ThemeIcon Size="18" />
+                </button>
+
+                <a href="/gio-hang" class="btn btn-primary cart-btn" aria-label="Giỏ hàng">
+                    <CartIcon Size="18" />
+                    <span class="hide-sm">Giỏ hàng</span>
+                    @if (Cart.TotalQuantity > 0)
+                    {
+                        <span class="cart-count" aria-live="polite">@Cart.TotalQuantity</span>
+                    }
+                </a>
+            </div>
+        </div>
+    </header>
+
+    @* ── NỘI DUNG ────────────────────────────────────────────────────────── *@
+    <main id="main-content">
+        @Body
+    </main>
+
+    @* ── CHÂN TRANG ──────────────────────────────────────────────────────── *@
+    <footer class="shop-footer">
+        <div class="container">
+            <div class="footer-grid">
+
+                <div class="stack stack-3">
+                    <div class="row row-3">
+                        <LogoMark Size="30" />
+                        <span class="brand-name">Qly Coffee</span>
+                    </div>
+                    <p class="small muted" style="max-width: 34ch;">
+                        Cà phê pha phin, trà trái cây và đá xay — làm tươi mỗi ly,
+                        đong đếm bằng công thức chuẩn.
+                    </p>
+                </div>
+
+                <div class="stack stack-2">
+                    <span class="label">Ghé quán</span>
+                    <span class="small">@StoreAddress</span>
+                    <span class="small">
+                        Mở cửa <span class="num">@OpenTime</span> – <span class="num">@CloseTime</span> mỗi ngày
+                    </span>
+                </div>
+
+                <div class="stack stack-2">
+                    <span class="label">Liên hệ</span>
+                    <a href="tel:@StorePhone" class="small">@StorePhone</a>
+                    <a href="mailto:@StoreEmail" class="small">@StoreEmail</a>
+                </div>
+
+                <div class="stack stack-2">
+                    <span class="label">Dành cho nhân viên</span>
+                    <a href="/admin" class="small">Trang quản lý</a>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <span class="xs muted">© @DateTime.Now.Year Qly Coffee</span>
+                <span class="xs muted">Giá đã bao gồm thuế</span>
+            </div>
+        </div>
+    </footer>
+</div>
+
+@code {
+    // Thông tin quán — thực tế nạp từ API /api/store; để hằng số cho bản dựng đầu.
+    private const string StoreAddress = "123 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM";
+    private const string StorePhone   = "0901 234 567";
+    private const string StoreEmail   = "xinchao@qlycoffee.vn";
+    private const string OpenTime     = "07:00";
+    private const string CloseTime    = "22:00";
+
+    protected override void OnInitialized()
+    {
+        // Giỏ hàng thay đổi ở bất kỳ trang nào thì số trên nút giỏ phải cập nhật ngay.
+        Cart.OnChange += StateHasChanged;
+    }
+
+    public void Dispose() => Cart.OnChange -= StateHasChanged;
+
+    /// <summary>
+    /// Đổi giữa sáng và tối. Ghi thuộc tính data-theme lên thẻ gốc để CSS
+    /// ưu tiên lựa chọn thủ công hơn cấu hình hệ điều hành.
+    /// </summary>
+    private async Task ToggleTheme() => await Theme.ToggleAsync();
+}
