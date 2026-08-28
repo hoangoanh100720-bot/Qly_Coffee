@@ -2,24 +2,45 @@
    QLY COFFEE — DESIGN SYSTEM
    =============================================================================
 
-   NGUYÊN TẮC THIẾT KẾ
+   NGUYÊN TẮC THIẾT KẾ  (bản 2 — hướng tới khách trẻ)
 
-   1. MÀU LẤY TỪ ĐỒ UỐNG THẬT, KHÔNG PHẢI TỪ BẢNG MÀU CHUNG CHUNG
-      Neutrals ám nâu ấm (hue 28–34) — màu của giấy kraft và cà phê rang,
-      không dùng xám trung tính vì xám thuần trông "chết" và vô cảm.
-      Accent duy nhất là màu crema — lớp bọt nâu vàng trên mặt espresso.
+   1. CHỮ TO, ĐỌC ĐƯỢC TỪ XA
+      Thân bài 17px, chữ nhỏ nhất trong giao diện bán hàng vẫn là 15px.
+      Tiêu đề dùng clamp() nên co giãn mượt từ điện thoại 320px tới màn 1920px
+      mà không cần một đống media query.
 
-   2. MÀU CỦA TỪNG MÓN/NGUYÊN LIỆU LÀ DỮ LIỆU, KHÔNG PHẢI CSS
-      Chúng đến từ cột color_hex trong database và được truyền vào qua
-      CSS custom property inline. Nhờ vậy bảng tồn kho đọc được bằng mắt.
+   2. HAI HỌ CHỮ, MỖI HỌ MỘT VIỆC
+      --font-display  "Baloo 2"        — bo tròn, vui, dùng CHO TIÊU ĐỀ.
+      --font-sans     "Be Vietnam Pro" — thiết kế riêng cho dấu tiếng Việt,
+                                         dùng cho thân bài và giao diện.
+      Cả hai đều có bộ ký tự vietnamese trên Google Fonts nên dấu không bị
+      cắt cụt hay lệch như khi mượn font Latin.
+      Nếu mạng chặn Google Fonts thì rơi về font hệ thống — bố cục không vỡ
+      vì mọi kích thước đều tính bằng rem, không phụ thuộc font.
 
-   3. MỘT ACCENT DUY NHẤT
-      Ngoài accent, chỉ có ba màu ngữ nghĩa (ok / warn / danger) và chúng
-      CHỈ dùng để mã hóa trạng thái, không bao giờ dùng để trang trí.
+   3. MỘT ACCENT CHÍNH + BỐN MÀU VUI
+      --accent (cam cháy) là màu hành động: nút chính, liên kết, trạng thái đang chọn.
+      Bốn màu phụ --pop / --fresh / --grape / --sun KHÔNG dùng cho nút hành động,
+      chỉ để phân biệt nhóm món và tạo nhịp màu trên trang chủ. Nhờ giới hạn này
+      trang trông trẻ trung mà vẫn không loạn: mắt luôn biết bấm vào đâu.
 
-   4. KHOẢNG CÁCH LÀ THỨ BẬC
+   4. MỌI MÀU CHỮ ĐỀU ĐẠT WCAG AA
+      Đã đo tỉ lệ tương phản trên nền --bg và --surface ở cả hai chế độ:
+      thấp nhất là 4.69:1 (--accent trên nền sáng), cao nhất 16.5:1.
+      Màu --sun là NGOẠI LỆ: quá sáng để làm chữ, chỉ dùng làm nền hoặc hình khối.
+
+   5. MÀU CỦA TỪNG MÓN/NGUYÊN LIỆU LÀ DỮ LIỆU, KHÔNG PHẢI CSS
+      Chúng đến từ cột color_hex trong database, truyền vào qua CSS custom
+      property inline. Nhờ vậy bảng tồn kho đọc được bằng mắt.
+
+   6. KHOẢNG CÁCH LÀ THỨ BẬC
       Thứ liên quan đứng gần nhau. Khoảng cách giữa các khối lớn gấp 2–3 lần
       khoảng cách bên trong khối.
+
+   7. ẢNH LÀ ẢNH CHỤP THẬT
+      Khối bán hàng không dùng hình vẽ vector minh họa đồ uống nữa. Ảnh thật
+      bán hàng tốt hơn và cũng là thứ Google đưa vào kết quả tìm kiếm hình ảnh.
+      Xem Services/DrinkPhoto.cs để biết cách chọn ảnh dự phòng theo danh mục.
 
    MỤC LỤC
    §1  Tokens          §6  Card
@@ -34,79 +55,114 @@
    §1  TOKENS
 ============================================================================= */
 :root {
-  /* --- Thang chữ, tỉ lệ ~1.25 ------------------------------------------- */
-  --text-2xs: 0.6875rem;  /* 11px — nhãn siêu nhỏ, mã lô */
-  --text-xs:  0.75rem;    /* 12px — nhãn, caption */
-  --text-sm:  0.875rem;   /* 14px — bảng dữ liệu, phụ đề */
-  --text-base:1rem;       /* 16px — thân bài (không bao giờ nhỏ hơn) */
-  --text-lg:  1.25rem;    /* 20px — tiêu đề thẻ */
-  --text-xl:  1.75rem;    /* 28px — tiêu đề mục */
-  --text-2xl: 2.5rem;     /* 40px — tiêu đề trang */
-  --text-3xl: clamp(2.5rem, 1.8rem + 3vw, 4rem);  /* hero, co giãn theo màn hình */
+  /* --- Thang chữ ---------------------------------------------------------
+     Bốn cỡ nhỏ cố định (dùng trong bảng, nhãn — cần đoán trước được),
+     ba cỡ lớn co giãn theo bề ngang màn hình (dùng cho tiêu đề).
+     So với bản 1, mọi cỡ đều tăng 1–2 bậc: thân bài 16→17px, tiêu đề
+     trang 40→54px, tiêu đề hero tối đa 64→84px.                            */
+  --text-2xs: 0.75rem;    /* 12px — nhãn siêu nhỏ, mã lô */
+  --text-xs:  0.8125rem;  /* 13px — nhãn, caption */
+  --text-sm:  0.9375rem;  /* 15px — bảng dữ liệu, phụ đề (sàn của thân bài) */
+  --text-base:1.0625rem;  /* 17px — thân bài */
+  --text-lg:  1.375rem;   /* 22px — tiêu đề thẻ, đoạn dẫn */
+
+  /* Ba cỡ tiêu đề: giá trị nhỏ ở 320px — giá trị lớn từ khoảng 1440px trở lên */
+  --text-xl:  clamp(1.625rem, 1.30rem + 1.6vw, 2.375rem);  /* 26 → 38px */
+  --text-2xl: clamp(2.125rem, 1.55rem + 2.9vw, 3.375rem);  /* 34 → 54px */
+  /* Trần 68px chứ không lớn hơn: hero chia hai cột nên cột chữ chỉ rộng khoảng
+     680px. Ở 84px thì câu "Cà phê pha phin," không nằm gọn một dòng và bị bẻ
+     giữa chừng thành bốn dòng lệch nhịp. Đây là giới hạn do BỐ CỤC quy định,
+     không phải chọn tùy hứng. */
+  --text-3xl: clamp(2.5rem, 1.70rem + 4.0vw, 4.25rem);     /* 40 → 68px */
 
   /* --- Khoảng cách, bội số của 4px -------------------------------------- */
   --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
   --space-5: 20px;  --space-6: 24px;  --space-8: 32px;  --space-10: 40px;
-  --space-12: 48px; --space-16: 64px; --space-20: 80px; --space-24: 96px;
+  --space-12: 48px; --space-16: 64px; --space-18: 72px;
+  --space-20: 80px; --space-24: 96px;
 
-  /* --- Bo góc ------------------------------------------------------------ */
-  --radius-sm: 6px;
-  --radius:    10px;
-  --radius-lg: 16px;
+  /* --- Bo góc ------------------------------------------------------------
+     Bo tròn hơn bản trước. Góc tròn đọc ra "thân thiện, không nghiêm nghị" —
+     đúng cảm giác muốn có với khách tuổi teen.                             */
+  --radius-sm:   8px;
+  --radius:      14px;
+  --radius-lg:   22px;
+  --radius-xl:   32px;
   --radius-full: 999px;
 
-  /* --- Nền & chữ (ám nâu ấm, hue 28–34) ---------------------------------
-     Nền không phải trắng thuần mà ngả kem rất nhẹ — giống giấy in menu.
-     Chữ không phải đen thuần mà là nâu cà phê đậm — đọc êm mắt hơn. */
-  --bg:           hsl(34 33% 97%);
-  --bg-sunken:    hsl(32 26% 94%);   /* nền lõm: thanh bên, khu vực phụ */
-  --surface:      hsl(0 0% 100%);
-  --surface-2:    hsl(32 30% 96%);   /* thẻ phụ, hàng bảng sọc */
-  --surface-3:    hsl(30 24% 92%);   /* nền nút phụ khi hover */
-  --border:       hsl(30 20% 88%);
-  --border-strong:hsl(30 16% 78%);
-  --text:         hsl(26 30% 13%);
-  --text-2:       hsl(28 14% 34%);   /* chữ phụ, vẫn đạt 4.5:1 trên nền sáng */
-  --muted:        hsl(30 10% 48%);   /* nhãn, chú thích */
+  /* --- Nền và chữ --------------------------------------------------------
+     Nền kem ấm (hue 32–40), không phải trắng thuần — giống giấy in menu.
+     Chữ là nâu cà phê rất đậm chứ không phải đen thuần: đọc êm mắt hơn
+     mà vẫn đạt 15.7:1.                                                     */
+  --bg:            hsl(40 56% 97%);
+  --bg-sunken:     hsl(38 42% 94%);   /* nền lõm: thanh bên, khu vực phụ */
+  --surface:       hsl(0 0% 100%);
+  --surface-2:     hsl(38 46% 96%);   /* thẻ phụ, hàng bảng sọc */
+  --surface-3:     hsl(34 34% 92%);   /* nền nút phụ khi hover */
+  --border:        hsl(32 28% 88%);
+  --border-strong: hsl(30 22% 76%);
+  --text:          hsl(22 45% 12%);   /* 15.7:1 trên --bg */
+  --text-2:        hsl(24 20% 32%);   /* 7.4:1  — chữ phụ */
+  --muted:         hsl(28 14% 44%);   /* 4.6:1  — nhãn, chú thích */
 
-  /* --- Accent: màu CREMA của espresso ------------------------------------
-     Đủ đậm để chữ trắng trên nền này đạt tương phản 4.5:1. */
-  --accent:        hsl(24 72% 42%);
-  --accent-hover:  hsl(24 74% 36%);
-  --accent-fg:     hsl(36 40% 98%);
-  --accent-soft:   hsl(28 70% 94%);  /* nền chip, vùng nhấn nhẹ */
-  --accent-border: hsl(26 55% 82%);
+  /* --- Accent chính: CAM CHÁY -------------------------------------------
+     Đậm hơn cam thuần để chữ trắng trên nền này đạt 4.9:1.
+     --accent-bright là bản rực rỡ, CHỈ dùng cho mảng lớn và gradient
+     (chữ trắng trên nó không đạt AA nên không bao giờ đặt chữ nhỏ lên).    */
+  --accent:        hsl(16 90% 42%);
+  --accent-hover:  hsl(14 92% 36%);
+  --accent-bright: hsl(22 95% 55%);
+  --accent-fg:     hsl(40 60% 99%);
+  --accent-soft:   hsl(26 90% 94%);   /* nền chip, vùng nhấn nhẹ */
+  --accent-border: hsl(24 80% 82%);
+
+  /* --- Bốn màu vui: phân nhóm và trang trí, KHÔNG dùng cho nút hành động -- */
+  --pop:        hsl(340 82% 46%);  --pop-soft:   hsl(340 85% 95%);   /* hồng — món hot */
+  --fresh:      hsl(164 84% 27%);  --fresh-soft: hsl(160 55% 93%);   /* bạc hà — trà, healthy */
+  --grape:      hsl(264 68% 48%);  --grape-soft: hsl(264 80% 96%);   /* tím — món mới */
+  --sun:        hsl(38 96% 50%);   --sun-soft:   hsl(44 95% 90%);    /* vàng — CHỈ làm nền */
+
+  /* --- Gradient: dùng cho hero, nhãn nổi bật, nút hot -------------------- */
+  --grad-hot:   linear-gradient(135deg, hsl(28 96% 56%), hsl(348 84% 52%));
+  --grad-cool:  linear-gradient(135deg, hsl(264 72% 58%), hsl(196 92% 46%));
+  --grad-fresh: linear-gradient(135deg, hsl(164 72% 40%), hsl(78 68% 48%));
 
   /* --- Màu ngữ nghĩa: CHỈ dùng mã hóa trạng thái ------------------------- */
-  --ok:          hsl(152 52% 30%);
+  --ok:          hsl(152 60% 28%);
   --ok-soft:     hsl(150 45% 93%);
   --ok-border:   hsl(150 35% 78%);
 
-  --warn:        hsl(35 88% 34%);
-  --warn-soft:   hsl(40 80% 93%);
-  --warn-border: hsl(38 60% 76%);
+  --warn:        hsl(30 90% 34%);
+  --warn-soft:   hsl(40 88% 92%);
+  --warn-border: hsl(38 65% 76%);
 
-  --danger:      hsl(2 66% 42%);
-  --danger-soft: hsl(4 70% 95%);
-  --danger-border:hsl(4 50% 82%);
+  --danger:      hsl(356 72% 44%);
+  --danger-soft: hsl(356 80% 96%);
+  --danger-border:hsl(356 60% 84%);
 
-  --info:        hsl(205 62% 36%);
-  --info-soft:   hsl(205 60% 94%);
+  --info:        hsl(205 80% 36%);
+  --info-soft:   hsl(205 70% 94%);
 
-  /* --- Đổ bóng: hai lớp, độ mờ thấp ------------------------------------- */
-  --shadow-sm: 0 1px 2px hsl(26 30% 13% / .05);
-  --shadow:    0 1px 2px hsl(26 30% 13% / .06), 0 4px 12px -4px hsl(26 30% 13% / .10);
-  --shadow-lg: 0 2px 4px hsl(26 30% 13% / .06), 0 16px 32px -12px hsl(26 30% 13% / .18);
+  /* --- Đổ bóng: hai lớp, độ mờ thấp, ám nâu cho hợp nền kem -------------- */
+  --shadow-sm: 0 1px 2px hsl(22 45% 12% / .05);
+  --shadow:    0 1px 2px hsl(22 45% 12% / .06), 0 4px 12px -4px hsl(22 45% 12% / .10);
+  --shadow-lg: 0 2px 4px hsl(22 45% 12% / .06), 0 16px 32px -12px hsl(22 45% 12% / .18);
+  /* Bóng mang màu accent — dùng cho nút chính và ảnh hero để chúng nổi lên */
+  --shadow-accent: 0 8px 24px -8px hsl(16 90% 42% / .45);
 
   /* --- Chữ --------------------------------------------------------------- */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-               "Be Vietnam Pro", Roboto, "Helvetica Neue", sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", "Segoe UI Mono",
-               Consolas, monospace;
+  --font-display: "Baloo 2", "Be Vietnam Pro", ui-rounded, system-ui, sans-serif;
+  --font-sans:    "Be Vietnam Pro", ui-sans-serif, system-ui, -apple-system,
+                  "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono:    ui-monospace, "Cascadia Mono", "SF Mono", "Segoe UI Mono",
+                  Consolas, monospace;
 
-  /* --- Chuyển động ------------------------------------------------------- */
-  --ease-out: cubic-bezier(.16, 1, .3, 1);
-  --ease-in:  cubic-bezier(.4, 0, 1, 1);
+  /* --- Chuyển động -------------------------------------------------------
+     --ease-bounce vọt quá đích rồi mới về — dùng riêng cho tương tác vui
+     (thẻ món nảy lên khi rê chuột). Không dùng cho thứ nghiêm túc như modal. */
+  --ease-out:    cubic-bezier(.16, 1, .3, 1);
+  --ease-in:     cubic-bezier(.4, 0, 1, 1);
+  --ease-bounce: cubic-bezier(.34, 1.56, .64, 1);
   --dur-fast: 120ms;
   --dur:      180ms;
   --dur-slow: 240ms;
@@ -118,71 +174,110 @@
   --prose-max:     65ch;
 }
 
+/* --- Khối quản lý: kéo thang chữ nhỏ lại ------------------------------------
+   Trang bán hàng cần chữ to để bán hàng. Trang quản lý thì ngược lại: mật độ
+   dữ liệu MỚI là tính năng — nhân viên cần thấy 30 dòng tồn kho cùng lúc.
+   Vì vậy .shell (khung admin) hạ hai cỡ nhỏ về đúng mức của bản 1, còn tiêu đề
+   vẫn hưởng thang mới. Đây là ngoại lệ CÓ CHỦ ĐÍCH, không phải quên đồng bộ. */
+.shell {
+  --text-sm:   0.875rem;   /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-xl:   1.75rem;
+  --text-2xl:  2.25rem;
+}
+
 /* --- Chế độ tối -------------------------------------------------------------
    KHÔNG phải đảo ngược chế độ sáng. Ba khác biệt cố ý:
    (1) bề mặt SÁNG dần khi nổi lên, không tối đi;
    (2) bóng gần như không đọc được nên dùng viền thay thế;
-   (3) accent phải sáng hơn để nổi trên nền tối.                              */
+   (3) accent phải sáng hơn hẳn để nổi trên nền tối — kéo theo chữ ĐẶT TRÊN
+       accent phải đổi từ trắng sang nâu đen (--accent-fg).                   */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:            hsl(28 16% 8%);
-    --bg-sunken:     hsl(28 18% 6%);
-    --surface:       hsl(28 14% 11%);
-    --surface-2:     hsl(28 13% 14%);
-    --surface-3:     hsl(28 12% 18%);
-    --border:        hsl(28 11% 21%);
-    --border-strong: hsl(28 10% 30%);
-    --text:          hsl(34 28% 93%);
-    --text-2:        hsl(32 12% 72%);
-    --muted:         hsl(32 9% 58%);
+    --bg:            hsl(24 20% 8%);
+    --bg-sunken:     hsl(24 22% 6%);
+    --surface:       hsl(24 17% 12%);
+    --surface-2:     hsl(24 15% 15%);
+    --surface-3:     hsl(24 14% 19%);
+    --border:        hsl(24 13% 22%);
+    --border-strong: hsl(24 12% 32%);
+    --text:          hsl(38 40% 94%);
+    --text-2:        hsl(32 18% 74%);
+    --muted:         hsl(30 12% 60%);
 
-    --accent:        hsl(28 78% 56%);
-    --accent-hover:  hsl(28 82% 64%);
-    --accent-fg:     hsl(26 40% 10%);
-    --accent-soft:   hsl(26 30% 17%);
-    --accent-border: hsl(26 32% 30%);
+    --accent:        hsl(26 95% 62%);
+    --accent-hover:  hsl(30 98% 70%);
+    --accent-bright: hsl(30 98% 66%);
+    --accent-fg:     hsl(24 60% 10%);
+    --accent-soft:   hsl(22 40% 18%);
+    --accent-border: hsl(22 40% 32%);
 
-    --ok:            hsl(150 48% 55%);
+    --pop:        hsl(344 90% 68%);  --pop-soft:   hsl(344 40% 18%);
+    --fresh:      hsl(160 65% 55%);  --fresh-soft: hsl(162 40% 15%);
+    --grape:      hsl(266 90% 74%);  --grape-soft: hsl(266 40% 20%);
+    --sun:        hsl(42 96% 60%);   --sun-soft:   hsl(40 40% 18%);
+
+    --grad-hot:   linear-gradient(135deg, hsl(30 98% 62%), hsl(344 88% 62%));
+    --grad-cool:  linear-gradient(135deg, hsl(266 88% 70%), hsl(196 90% 58%));
+    --grad-fresh: linear-gradient(135deg, hsl(162 70% 52%), hsl(78 70% 56%));
+
+    --ok:            hsl(150 55% 55%);
     --ok-soft:       hsl(152 30% 14%);
     --ok-border:     hsl(152 25% 26%);
 
-    --warn:          hsl(40 82% 60%);
+    --warn:          hsl(40 90% 60%);
     --warn-soft:     hsl(36 32% 15%);
     --warn-border:   hsl(36 28% 28%);
 
-    --danger:        hsl(4 74% 65%);
-    --danger-soft:   hsl(4 32% 16%);
-    --danger-border: hsl(4 28% 30%);
+    --danger:        hsl(358 85% 68%);
+    --danger-soft:   hsl(358 32% 17%);
+    --danger-border: hsl(358 28% 32%);
 
-    --info:          hsl(205 60% 62%);
-    --info-soft:     hsl(205 30% 15%);
+    --info:          hsl(203 80% 64%);
+    --info-soft:     hsl(203 30% 16%);
 
     --shadow-sm: 0 1px 2px hsl(0 0% 0% / .3);
     --shadow:    0 1px 2px hsl(0 0% 0% / .35), 0 4px 12px -4px hsl(0 0% 0% / .5);
     --shadow-lg: 0 2px 4px hsl(0 0% 0% / .4), 0 16px 32px -12px hsl(0 0% 0% / .65);
+    --shadow-accent: 0 8px 24px -8px hsl(26 95% 62% / .35);
   }
 }
 
-/* Người dùng chọn tối thủ công — thắng cả cấu hình hệ thống */
+/* Người dùng chọn tối thủ công — thắng cả cấu hình hệ thống.
+   Trùng lặp với khối trên là CỐ Ý: CSS không cho gộp hai selector khác điều
+   kiện vào một khai báo mà vẫn giữ được thứ tự ưu tiên này.                  */
 :root[data-theme="dark"] {
-  --bg: hsl(28 16% 8%);            --bg-sunken: hsl(28 18% 6%);
-  --surface: hsl(28 14% 11%);      --surface-2: hsl(28 13% 14%);
-  --surface-3: hsl(28 12% 18%);    --border: hsl(28 11% 21%);
-  --border-strong: hsl(28 10% 30%);--text: hsl(34 28% 93%);
-  --text-2: hsl(32 12% 72%);       --muted: hsl(32 9% 58%);
-  --accent: hsl(28 78% 56%);       --accent-hover: hsl(28 82% 64%);
-  --accent-fg: hsl(26 40% 10%);    --accent-soft: hsl(26 30% 17%);
-  --accent-border: hsl(26 32% 30%);
-  --ok: hsl(150 48% 55%);          --ok-soft: hsl(152 30% 14%);
+  --bg: hsl(24 20% 8%);            --bg-sunken: hsl(24 22% 6%);
+  --surface: hsl(24 17% 12%);      --surface-2: hsl(24 15% 15%);
+  --surface-3: hsl(24 14% 19%);    --border: hsl(24 13% 22%);
+  --border-strong: hsl(24 12% 32%);--text: hsl(38 40% 94%);
+  --text-2: hsl(32 18% 74%);       --muted: hsl(30 12% 60%);
+
+  --accent: hsl(26 95% 62%);       --accent-hover: hsl(30 98% 70%);
+  --accent-bright: hsl(30 98% 66%);--accent-fg: hsl(24 60% 10%);
+  --accent-soft: hsl(22 40% 18%);  --accent-border: hsl(22 40% 32%);
+
+  --pop: hsl(344 90% 68%);         --pop-soft: hsl(344 40% 18%);
+  --fresh: hsl(160 65% 55%);       --fresh-soft: hsl(162 40% 15%);
+  --grape: hsl(266 90% 74%);       --grape-soft: hsl(266 40% 20%);
+  --sun: hsl(42 96% 60%);          --sun-soft: hsl(40 40% 18%);
+
+  --grad-hot:   linear-gradient(135deg, hsl(30 98% 62%), hsl(344 88% 62%));
+  --grad-cool:  linear-gradient(135deg, hsl(266 88% 70%), hsl(196 90% 58%));
+  --grad-fresh: linear-gradient(135deg, hsl(162 70% 52%), hsl(78 70% 56%));
+
+  --ok: hsl(150 55% 55%);          --ok-soft: hsl(152 30% 14%);
   --ok-border: hsl(152 25% 26%);
-  --warn: hsl(40 82% 60%);         --warn-soft: hsl(36 32% 15%);
+  --warn: hsl(40 90% 60%);         --warn-soft: hsl(36 32% 15%);
   --warn-border: hsl(36 28% 28%);
-  --danger: hsl(4 74% 65%);        --danger-soft: hsl(4 32% 16%);
-  --danger-border: hsl(4 28% 30%);
-  --info: hsl(205 60% 62%);        --info-soft: hsl(205 30% 15%);
+  --danger: hsl(358 85% 68%);      --danger-soft: hsl(358 32% 17%);
+  --danger-border: hsl(358 28% 32%);
+  --info: hsl(203 80% 64%);        --info-soft: hsl(203 30% 16%);
+
   --shadow-sm: 0 1px 2px hsl(0 0% 0% / .3);
   --shadow:    0 1px 2px hsl(0 0% 0% / .35), 0 4px 12px -4px hsl(0 0% 0% / .5);
   --shadow-lg: 0 2px 4px hsl(0 0% 0% / .4), 0 16px 32px -12px hsl(0 0% 0% / .65);
+  --shadow-accent: 0 8px 24px -8px hsl(26 95% 62% / .35);
 }
 
 /* =============================================================================
@@ -190,7 +285,14 @@
 ============================================================================= */
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+/* scroll-padding-top bù đúng chiều cao thanh điều hướng dính (72px).
+   Thiếu dòng này thì mọi liên kết neo (#main-content, #thuc-don…) sẽ nhảy tới
+   vị trí bị thanh nav che mất tiêu đề. */
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: 88px;
+}
 
 body {
   margin: 0;
@@ -199,11 +301,17 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Chặn cuộn ngang: hero có hình khối tràn mép, nếu không khóa ở đây thì
+     điện thoại sẽ kéo ngang được vài chục pixel. */
+  overflow-x: hidden;
 }
 
+/* object-fit: cover là mặc định cho MỌI ảnh trong dự án — vì toàn bộ ảnh món
+   đều là ảnh chụp thật với tỉ lệ khung khác nhau, để mặc định fill sẽ méo. */
+img { object-fit: cover; }
 img, svg, video { display: block; max-width: 100%; height: auto; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -229,11 +337,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* =============================================================================
    §3  TYPOGRAPHY
 ============================================================================= */
+/* Tiêu đề dùng HỌ CHỮ RIÊNG (Baloo 2 — bo tròn) chứ không chỉ tăng cỡ của
+   font thân bài. Đây là thứ tạo ra cảm giác "trẻ" nhiều nhất trong cả bản
+   thiết kế: hình dáng chữ khác hẳn, không chỉ đậm hơn.
+   Baloo 2 vẽ hơi thấp so với đường cơ sở nên line-height 1.15 bị chật —
+   nới lên 1.18 và bù lại bằng letter-spacing âm sâu hơn.                   */
 h1, h2, h3, h4, h5 {
   margin: 0;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 h1 { font-size: var(--text-2xl); }
@@ -244,7 +358,10 @@ h4 { font-size: var(--text-base); letter-spacing: -0.01em; }
 p { margin: 0; }
 
 .prose { max-width: var(--prose-max); }
-.lead  { font-size: var(--text-lg); color: var(--text-2); line-height: 1.5; }
+
+/* Đoạn dẫn dưới tiêu đề — to hơn thân bài một bậc, màu nhạt hơn một bậc.
+   Hai tín hiệu ngược chiều nhau khiến nó vừa nổi vừa không tranh chỗ tiêu đề. */
+.lead  { font-size: var(--text-lg); color: var(--text-2); line-height: 1.55; }
 
 /* Nhãn nhỏ chữ hoa — dùng cho tiêu đề cột, tiêu đề nhóm.
    Chữ hoa cần giãn chữ, nếu không sẽ dính vào nhau. */
@@ -254,6 +371,36 @@ p { margin: 0; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+/* --- Chữ tô gradient -------------------------------------------------------
+   Chỉ dùng cho MỘT cụm từ khóa trong tiêu đề hero, không bao giờ cho cả câu.
+   background-clip: text không có màu dự phòng nếu trình duyệt không hỗ trợ,
+   nên đặt color: var(--accent) trước làm lớp đỡ.                            */
+.text-grad {
+  color: var(--accent);
+  background: var(--grad-hot);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+@supports not (background-clip: text) {
+  .text-grad { -webkit-text-fill-color: currentColor; }
+}
+
+/* Gạch chân bằng nét bút vẽ tay — nhấn một từ mà không cần đổi màu chữ,
+   nên vẫn giữ nguyên tỉ lệ tương phản của chữ gốc. */
+.text-mark {
+  position: relative;
+  white-space: nowrap;
+}
+.text-mark::after {
+  content: "";
+  position: absolute; inset-inline: -2%; bottom: .04em;
+  height: .28em;
+  background: var(--sun-soft);
+  border-radius: var(--radius-full);
+  z-index: -1;
 }
 
 .muted   { color: var(--muted); }
@@ -300,11 +447,19 @@ p { margin: 0; }
 .grow { flex: 1; }
 
 .grid { display: grid; gap: var(--space-4); }
-.grid-cards  { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+/* 260px thay vì 240px: thẻ món giờ có ảnh chụp thật, cần chỗ để ảnh không
+   bị nén thành con tem. Ở màn 1240px vẫn ra đúng 4 cột. */
+.grid-cards  { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .grid-stats  { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .grid-2      { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 
-.section { padding-block: clamp(var(--space-12), 7vw, var(--space-24)); }
+/* Nhịp dọc giữa các khối.
+   Trần hạ từ 96px xuống 72px so với bản trước: với thang chữ mới (tiêu đề khối
+   38px thay vì 28px) thì bản thân chữ đã tạo ra khoảng nghỉ thị giác, thêm 96px
+   đệm nữa khiến trang dài lê thê và các khối trông rời rạc, không liên quan.
+   Vẫn giữ đúng nguyên tắc "khoảng cách giữa khối gấp 2–3 lần khoảng cách trong
+   khối": trong khối dùng --space-5 (20px), giữa khối là 72px. */
+.section { padding-block: clamp(var(--space-10), 5vw, var(--space-18)); }
 
 /* Đường kẻ phân cách có nhãn ở giữa */
 .divider {
@@ -317,30 +472,39 @@ p { margin: 0; }
 /* =============================================================================
    §5  BUTTON & FORM
 ============================================================================= */
+/* Nút dạng VIÊN (bo tròn hoàn toàn) thay vì bo góc nhẹ như bản 1.
+   Lý do: viên tròn là ngôn ngữ hình khối của app di động mà nhóm khách trẻ
+   dùng hằng ngày — nó đọc ra "bấm được" nhanh hơn hình chữ nhật bo góc.
+   Cỡ chữ nâng từ 14px lên 15px và vùng bấm cao tối thiểu 44px cho vừa ngón tay. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-5);
+  min-height: 44px;
+  padding: var(--space-3) var(--space-6);
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
   text-decoration: none;
   transition: background-color var(--dur) var(--ease-out),
               border-color var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out),
               transform var(--dur-fast) var(--ease-out);
 }
+/* Bốn trạng thái đều được quyết định, không để trình duyệt tự lo */
+.btn:hover:not(:disabled)  { transform: translateY(-1px); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-.btn-primary   { background: var(--accent); color: var(--accent-fg); }
+.btn-primary   { background: var(--accent); color: var(--accent-fg); box-shadow: var(--shadow-accent); }
 .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
 
 .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-.btn-secondary:hover:not(:disabled) { background: var(--surface-3); }
+.btn-secondary:hover:not(:disabled) { background: var(--surface-3); border-color: var(--accent-border); }
 
 .btn-ghost     { background: transparent; color: var(--text-2); }
 .btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
@@ -348,10 +512,19 @@ p { margin: 0; }
 .btn-danger    { background: var(--danger); color: white; }
 .btn-danger:hover:not(:disabled) { filter: brightness(1.08); }
 
-.btn-lg  { padding: var(--space-4) var(--space-8); font-size: var(--text-base); }
-.btn-sm  { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+/* Nút gradient — DÀNH RIÊNG cho lời kêu gọi hành động số một của mỗi màn hình.
+   Nếu dùng ở hai chỗ trên cùng một trang thì nó mất tác dụng phân cấp. */
+.btn-hot {
+  background: var(--grad-hot);
+  color: hsl(40 60% 99%);
+  box-shadow: var(--shadow-accent);
+}
+.btn-hot:hover:not(:disabled) { filter: saturate(1.1) brightness(1.05); }
+
+.btn-lg  { min-height: 54px; padding: var(--space-4) var(--space-8); font-size: var(--text-base); }
+.btn-sm  { min-height: 36px; padding: var(--space-2) var(--space-4); font-size: var(--text-xs); }
 .btn-block { width: 100%; }
-.btn-icon { padding: var(--space-2); width: 36px; height: 36px; }
+.btn-icon { padding: var(--space-2); width: 44px; height: 44px; min-height: 0; }
 
 /* --- Form ------------------------------------------------------------------
    Nhãn ĐẶT TRÊN ô nhập (không đặt bên trái) — dễ quét mắt hơn và không vỡ
@@ -452,12 +625,21 @@ legend { padding: 0; }
   display: flex; flex-direction: column; gap: var(--space-3);
 }
 .card-flat    { border-radius: var(--radius); padding: var(--space-4); }
+
+/* Thẻ nảy nhẹ khi rê chuột. Chỉ animate transform + box-shadow (thuộc tính
+   hợp thành, không gây reflow); dùng --ease-bounce để cú nảy có cảm giác
+   "đàn hồi" thay vì trôi đều — chi tiết nhỏ nhưng làm trang bớt tĩnh. */
 .card-hover   { transition: border-color var(--dur) var(--ease-out),
-                            box-shadow var(--dur) var(--ease-out); }
-.card-hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
+                            box-shadow var(--dur) var(--ease-out),
+                            transform var(--dur-slow) var(--ease-bounce); }
+.card-hover:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
 
 .card-header  { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.card-title   { font-size: var(--text-lg); font-weight: 700; }
+.card-title   { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; }
 .card-footer  { padding-top: var(--space-3); border-top: 1px solid var(--border); }
 
 /* Thẻ số liệu trên dashboard */
@@ -540,10 +722,18 @@ legend { padding: 0; }
 ============================================================================= */
 .badge {
   display: inline-flex; align-items: center; gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-sm);
+  /* width: fit-content là BẮT BUỘC, không phải thừa.
+     Khi badge là con trực tiếp của .stack (flex hướng dọc), mặc định
+     align-items: stretch kéo nó dài hết bề ngang — nhãn "GIẢM 20%" biến thành
+     một thanh gradient vắt ngang cả banner. inline-flex không cứu được vì phần
+     tử flex bị stretch bất kể display là gì.
+     Đặt fit-content thay vì align-self: flex-start vì fit-content vô hại khi
+     badge nằm trong hàng ngang, còn align-self sẽ phá canh giữa theo chiều dọc. */
+  width: fit-content;
+  padding: 3px var(--space-3);
+  border-radius: var(--radius-full);
   font-size: var(--text-2xs);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: .04em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -555,6 +745,17 @@ legend { padding: 0; }
 .badge-warn    { background: var(--warn-soft);   color: var(--warn);   border-color: var(--warn-border); }
 .badge-danger  { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-border); }
 .badge-info    { background: var(--info-soft);   color: var(--info); }
+
+/* Ba nhãn "vui" — dùng để phân nhóm món trên trang bán hàng, KHÔNG dùng
+   trong khối quản lý (ở đó màu phải mang nghĩa trạng thái, không trang trí). */
+.badge-pop   { background: var(--pop-soft);   color: var(--pop); }
+.badge-fresh { background: var(--fresh-soft); color: var(--fresh); }
+.badge-grape { background: var(--grape-soft); color: var(--grape); }
+
+/* Nhãn đặc/gradient — đặt đè lên ảnh, nơi nhãn nền nhạt sẽ chìm mất */
+.badge-solid { background: var(--grad-hot); color: hsl(40 60% 99%); border: none; }
+.badge-dark  { background: hsl(22 45% 12% / .72); color: hsl(40 60% 99%); border: none;
+               backdrop-filter: blur(6px); }
 
 /* Chip lọc — dùng ở thanh lọc danh mục trang menu */
 .chip {
@@ -610,13 +811,21 @@ legend { padding: 0; }
               box-shadow var(--dur) var(--ease-out),
               transform var(--dur) var(--ease-out);
 }
-.product-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
-.product-card:hover .product-visual > * { transform: scale(1.04); }
+.product-card:hover {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-4px);
+}
+.product-card:hover .product-visual img { transform: scale(1.06); }
 
-/* Nền thẻ pha từ chính màu của ly nước — mỗi món có sắc riêng, không thẻ nào giống thẻ nào */
+/* Khung ảnh món.
+   Tỉ lệ đổi từ 4:3 sang 1:1 — ảnh ly nước là ảnh DỌC, khung vuông giữ được
+   trọn cái ly còn khung ngang thì cắt mất phần thân. Nền vẫn pha từ màu món
+   trong database để lúc ảnh đang tải, ô trống đã mang đúng sắc của món
+   (không nhấp nháy xám rồi mới ra ảnh). */
 .product-visual {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   display: grid; place-items: center;
   background:
     radial-gradient(120% 100% at 50% 100%,
@@ -626,11 +835,14 @@ legend { padding: 0; }
     var(--surface-2);
   overflow: hidden;
 }
-.product-visual > * { transition: transform var(--dur-slow) var(--ease-out); }
-.product-visual img { width: 100%; height: 100%; object-fit: cover; }
+.product-visual img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
 
 .product-body { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); flex: 1; }
-.product-name { font-size: var(--text-base); font-weight: 700; line-height: 1.3; }
+.product-name { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; line-height: 1.25; }
 .product-desc {
   font-size: var(--text-sm); color: var(--muted); line-height: 1.5;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -649,11 +861,17 @@ legend { padding: 0; }
 }
 .product-card.is-unavailable .product-name { color: var(--muted); }
 
+/* Chữ "Tạm hết" nằm ĐÈ LÊN ẢNH CHỤP, nên không thể chỉ đổi màu chữ — ảnh nào
+   cũng có vùng sáng vùng tối. Dùng chip nền đặc để tương phản không phụ thuộc
+   vào bức ảnh phía dưới. */
 .unavailable-tag {
-  position: absolute; inset-inline: 0; top: 50%; translate: 0 -50%;
-  z-index: 1; text-align: center;
-  font-size: var(--text-xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--danger);
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+  z-index: 2;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: hsl(22 45% 12% / .82);
+  color: hsl(40 60% 99%);
+  font-size: var(--text-xs); font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
 }
 
 /* Cảnh báo sắp hết — hiện số ly còn lại */
@@ -772,7 +990,13 @@ legend { padding: 0; }
 }
 
 .brand { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-5) var(--space-4); }
-.brand-name { font-weight: 800; letter-spacing: -0.02em; }
+.brand-name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
 .brand-sub  { font-size: var(--text-2xs); color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
 
 .nav { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2); }
@@ -803,14 +1027,30 @@ legend { padding: 0; }
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
-.topnav-inner { display: flex; align-items: center; gap: var(--space-6); height: 64px; }
+.topnav-inner { display: flex; align-items: center; gap: var(--space-6); height: 72px; }
 .topnav-links { display: flex; gap: var(--space-1); margin-left: auto; }
 .topnav-link {
-  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
-  color: var(--text-2); text-decoration: none; font-size: var(--text-sm); font-weight: 500;
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-full);
+  color: var(--text-2); text-decoration: none;
+  font-size: var(--text-sm); font-weight: 600;
+  transition: background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
 }
 .topnav-link:hover { background: var(--surface-2); color: var(--text); }
-.topnav-link.active { color: var(--accent); font-weight: 600; }
+/* Trang đang xem: nền viên màu accent nhạt + chữ accent + chữ đậm hơn.
+   Ba tín hiệu chồng lên nhau nên người mù màu vẫn nhận ra. */
+.topnav-link.active { background: var(--accent-soft); color: var(--accent); font-weight: 800; }
+
+/* Điện thoại: menu chính tụt xuống thành hàng cuộn ngang ngay dưới logo,
+   thay vì bị nhồi vào cùng một hàng 72px với logo và nút giỏ. */
+@media (max-width: 720px) {
+  .topnav-inner { flex-wrap: wrap; height: auto; padding-block: var(--space-3); gap: var(--space-3); }
+  .topnav-links {
+    order: 3; width: 100%; margin-left: 0;
+    overflow-x: auto; scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .topnav-links::-webkit-scrollbar { display: none; }
+}
 
 /* Nút giỏ hàng có số lượng */
 .cart-btn { position: relative; }
@@ -823,15 +1063,34 @@ legend { padding: 0; }
   font-size: 10px; font-weight: 800; font-variant-numeric: tabular-nums;
 }
 
-/* Banner khuyến mãi do AI đề xuất — dùng chính màu món được giảm giá */
+/* Banner khuyến mãi do AI đề xuất.
+   Bên trái là ẢNH CHỤP THẬT của món (không còn hình vẽ vector), phần nền pha
+   từ màu món trong database nên mỗi banner có sắc riêng mà vẫn cùng một khuôn. */
 .promo-banner {
-  display: flex; align-items: center; gap: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-5);
   padding: var(--space-4) var(--space-5);
   border-radius: var(--radius-lg);
   border: 1px solid color-mix(in srgb, var(--drink, var(--accent)) 32%, transparent);
   background: linear-gradient(100deg,
     color-mix(in srgb, var(--drink, var(--accent)) 16%, var(--surface)) 0%,
     var(--surface) 70%);
+}
+/* Ảnh món trong banner: hình tròn, cỡ cố định 88px. Tròn để phân biệt rõ với
+   thẻ món (vuông) — người dùng không nhầm banner là một món trong lưới. */
+.promo-photo {
+  flex: none;
+  width: 88px; height: 88px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 3px solid var(--surface);
+  box-shadow: var(--shadow);
+}
+.promo-name { font-family: var(--font-display); font-size: var(--text-lg); font-weight: 800; line-height: 1.2; }
+
+@media (max-width: 560px) {
+  .promo-banner { flex-wrap: wrap; }
+  .promo-photo  { width: 64px; height: 64px; }
+  .promo-banner > .btn { width: 100%; }
 }
 
 /* =============================================================================

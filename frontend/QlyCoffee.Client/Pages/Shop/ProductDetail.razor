@@ -17,7 +17,24 @@
 @inject AlertService Alerts
 @inject NavigationManager Nav
 
-<PageTitle>@(_product?.Name ?? "Món") — Qly Coffee</PageTitle>
+@*  SEO: đây là loại trang mang lại nhiều truy cập tự nhiên nhất — người ta gõ
+    "trà sữa trân châu đường đen quận 1" chứ hiếm khi gõ tên quán.
+    Mô tả ghép từ tên món + mô tả trong database + giá, nên mỗi món có một
+    đoạn mô tả riêng thay vì dùng chung một câu (Google phạt nội dung trùng lặp).
+    Chỉ dựng SeoHead khi đã có dữ liệu — trước đó dùng bộ thẻ mặc định của site. *@
+@if (_product is not null)
+{
+    <SeoHead Title="@_product.Name"
+             Description="@BuildSeoDescription()"
+             Path="@($"/menu/{_product.Slug}")"
+             Image="@DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name)"
+             ImageAlt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name)"
+             OgType="product" />
+}
+else
+{
+    <PageTitle>Món — Qly Coffee</PageTitle>
+}
 
 @if (_loading)
 {
@@ -54,21 +71,16 @@ else
 
         <div class="product-detail">
 
-            @* ── HÌNH MINH HỌA ──────────────────────────────────────────── *@
+            @*  ── ẢNH MÓN ────────────────────────────────────────────────
+                Ảnh chụp thật, luôn có (DrinkPhoto không bao giờ trả về rỗng).
+                fetchpriority="high" vì đây là phần tử LCP của trang chi tiết —
+                khách vào từ Google sẽ thấy ảnh trước cả khi đọc tên món.       *@
             <div class="detail-visual"
                  style="--drink: @_product.ColorPrimaryHex; --foam: @_product.ColorAccentHex;">
-                @if (!string.IsNullOrEmpty(_product.ImageUrl))
-                {
-                    <img src="@Media.Resolve(_product.ImageUrl)" alt="@_product.Name" width="520" height="520" />
-                }
-                else
-                {
-                    <DrinkGlass DrinkColor="@_product.ColorPrimaryHex"
-                                FoamColor="@_product.ColorAccentHex"
-                                Style="@GuessGlassStyle()"
-                                Size="280"
-                                AriaLabel="@($"Minh họa {_product.Name}")" />
-                }
+                <img src="@DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name)"
+                     alt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name)"
+                     fetchpriority="high" decoding="async"
+                     width="600" height="600" />
             </div>
 
             @* ── THÔNG TIN & LỰA CHỌN ───────────────────────────────────── *@
@@ -399,14 +411,26 @@ else
         _note = null;
     }
 
-    private DrinkGlass.GlassStyle GuessGlassStyle()
+    /// <summary>
+    /// Dựng đoạn mô tả cho thẻ meta description của riêng món này.
+    ///
+    /// Ba yêu cầu phải cân đối cùng lúc:
+    ///   - Dài 120–160 ký tự. Ngắn quá Google tự viết lại, dài quá bị cắt.
+    ///   - Chứa tên món và tên danh mục — đó là cụm từ khách gõ vào ô tìm kiếm.
+    ///   - Có giá, vì đoạn mô tả kèm giá được bấm nhiều hơn hẳn.
+    ///
+    /// Mô tả trong database được ưu tiên; nếu quán chưa nhập thì ghép câu mặc định.
+    /// </summary>
+    private string BuildSeoDescription()
     {
-        var c = _product!.CategoryName.ToLowerInvariant();
-        if (c.Contains("trà sữa")) return DrinkGlass.GlassStyle.Boba;
-        if (c.Contains("đá xay") || c.Contains("sinh tố")) return DrinkGlass.GlassStyle.Blended;
-        if (_product.Name.Contains("nóng", StringComparison.OrdinalIgnoreCase))
-            return DrinkGlass.GlassStyle.HotCup;
-        return DrinkGlass.GlassStyle.IcedTall;
+        var p = _product!;
+        var gia = Money.Format(p.EffectivePrice);
+
+        var than = string.IsNullOrWhiteSpace(p.Description)
+            ? $"{p.Name} thuộc nhóm {p.CategoryName}, pha theo công thức định lượng chuẩn"
+            : p.Description.Trim().TrimEnd('.');
+
+        return $"{than}. Giá từ {gia}. Đặt online tại Qly Coffee, tới lấy là có.";
     }
 
     private static string TagLabel(string tag) => tag switch

@@ -13,6 +13,18 @@
 @inject AlertService Alerts
 @inject ThemeService Theme
 
+@*  Chặn lập chỉ mục cho TOÀN BỘ khối quản lý, khai báo một lần ở layout thay vì
+    lặp lại trên 12 trang con. "nofollow" ở đây (khác với trang giỏ hàng dùng
+    "follow") vì mọi liên kết trong khối quản lý đều dẫn tới trang quản lý khác —
+    không có gì đáng để bot đi theo.
+    Đây là lớp phòng thủ THỨ HAI: lớp thứ nhất là Disallow: /admin trong
+    wwwroot/robots.txt. Cần cả hai vì robots.txt chỉ ngăn bot TRUY CẬP, còn thẻ
+    meta này ngăn trang xuất hiện trên kết quả kể cả khi bot tìm thấy đường dẫn
+    từ nơi khác.                                                                *@
+<HeadContent>
+    <meta name="robots" content="noindex, nofollow" />
+</HeadContent>
+
 <div class="shell">
 
     @* ── THANH BÊN ───────────────────────────────────────────────────────── *@

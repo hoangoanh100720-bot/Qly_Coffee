@@ -47,6 +47,26 @@
 
 .menu-header { margin-bottom: var(--space-8); }
 
+/* Ảnh món nhỏ trong danh sách đơn hàng (trang tra cứu đơn).
+   Bo tròn hoàn toàn để phân biệt với ô ảnh vuông trong giỏ hàng — hai màn hình
+   khác nhau thì hình khối cũng nên khác, người dùng đỡ nhầm mình đang ở đâu. */
+.order-thumb {
+  width: 56px; height: 56px; flex: none;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid var(--border);
+}
+
+/* Thẻ <address> mặc định là chữ nghiêng — bỏ đi để đồng bộ với phần còn lại
+   của chân trang. Dùng <address> là vì ngữ nghĩa, không phải vì kiểu chữ. */
+.footer-address {
+  font-style: normal;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.5;
+  max-width: 26ch;
+}
+
 .shop-footer {
   margin-top: var(--space-20);
   padding-block: var(--space-12) var(--space-8);

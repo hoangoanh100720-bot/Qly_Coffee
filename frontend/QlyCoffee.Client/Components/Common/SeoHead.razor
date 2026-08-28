@@ -1,0 +1,184 @@
+@*
+    =============================================================================
+    SEO HEAD — Thẻ meta dùng chung cho mọi trang
+    =============================================================================
+
+    CÁCH DÙNG
+
+        <SeoHead Title="Thực đơn"
+                 Description="Hơn 40 món cà phê, trà trái cây và đá xay..."
+                 Path="/menu"
+                 Image="img/drink-tra-sua.webp" />
+
+    Component này ghi vào <head> thông qua <HeadContent>, hoạt động được là nhờ
+    Program.cs đã đăng ký:  builder.RootComponents.Add<HeadOutlet>("head::after");
+
+    NHỮNG GÌ ĐƯỢC SINH RA
+      - <title>                      tiêu đề tab và tiêu đề trên kết quả Google
+      - meta description             đoạn mô tả dưới tiêu đề trên Google
+      - link rel=canonical           chống trùng lặp nội dung (một trang có nhiều
+                                     đường dẫn: /gio-hang và /dat-mon cùng trỏ về một chỗ)
+      - meta robots                  cho phép hay chặn lập chỉ mục
+      - Open Graph (og:*)            khung xem trước khi dán link lên Facebook, Zalo
+      - Twitter Card                 khung xem trước trên X/Twitter
+
+    ⚠️ GIỚI HẠN CẦN BIẾT
+    Đây là ứng dụng Blazor WebAssembly — HTML được dựng bằng JavaScript ở phía
+    trình duyệt. Googlebot có chạy JavaScript nên vẫn đọc được các thẻ này,
+    NHƯNG nó phải xếp trang vào hàng đợi dựng lại, chậm hơn trang HTML tĩnh vài
+    ngày. Các bot không chạy JavaScript (Facebook, Zalo, Twitter khi tạo khung
+    xem trước link) thì CHỈ đọc được HTML gốc.
+
+    Vì vậy wwwroot/index.html đã ghi sẵn một bộ thẻ mặc định cho toàn site —
+    bot nào không chạy JavaScript vẫn có tiêu đề, mô tả và ảnh để hiển thị.
+    Component này ghi đè bộ mặc định đó cho từng trang cụ thể.
+
+    Muốn SEO thật sự tốt thì bước tiếp theo là bật prerender phía máy chủ
+    (chuyển sang Blazor Web App interactive WebAssembly, hoặc đặt một lớp
+    prerender trước site). Xem ghi chú ở cuối docs/SEO.md.
+    =============================================================================
+*@
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<HeadContent>
+    @* --- Cơ bản ---------------------------------------------------------- *@
+    <meta name="description" content="@Description" />
+    <link rel="canonical" href="@CanonicalUrl" />
+    <meta name="robots" content="@RobotsValue" />
+
+    @* --- Open Graph: Facebook, Zalo, Messenger, LinkedIn ------------------ *@
+    <meta property="og:type" content="@OgType" />
+    <meta property="og:site_name" content="Qly Coffee" />
+    <meta property="og:locale" content="vi_VN" />
+    <meta property="og:title" content="@FullTitle" />
+    <meta property="og:description" content="@Description" />
+    <meta property="og:url" content="@CanonicalUrl" />
+    <meta property="og:image" content="@AbsoluteImageUrl" />
+    <meta property="og:image:alt" content="@(ImageAlt ?? FullTitle)" />
+
+    @* --- Twitter/X -------------------------------------------------------
+         summary_large_image cho ảnh tràn ngang thay vì ô vuông nhỏ bên trái. *@
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="@FullTitle" />
+    <meta name="twitter:description" content="@Description" />
+    <meta name="twitter:image" content="@AbsoluteImageUrl" />
+</HeadContent>
+
+@* PageTitle tách riêng khỏi HeadContent — Blazor xử lý <title> qua kênh riêng *@
+<PageTitle>@FullTitle</PageTitle>
+
+@code {
+    /// <summary>
+    /// Tiêu đề riêng của trang, KHÔNG kèm tên quán — component tự nối "— Qly Coffee".
+    /// Để trống thì dùng tiêu đề mặc định của trang chủ.
+    /// Độ dài nên dưới 60 ký tự, quá dài Google sẽ cắt bằng dấu ba chấm.
+    /// </summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>
+    /// Đoạn mô tả hiện dưới tiêu đề trên kết quả tìm kiếm.
+    /// Nên dài 120–160 ký tự và chứa từ khóa khách thật sự gõ vào Google.
+    /// </summary>
+    [Parameter] public string Description { get; set; } = DefaultDescription;
+
+    /// <summary>
+    /// Đường dẫn chuẩn của trang, bắt đầu bằng "/". Để trống thì lấy URL hiện tại
+    /// (đã bỏ query string) — dùng cho trang có tham số lọc không cần lập chỉ mục.
+    /// </summary>
+    [Parameter] public string? Path { get; set; }
+
+    /// <summary>Ảnh xem trước khi chia sẻ link. Đường dẫn tương đối tính từ gốc site.</summary>
+    [Parameter] public string Image { get; set; } = DrinkPhoto.OgCover;
+
+    /// <summary>Mô tả ảnh xem trước, dành cho người dùng trình đọc màn hình.</summary>
+    [Parameter] public string? ImageAlt { get; set; }
+
+    /// <summary>
+    /// Đặt true cho các trang KHÔNG được lên Google: giỏ hàng, đăng nhập,
+    /// trang quản lý, trang tra cứu đơn theo mã. Những trang này hoặc là riêng tư,
+    /// hoặc là nội dung mỏng — để chúng lên chỉ mục làm loãng chất lượng cả site.
+    /// </summary>
+    [Parameter] public bool NoIndex { get; set; }
+
+    /// <summary>
+    /// Loại nội dung theo chuẩn Open Graph. Trang món ăn nên truyền "product"
+    /// để Facebook hiển thị đúng khung có giá.
+    /// </summary>
+    [Parameter] public string OgType { get; set; } = "website";
+
+    private const string DefaultTitle = "Qly Coffee — Cà phê pha phin & trà trái cây";
+    private const string DefaultDescription =
+        "Cà phê pha phin, trà trái cây tươi và đá xay tại TP.HCM. Đặt món online, "
+      + "biết trước món còn hay hết, tới lấy là có. Mở cửa 07:00 – 22:00 mỗi ngày.";
+
+    /// <summary>Tiêu đề đầy đủ hiện trên tab trình duyệt và trên Google.</summary>
+    private string FullTitle =>
+        string.IsNullOrWhiteSpace(Title) ? DefaultTitle : $"{Title} — Qly Coffee";
+
+    /// <summary>
+    /// URL chuẩn tuyệt đối. Phải là tuyệt đối: thẻ canonical và og:url dùng
+    /// đường dẫn tương đối sẽ bị bot bỏ qua.
+    /// </summary>
+    private string CanonicalUrl
+    {
+        get
+        {
+            var baseUri = Nav.BaseUri.TrimEnd('/');
+
+            if (!string.IsNullOrWhiteSpace(Path))
+                return $"{baseUri}/{Path.TrimStart('/')}";
+
+            // Không truyền Path thì lấy URL hiện tại nhưng CẮT BỎ query string —
+            // "/menu?q=trà" và "/menu?q=cà phê" là cùng một trang với Google,
+            // để nguyên query sẽ tạo ra vô số bản trùng lặp.
+            var current = Nav.Uri;
+            var q = current.IndexOf('?');
+            return q >= 0 ? current[..q] : current;
+        }
+    }
+
+    /// <summary>Ảnh xem trước dạng URL tuyệt đối — bắt buộc với og:image.</summary>
+    private string AbsoluteImageUrl =>
+        Image.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? Image
+            : $"{Nav.BaseUri.TrimEnd('/')}/{Image.TrimStart('/')}";
+
+    /// <summary>
+    /// "noindex, follow" chứ không phải "noindex, nofollow": vẫn muốn bot đi
+    /// theo các liên kết trên trang giỏ hàng để tìm ra trang món, chỉ là không
+    /// đưa chính trang giỏ hàng vào chỉ mục.
+    /// </summary>
+    private string RobotsValue =>
+        NoIndex ? "noindex, follow" : "index, follow, max-image-preview:large";
+
+    /// <summary>
+    /// Gỡ bộ thẻ SEO mặc định của index.html sau khi thẻ của trang đã được ghi.
+    ///
+    /// Vì sao phải làm: HeadOutlet của Blazor THÊM thẻ chứ không thay thế. Không
+    /// gỡ thì mỗi trang có hai thẻ canonical trỏ hai nơi khác nhau, và Google
+    /// gặp hai canonical mâu thuẫn thì bỏ qua cả hai.
+    ///
+    /// Vì sao đặt trong OnAfterRenderAsync chứ không phải OnInitialized: phải
+    /// đợi Blazor ghi xong thẻ mới rồi mới gỡ thẻ cũ. Làm ngược lại thì có một
+    /// khoảnh khắc head không có thẻ mô tả nào.
+    ///
+    /// firstRender = true chỉ đúng MỘT lần cho mỗi lần khởi động ứng dụng, đúng
+    /// bằng số lần cần gọi — thẻ mặc định chỉ có trong HTML gốc, gỡ rồi là hết.
+    /// Chuyển trang không dựng lại chúng.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("qlySeo.clearDefaults");
+        }
+        catch (JSException)
+        {
+            // index.html cũ chưa có window.qlySeo. Trang vẫn chạy bình thường,
+            // chỉ là còn dư một bộ thẻ mặc định — không đáng để làm sập giao diện.
+        }
+    }
+}

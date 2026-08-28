@@ -2,8 +2,26 @@
     =============================================================================
     SHOP LAYOUT — Khung trang bán hàng (khối công khai)
     =============================================================================
-    Archetype: trang thương mại. Chữ lớn được phép, nhịp dọc rộng rãi,
+    Archetype: TRANG THƯƠNG MẠI. Chữ lớn được phép, nhịp dọc rộng rãi,
     một lời kêu gọi hành động rõ ràng mỗi màn hình.
+
+    BA QUYẾT ĐỊNH VỀ CẤU TRÚC
+
+    1. THẺ HTML NGỮ NGHĨA, KHÔNG PHẢI DIV
+       header / nav / main / footer / address. Vừa để trình đọc màn hình nhảy
+       theo vùng, vừa để bot tìm kiếm biết đâu là nội dung chính và đâu là
+       khung lặp lại trên mọi trang.
+
+    2. THÔNG TIN QUÁN Ở CHÂN TRANG CÓ ĐÁNH DẤU MICRODATA
+       itemscope/itemprop theo schema.org/CafeOrCoffeeShop. Google đối chiếu
+       thông tin này với khối JSON-LD trong index.html — trùng khớp thì độ tin
+       cậy của hồ sơ doanh nghiệp tăng lên. Đây là yếu tố cốt lõi của SEO địa
+       phương: khách gõ "cà phê quận 1" thì quán mới có cơ hội xuất hiện.
+
+    3. ĐỊA CHỈ VÀ SỐ ĐIỆN THOẠI VIẾT MỘT CHỖ DUY NHẤT
+       Các hằng số ở cuối file. Sai lệch giữa website và Google Maps là lỗi SEO
+       địa phương phổ biến nhất, nên càng ít nơi phải sửa càng tốt.
+       ⚠️ Sửa ở đây thì nhớ sửa cả khối JSON-LD trong wwwroot/index.html.
     =============================================================================
 *@
 @inherits LayoutComponentBase
@@ -14,12 +32,15 @@
 
 <div class="shop-root">
 
-    @* ── THANH ĐIỀU HƯỚNG ────────────────────────────────────────────────── *@
+    @* ── THANH ĐIỀU HƯỚNG ──────────────────────────────────────────────────
+         Dính trên đỉnh (position: sticky) và có nền mờ — khách cuộn tới đâu
+         cũng bấm được vào giỏ hàng. Xem .topnav trong design-system.css §11. *@
     <header class="topnav">
         <div class="container topnav-inner">
 
-            <a href="/" class="brand" style="padding: 0; text-decoration: none; color: inherit;">
-                <LogoMark Size="34" />
+            <a href="/" class="brand" style="padding: 0; text-decoration: none; color: inherit;"
+               aria-label="Qly Coffee — về trang chủ">
+                <LogoMark Size="38" />
                 <div class="stack" style="gap: 0;">
                     <span class="brand-name">Qly Coffee</span>
                     <span class="brand-sub">Cà phê &amp; Trà</span>
@@ -33,14 +54,16 @@
             </nav>
 
             <div class="row row-2">
-                @* Nút đổi sáng/tối — người dùng chọn thủ công sẽ thắng cấu hình hệ thống *@
+                @* Nút đổi sáng/tối — lựa chọn thủ công thắng cấu hình hệ điều hành *@
                 <button class="btn btn-ghost btn-icon" @onclick="ToggleTheme"
                         aria-label="Đổi giao diện sáng/tối" title="Đổi giao diện sáng/tối">
-                    <ThemeIcon Size="18" />
+                    <ThemeIcon Size="20" />
                 </button>
 
+                @* Số trên nút giỏ có aria-live nên trình đọc màn hình thông báo
+                   ngay khi khách thêm món, không cần họ tự đi kiểm tra. *@
                 <a href="/gio-hang" class="btn btn-primary cart-btn" aria-label="Giỏ hàng">
-                    <CartIcon Size="18" />
+                    <CartIcon Size="20" />
                     <span class="hide-sm">Giỏ hàng</span>
                     @if (Cart.TotalQuantity > 0)
                     {
@@ -51,44 +74,61 @@
         </div>
     </header>
 
-    @* ── NỘI DUNG ────────────────────────────────────────────────────────── *@
+    @* ── NỘI DUNG ──────────────────────────────────────────────────────────
+         id="main-content" là đích của liên kết bỏ qua điều hướng trong index.html *@
     <main id="main-content">
         @Body
     </main>
 
-    @* ── CHÂN TRANG ──────────────────────────────────────────────────────── *@
-    <footer class="shop-footer">
+    @* ── CHÂN TRANG ────────────────────────────────────────────────────────
+         itemscope trên footer: mọi itemprop bên trong thuộc về doanh nghiệp này. *@
+    <footer class="shop-footer" itemscope itemtype="https://schema.org/CafeOrCoffeeShop">
         <div class="container">
             <div class="footer-grid">
 
                 <div class="stack stack-3">
                     <div class="row row-3">
-                        <LogoMark Size="30" />
-                        <span class="brand-name">Qly Coffee</span>
+                        <LogoMark Size="34" />
+                        <span class="brand-name" itemprop="name">Qly Coffee</span>
                     </div>
-                    <p class="small muted" style="max-width: 34ch;">
+                    <p class="small text-2" style="max-width: 34ch;" itemprop="description">
                         Cà phê pha phin, trà trái cây và đá xay — làm tươi mỗi ly,
                         đong đếm bằng công thức chuẩn.
                     </p>
                 </div>
 
+                @* Địa chỉ dùng thẻ <address> chứ không phải <div>: đây đúng là
+                   thông tin liên hệ của chủ sở hữu trang, và trình đọc màn hình
+                   thông báo rõ điều đó. *@
                 <div class="stack stack-2">
                     <span class="label">Ghé quán</span>
-                    <span class="small">@StoreAddress</span>
+                    <address class="footer-address"
+                             itemprop="address" itemscope itemtype="https://schema.org/PostalAddress">
+                        <span itemprop="streetAddress">123 Nguyễn Huệ</span>,
+                        <span itemprop="addressLocality">Bến Nghé</span>,
+                        <span itemprop="addressRegion">Quận 1, TP.HCM</span>
+                    </address>
                     <span class="small">
-                        Mở cửa <span class="num">@OpenTime</span> – <span class="num">@CloseTime</span> mỗi ngày
+                        Mở cửa
+                        @* <time> cho phép bot đọc đúng khung giờ thay vì đoán từ chuỗi chữ *@
+                        <time itemprop="openingHours" datetime="Mo-Su 07:00-22:00">
+                            <span class="num">@OpenTime</span> – <span class="num">@CloseTime</span>
+                        </time>
+                        mỗi ngày
                     </span>
                 </div>
 
                 <div class="stack stack-2">
                     <span class="label">Liên hệ</span>
-                    <a href="tel:@StorePhone" class="small">@StorePhone</a>
-                    <a href="mailto:@StoreEmail" class="small">@StoreEmail</a>
+                    <a href="tel:@StorePhoneRaw" class="small" itemprop="telephone">@StorePhone</a>
+                    <a href="mailto:@StoreEmail" class="small" itemprop="email">@StoreEmail</a>
                 </div>
 
                 <div class="stack stack-2">
                     <span class="label">Dành cho nhân viên</span>
-                    <a href="/admin" class="small">Trang quản lý</a>
+                    @* rel="nofollow": không muốn bot dồn "sức mạnh liên kết" vào
+                       trang quản lý, vốn đã bị chặn lập chỉ mục. *@
+                    <a href="/admin" class="small" rel="nofollow">Trang quản lý</a>
                 </div>
             </div>
 
@@ -101,12 +141,30 @@
 </div>
 
 @code {
-    // Thông tin quán — thực tế nạp từ API /api/store; để hằng số cho bản dựng đầu.
-    private const string StoreAddress = "123 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM";
-    private const string StorePhone   = "0901 234 567";
-    private const string StoreEmail   = "xinchao@qlycoffee.vn";
-    private const string OpenTime     = "07:00";
-    private const string CloseTime    = "22:00";
+    // ==========================================================================
+    //  THÔNG TIN QUÁN
+    // ==========================================================================
+    //  Để hằng số cho bản dựng đầu; thực tế nên nạp từ API /api/store để nhân
+    //  viên đổi được trong trang quản lý mà không phải build lại frontend.
+    //
+    //  ⚠️ Ba nơi phải khớp nhau tuyệt đối, nếu lệch thì Google hạ điểm tin cậy
+    //     hồ sơ doanh nghiệp:
+    //       1. Các hằng số dưới đây
+    //       2. Khối JSON-LD trong wwwroot/index.html
+    //       3. Hồ sơ Google Business Profile của quán
+    // ==========================================================================
+
+    private const string StoreAddress  = "123 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM";
+
+    /// <summary>Số điện thoại hiển thị cho người đọc, có khoảng trắng cho dễ nhìn.</summary>
+    private const string StorePhone    = "0901 234 567";
+
+    /// <summary>Số điện thoại cho thuộc tính href="tel:" — không được có khoảng trắng.</summary>
+    private const string StorePhoneRaw = "0901234567";
+
+    private const string StoreEmail    = "xinchao@qlycoffee.vn";
+    private const string OpenTime      = "07:00";
+    private const string CloseTime     = "22:00";
 
     protected override void OnInitialized()
     {

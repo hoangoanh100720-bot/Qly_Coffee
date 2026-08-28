@@ -15,44 +15,302 @@
 /* =============================================================================
    §1  TRANG CHỦ
 ============================================================================= */
-.hero {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: var(--space-12);
-  align-items: center;
-  padding-block: clamp(var(--space-12), 8vw, var(--space-24));
+/* --- Dải nền hero ----------------------------------------------------------
+   MỘT lớp chuyển sắc dọc duy nhất, rất nhạt, từ kem ấm về màu nền.
+
+   Bản trước dùng hai quầng màu tròn mờ (cam và tím) đặt chồng lên nhau. Kết
+   quả là nền có hai vùng màu không liên quan tới nội dung, còn khoảng trống
+   dưới hero thì ánh tím — trông như lỗi hiển thị hơn là chủ ý thiết kế.
+   Nền phẳng một sắc để ẢNH và CHỮ là thứ duy nhất thu hút mắt.               */
+.hero-band {
+  position: relative;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent-soft) 62%, var(--bg)) 0%,
+    var(--bg) 92%);
+  border-bottom: 1px solid var(--border);
 }
+
+.hero {
+  position: relative; z-index: 1;
+  display: grid;
+  /* Cột chữ rộng hơn cột ảnh: tiêu đề hero cần đủ chỗ để mỗi câu nằm gọn một
+     dòng, còn lưới ảnh thì co giãn theo cột nên nhường phần rộng cho chữ. */
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr);
+  gap: clamp(var(--space-8), 4vw, var(--space-12));
+  align-items: center;
+  padding-block: clamp(var(--space-12), 7vw, var(--space-20));
+}
+
+.hero-text { display: flex; flex-direction: column; gap: var(--space-6); }
 
 .hero-title {
   font-size: var(--text-3xl);
   font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.05;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
 }
 
-/* Ba ly xếp so le — ly giữa lớn nhất và nhô lên, tạo nhịp thị giác
-   thay vì một hàng ngang đều đặn buồn tẻ. */
-.hero-visual {
-  display: flex;
-  align-items: flex-end;
-  gap: calc(var(--space-4) * -1);
+.hero-lead   { max-width: 46ch; }
+.hero-actions { margin-top: var(--space-2); }
+
+/* --- Chip "đang mở cửa" ----------------------------------------------------
+   Nền trắng đặc + viền, KHÔNG trong suốt: nó nằm trên nền chuyển sắc của
+   .hero-band, để trong suốt thì độ tương phản của chữ sẽ đổi theo vị trí. */
+.pill-live {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1px solid var(--accent-border);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--text-sm); font-weight: 700;
+  color: var(--text-2);
 }
-.hero-glass { filter: drop-shadow(0 12px 24px hsl(26 40% 20% / .14)); }
-.hero-glass-1 { transform: rotate(-7deg) translateY(14px); z-index: 1; }
-.hero-glass-2 { z-index: 3; margin-inline: -18px; }
-.hero-glass-3 { transform: rotate(7deg) translateY(14px); z-index: 2; }
+/* Chấm nhấp nháy — dấu hiệu "đang hoạt động" quen thuộc từ app nhắn tin */
+.pulse-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 70%, transparent);
+  animation: pulse-ring 2s var(--ease-out) infinite;
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0   color-mix(in srgb, var(--ok) 60%, transparent); }
+  70%  { box-shadow: 0 0 0 9px color-mix(in srgb, var(--ok) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--ok) 0%, transparent); }
+}
+
+/* --- Ba con số tạo lòng tin ------------------------------------------------ */
+.hero-stats {
+  display: flex; flex-wrap: wrap; gap: var(--space-8);
+  margin: var(--space-2) 0 0;
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+.hero-stats div  { display: flex; flex-direction: column-reverse; gap: 2px; }
+.hero-stats dt   { font-size: var(--text-xs); color: var(--muted); }
+.hero-stats dd   { margin: 0; font-family: var(--font-display);
+                   font-size: var(--text-xl); font-weight: 800; line-height: 1.1; }
+
+/* --- Ảnh hero --------------------------------------------------------------
+   MỘT ẢNH DUY NHẤT, KHÔNG XOAY, KHÔNG CHỒNG LỚP.
+
+   Hai bản trước đã thử ba ảnh: đầu tiên xếp nghiêng chồng lên nhau (ảnh tràn
+   sang cột chữ, mép ngoài bị cắt), sau đó là lưới mosaic 2 cột (gọn hơn nhưng
+   vẫn đẩy hero cao lên và chia sự chú ý ra ba chỗ).
+
+   Chốt lại một ảnh. Hero chỉ có MỘT việc — nói quán bán gì rồi mời bấm nút.
+   Hai ảnh còn lại vốn đã xuất hiện ở dải danh mục và lưới món ngay bên dưới,
+   để thêm ở đây là lặp lại chính mình.
+
+   aspect-ratio 4/3 chứ không phải ảnh cao: khối ảnh phải cao xấp xỉ cột chữ
+   bên trái để hai cột kết thúc cùng một đường ngang. Ảnh cao hơn sẽ kéo dài
+   hero ra vô cớ — đúng cái "dài" cần tránh.                                  */
+.hero-photo {
+  margin: 0;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+}
+.hero-photo img { width: 100%; height: 100%; object-fit: cover; }
 
 @media (max-width: 900px) {
+  /* Máy tính bảng: ảnh xuống dưới chữ và giới hạn bề ngang, không kéo dài
+     hết màn hình — một tấm ảnh rộng 900px trông như banner quảng cáo. */
   .hero { grid-template-columns: 1fr; gap: var(--space-8); }
-  .hero-visual { justify-content: center; }
+  .hero-photo { max-width: 560px; }
 }
-@media (max-width: 520px) {
-  /* Màn hình hẹp: bỏ hai ly hai bên, giữ ly giữa cho gọn */
-  .hero-glass-1, .hero-glass-3 { display: none; }
-  .hero-glass-2 { margin-inline: 0; }
+@media (max-width: 560px) {
+  /* Điện thoại: ảnh thấp lại (3/2) để phần chữ và nút vẫn nằm trong màn hình
+     đầu tiên, không phải cuộn mới thấy nút đặt món. */
+  .hero-photo { aspect-ratio: 3 / 2; }
+
+  /* Hai nút kéo full chiều ngang và xếp chồng.
+     Ở 390px chúng gần vừa một hàng nhưng không đủ, nên tự xuống dòng với hai
+     bề ngang khác nhau — trông như lỗi. Kéo full là lựa chọn CÓ CHỦ ĐÍCH:
+     vùng bấm to hơn cho ngón tay, và hai nút thẳng mép nhau. */
+  .hero-actions { flex-direction: column; align-items: stretch; }
+  .hero-actions .btn { width: 100%; }
+
+  /* Ba con số chuyển từ flex-wrap sang lưới đều cột. Flex-wrap để lại một số
+     lẻ nằm một mình ở dòng dưới, lưới thì luôn cân. */
+  .hero-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: var(--space-4);
+  }
 }
 
-.grid-3 { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+/* --- Dải danh mục ảnh tròn, cuộn ngang -------------------------------------
+   Cuộn ngang có điểm neo (scroll-snap) để mỗi lần vuốt dừng gọn ở một mục,
+   giống cách cuộn Stories trên điện thoại.                                   */
+.cat-rail {
+  display: flex; gap: var(--space-5);
+  padding-block: var(--space-8);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  /* Khoảng đệm âm hai bên để mục đầu/cuối chạm được mép container khi cuộn */
+  margin-inline: calc(var(--space-2) * -1);
+  padding-inline: var(--space-2);
+}
+.cat-rail::-webkit-scrollbar { display: none; }
+
+.cat-item {
+  flex: none;
+  scroll-snap-align: start;
+  width: 108px;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  text-decoration: none; color: inherit;
+}
+.cat-item img {
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  /* Vòng màu lấy từ --cat (màu danh mục trong database) — mỗi nhóm một sắc,
+     nhờ vậy dải danh mục có nhịp màu thật thay vì một dãy tròn giống hệt nhau. */
+  border: 3px solid color-mix(in srgb, var(--cat, var(--accent)) 65%, var(--surface));
+  box-shadow: var(--shadow);
+  transition: transform var(--dur-slow) var(--ease-bounce);
+}
+.cat-item:hover img,
+.cat-item:focus-visible img { transform: scale(1.07) rotate(-3deg); }
+
+.cat-name  { font-weight: 700; font-size: var(--text-sm); text-align: center; line-height: 1.25; }
+.cat-count { font-size: var(--text-xs); color: var(--muted); }
+
+/* --- Banner khuyến mãi: xếp chồng, cách nhau đều --------------------------- */
+.promo-stack {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+/* --- Đầu mỗi khối nội dung -------------------------------------------------
+   .section-head được dùng trên HAI loại khung khác nhau:
+     - .row .section-head   → tiêu đề bên trái, nút "Xem tất cả" bên phải
+     - .stack .section-head → chỉ có nhãn và tiêu đề, xếp dọc
+
+   Vì vậy KHÔNG đặt align-items chung ở đây. Đặt align-items: flex-end ở mức
+   chung sẽ làm khối .stack (trục chính là dọc, trục phụ là NGANG) bị đẩy hết
+   sang phải — đúng lỗi của bản trước.                                        */
+.section-head { margin-bottom: var(--space-8); gap: var(--space-4); }
+
+/* Chỉ khi là hàng ngang mới canh đáy, để chữ tiêu đề và nút cùng nằm trên
+   một đường cơ sở dù chiều cao hai bên khác nhau. */
+.row.section-head { align-items: flex-end; }
+
+/* Khi xếp dọc thì canh trái — cùng một mép với lưới nội dung bên dưới. */
+.stack.section-head { align-items: flex-start; text-align: left; }
+
+/* --- Thẻ "vì sao chọn quán": ẢNH ở trên, chữ ở dưới ------------------------ */
+.grid-3 { display: grid; gap: var(--space-5); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+.feature-card {
+  display: flex; flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform var(--dur-slow) var(--ease-bounce),
+              box-shadow var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out);
+}
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--accent-border);
+}
+/* aspect-ratio cố định 16:10 để ba thẻ luôn cao bằng nhau dù ba tấm ảnh gốc
+   có tỉ lệ khác nhau — không có nó thì hàng thẻ sẽ so le. */
+.feature-card img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.feature-body {
+  padding: var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+
+/* --- Khối hai cột ảnh + chữ ------------------------------------------------ */
+.split-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(var(--space-8), 5vw, var(--space-16));
+  align-items: center;
+}
+.split-photo {
+  margin: 0;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.split-photo img { width: 100%; aspect-ratio: 10 / 7; object-fit: cover; }
+.split-text { max-width: 52ch; }
+
+@media (max-width: 860px) {
+  /* Màn hẹp: chữ lên trước ảnh. Người dùng đọc được nội dung ngay mà không
+     phải cuộn qua một tấm ảnh cao. */
+  .split-section { grid-template-columns: 1fr; }
+  .split-photo { order: 2; }
+  .split-text  { order: 1; }
+}
+
+/* --- Danh sách có dấu tích ------------------------------------------------- */
+.tick-list { list-style: none; margin: 0; padding: 0;
+             display: flex; flex-direction: column; gap: var(--space-3); }
+.tick-list li {
+  position: relative;
+  padding-left: var(--space-8);
+  color: var(--text-2);
+}
+/* Dấu tích vẽ bằng CSS thay vì ký tự ✓ — ký tự này rơi về font dự phòng khác
+   nhau trên từng hệ điều hành, kích thước không đoán trước được. */
+.tick-list li::before {
+  content: "";
+  position: absolute; left: 0; top: .42em;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--fresh-soft);
+}
+.tick-list li::after {
+  content: "";
+  position: absolute; left: 6px; top: calc(.42em + 5px);
+  width: 7px; height: 4px;
+  border-left: 2px solid var(--fresh);
+  border-bottom: 2px solid var(--fresh);
+  rotate: -45deg;
+}
+
+/* --- Dải chốt cuối trang ---------------------------------------------------
+   Nền gradient đặc — khối duy nhất trên trang dùng nền tối/đậm, nên mắt tự
+   hiểu đây là điểm dừng. Chữ trắng trên gradient cam-hồng đạt trên 4.5:1 ở
+   cả hai đầu dải màu.                                                        */
+.cta-band {
+  margin-top: clamp(var(--space-10), 5vw, var(--space-16));
+  padding-block: clamp(var(--space-12), 6vw, var(--space-20));
+  background: var(--grad-hot);
+  color: hsl(40 60% 99%);
+}
+.cta-title { font-size: var(--text-2xl); color: inherit; }
+.cta-lead  { color: hsl(40 60% 99% / .92); max-width: 44ch; }
+/* Nút đảo màu: nền trắng, chữ accent — cách duy nhất để nút nổi trên nền cam */
+.cta-btn {
+  background: hsl(40 60% 99%);
+  color: var(--accent);
+  box-shadow: 0 8px 24px -8px hsl(22 45% 12% / .4);
+}
+.cta-btn:hover { background: white; color: var(--accent-hover); }
+
+/* Tôn trọng cấu hình giảm chuyển động của hệ điều hành.
+   Trang chủ chỉ còn một hiệu ứng lặp vô hạn duy nhất — chấm nhấp nháy trên chip
+   "đang mở cửa" — nên khối này ngắn. Hiệu ứng trôi ảnh hero đã bị bỏ hẳn ở bản
+   này vì nó làm bố cục trông lộn xộn chứ không chỉ vì lý do trợ năng.
+   Bố cục giữ nguyên: tắt chuyển động không được làm mất phần tử nào. */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot  { animation: none; }
+  .cat-item:hover img,
+  .cat-item:focus-visible img { transform: none; }
+  .card-hover:hover, .product-card:hover, .feature-card:hover { transform: none; }
+}
 
 /* =============================================================================
    §2  CHI TIẾT MÓN

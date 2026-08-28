@@ -13,7 +13,14 @@
 @inject ApiClient Api
 @implements IDisposable
 
-<PageTitle>Tra cứu đơn — Qly Coffee</PageTitle>
+@*  Trang tra cứu KHÔNG kèm mã đơn (/tra-cuu-don) là nội dung công khai hữu ích,
+    cho lên chỉ mục. Trang có mã đơn (/don-hang/ABC123) chứa thông tin đơn của
+    một người cụ thể — bắt buộc noindex, nếu không mã đơn của khách sẽ tìm được
+    trên Google.                                                               *@
+<SeoHead Title="Tra cứu đơn hàng"
+         Description="Nhập mã đơn để xem tình trạng đơn đã đặt tại Qly Coffee: đang pha, sẵn sàng lấy, hay đã hoàn tất."
+         Path="/tra-cuu-don"
+         NoIndex="@(!string.IsNullOrEmpty(Code))" />
 
 <div class="container container-narrow section-sm">
 
@@ -108,9 +115,11 @@
                     @foreach (var item in _order.Items)
                     {
                         <div class="row row-3">
-                            <DrinkGlass DrinkColor="@item.ColorPrimaryHex"
-                                        FoamColor="@item.ColorAccentHex"
-                                        Size="44" AriaLabel="" />
+                            @* Ảnh thật thay cho hình vẽ. alt rỗng vì tên món đứng ngay cạnh. *@
+                            <img class="order-thumb"
+                                 src="@DrinkPhoto.PhotoFor(null, null, item.ProductName)"
+                                 alt="" loading="lazy" decoding="async"
+                                 width="56" height="56" />
                             <div class="stack stack-1 grow">
                                 <span style="font-weight: 600;">
                                     @item.ProductName

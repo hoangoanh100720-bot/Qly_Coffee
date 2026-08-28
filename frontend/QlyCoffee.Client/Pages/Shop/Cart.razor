@@ -19,7 +19,15 @@
 @inject NavigationManager Nav
 @implements IDisposable
 
-<PageTitle>Giỏ hàng — Qly Coffee</PageTitle>
+@*  NoIndex: giỏ hàng là nội dung riêng của từng người và thay đổi liên tục —
+    không có gì để Google lập chỉ mục. Vẫn để "follow" nên bot đi tiếp được
+    tới các trang món qua liên kết trên trang này.
+    Trang này có hai đường dẫn (/gio-hang và /dat-mon); Path cố định về
+    /gio-hang để cả hai cùng trỏ về một canonical duy nhất.                    *@
+<SeoHead Title="Giỏ hàng"
+         Description="Xem lại món đã chọn và gửi đơn đặt tại Qly Coffee."
+         Path="/gio-hang"
+         NoIndex="true" />
 
 <div class="container container-narrow section-sm">
 
@@ -45,17 +53,13 @@
                     <article class="cart-line" @key="item.LineKey"
                              style="--drink: @item.ColorPrimaryHex; --foam: @item.ColorAccentHex;">
 
+                        @*  Ảnh chụp thật, luôn có. alt="" là CỐ Ý: tên món nằm ngay
+                            bên cạnh dưới dạng chữ, để trình đọc màn hình đọc lại lần
+                            nữa chỉ làm rườm rà. Đây là ảnh trang trí thuần túy.      *@
                         <div class="cart-thumb">
-                            @if (!string.IsNullOrEmpty(item.ImageUrl))
-                            {
-                                <img src="@Media.Resolve(item.ImageUrl)" alt="" width="72" height="72" />
-                            }
-                            else
-                            {
-                                <DrinkGlass DrinkColor="@item.ColorPrimaryHex"
-                                            FoamColor="@item.ColorAccentHex"
-                                            Size="56" AriaLabel="" />
-                            }
+                            <img src="@DrinkPhoto.PhotoFor(item.ImageUrl, null, item.ProductName)"
+                                 alt="" loading="lazy" decoding="async"
+                                 width="72" height="72" />
                         </div>
 
                         <div class="stack stack-1 grow">

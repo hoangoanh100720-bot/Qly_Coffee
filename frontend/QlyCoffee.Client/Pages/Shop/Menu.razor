@@ -12,13 +12,22 @@
 @inject ApiClient Api
 @inject NavigationManager Nav
 
-<PageTitle>Thực đơn — Qly Coffee</PageTitle>
+@*  SEO: tiêu đề và mô tả đổi theo danh mục đang lọc, nhờ vậy /menu/danh-muc/tra-sua
+    có một trang riêng trên Google thay vì bị coi là bản trùng lặp của /menu.
+    Path cũng trỏ đúng đường dẫn danh mục — nếu để trống thì canonical sẽ lấy
+    URL hiện tại và trang lọc sẽ tự trỏ về chính nó, đúng ý muốn ở đây.          *@
+<SeoHead Title="@SeoTitle"
+         Description="@SeoDescription"
+         Path="@SeoPath"
+         Image="@SeoImage" />
 
 <div class="container section-sm">
 
-    @* ── TIÊU ĐỀ TRANG ───────────────────────────────────────────────────── *@
+    @* ── TIÊU ĐỀ TRANG ─────────────────────────────────────────────────────
+         h1 đổi theo danh mục đang xem. Một trang chỉ được có ĐÚNG MỘT h1, và
+         nội dung h1 nên khớp với thẻ title — đây là tín hiệu xếp hạng cơ bản. *@
     <header class="stack stack-3 menu-header">
-        <h1>Thực đơn</h1>
+        <h1>@PageHeading</h1>
         <p class="lead prose">
             Cà phê pha phin, trà trái cây và đá xay. Mỗi ly làm tươi theo công thức
             định lượng chuẩn — không ước lượng bằng mắt.
@@ -136,6 +145,50 @@
 
     /// <summary>Món tạm hết — hiển thị riêng ở cuối trang.</summary>
     private List<ProductCardDto> _unavailableProducts = new();
+
+    // ==========================================================================
+    //  SEO — thẻ meta đổi theo danh mục đang lọc
+    // ==========================================================================
+    //  Mỗi danh mục là một trang riêng trên Google. Nếu dùng chung một tiêu đề
+    //  "Thực đơn — Qly Coffee" cho cả /menu lẫn 8 trang danh mục thì Google coi
+    //  chúng là bản trùng lặp và chỉ giữ lại một trang trong chỉ mục.
+    // ==========================================================================
+
+    /// <summary>Danh mục đang lọc, null khi đang xem toàn bộ thực đơn.</summary>
+    private CategoryDto? ActiveCategory =>
+        _activeCategory is null
+            ? null
+            : _categories?.FirstOrDefault(c => c.Slug == _activeCategory);
+
+    /// <summary>Tiêu đề h1 trên trang. Khớp với thẻ title để tăng độ liên quan.</summary>
+    private string PageHeading => ActiveCategory?.Name ?? "Thực đơn";
+
+    private string SeoTitle =>
+        ActiveCategory is { } c ? $"{c.Name} — Thực đơn" : "Thực đơn";
+
+    private string SeoDescription
+    {
+        get
+        {
+            if (ActiveCategory is not { } c)
+                return "Toàn bộ thực đơn Qly Coffee: cà phê pha phin, trà trái cây, "
+                     + "trà sữa và đá xay. Xem giá, đặt online, biết trước món còn hay hết.";
+
+            // Ưu tiên mô tả danh mục do quán tự nhập; thiếu thì ghép câu có số món.
+            var than = string.IsNullOrWhiteSpace(c.Description)
+                ? $"{c.ProductCount} món {c.Name.ToLowerInvariant()} pha tươi theo công thức định lượng chuẩn"
+                : c.Description.Trim().TrimEnd('.');
+
+            return $"{than}. Xem giá và đặt online tại Qly Coffee, tới lấy là có.";
+        }
+    }
+
+    private string SeoPath =>
+        _activeCategory is null ? "/menu" : $"/menu/danh-muc/{_activeCategory}";
+
+    /// <summary>Ảnh xem trước khi chia sẻ link — lấy ảnh đại diện của danh mục.</summary>
+    private string SeoImage =>
+        ActiveCategory is { } c ? DrinkPhoto.FallbackFor(c.Name, null) : DrinkPhoto.OgCover;
 
     protected override async Task OnInitializedAsync()
     {

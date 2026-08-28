@@ -4,20 +4,132 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 
-    <title>Qly Coffee — Cà phê &amp; Trà</title>
-    <meta name="description" content="Cà phê pha phin, trà trái cây và đá xay. Đặt món online, biết trước món còn hay hết." />
+    <!-- =====================================================================
+         SEO — BỘ THẺ MẶC ĐỊNH CHO TOÀN SITE
+         =====================================================================
+         Đây là ứng dụng Blazor WebAssembly: HTML thật được JavaScript dựng ra
+         sau khi tải xong. Googlebot có chạy JavaScript nên nó đọc được thẻ do
+         component SeoHead sinh ra cho từng trang — nhưng các bot KHÔNG chạy
+         JavaScript (Facebook, Zalo, Twitter lúc tạo khung xem trước link) thì
+         chỉ đọc được đúng file này.
 
-    <!-- Màu thanh trạng thái trên trình duyệt di động — khớp với nền của giao diện.
-         Khai báo cả hai chế độ để không bị lệch màu khi người dùng đổi sáng/tối. -->
-    <meta name="theme-color" content="#F1F4F4" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0B1413" media="(prefers-color-scheme: dark)" />
+         Vì vậy mọi thẻ dưới đây là BẢN DỰ PHÒNG cho toàn site. Trang cụ thể sẽ
+         ghi đè chúng qua <SeoHead> — xem Components/Common/SeoHead.razor.
+
+         Thuộc tính data-seo-default đánh dấu những thẻ SẼ BỊ GỠ ngay khi Blazor
+         dựng xong trang đầu tiên (xem window.qlySeo bên dưới). Không gỡ thì mỗi
+         trang sẽ có hai thẻ canonical và hai thẻ description — Google gặp hai
+         canonical mâu thuẫn thì bỏ qua cả hai.
+
+         ⚠️ KHI DEPLOY LÊN TÊN MIỀN THẬT
+         Sửa https://qlycoffee.vn ở toàn bộ file này (dùng tìm-thay), và trong
+         wwwroot/robots.txt + wwwroot/sitemap.xml.
+         ===================================================================== -->
+
+    <title>Qly Coffee — Cà phê pha phin &amp; trà trái cây</title>
+    <meta data-seo-default name="description" content="Cà phê pha phin, trà trái cây tươi và đá xay tại TP.HCM. Đặt món online, biết trước món còn hay hết, tới lấy là có. Mở cửa 07:00 – 22:00 mỗi ngày." />
+    <link data-seo-default rel="canonical" href="https://qlycoffee.vn/" />
+    <meta data-seo-default name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="author" content="Qly Coffee" />
+
+    <!-- Khung xem trước khi dán link lên Facebook, Zalo, Messenger, LinkedIn.
+         og:image phải là URL TUYỆT ĐỐI và là ảnh bitmap (jpg/png), không dùng
+         SVG — các bot mạng xã hội không dựng được SVG. -->
+    <meta data-seo-default property="og:type" content="website" />
+    <meta data-seo-default property="og:site_name" content="Qly Coffee" />
+    <meta data-seo-default property="og:locale" content="vi_VN" />
+    <meta data-seo-default property="og:title" content="Qly Coffee — Cà phê pha phin &amp; trà trái cây" />
+    <meta data-seo-default property="og:description" content="Cà phê pha phin, trà trái cây tươi và đá xay tại TP.HCM. Đặt món online, biết trước món còn hay hết." />
+    <meta data-seo-default property="og:url" content="https://qlycoffee.vn/" />
+    <meta data-seo-default property="og:image" content="https://qlycoffee.vn/img/og-cover.jpg" />
+    <meta data-seo-default property="og:image:width" content="1200" />
+    <meta data-seo-default property="og:image:height" content="630" />
+    <meta data-seo-default property="og:image:alt" content="Ly cà phê sữa đá pha phin của Qly Coffee" />
+
+    <meta data-seo-default name="twitter:card" content="summary_large_image" />
+    <meta data-seo-default name="twitter:title" content="Qly Coffee — Cà phê pha phin &amp; trà trái cây" />
+    <meta data-seo-default name="twitter:description" content="Đặt cà phê, trà trái cây và đá xay online. Biết trước món còn hay hết." />
+    <meta data-seo-default name="twitter:image" content="https://qlycoffee.vn/img/og-cover.jpg" />
+
+    <!-- Dữ liệu có cấu trúc (JSON-LD).
+         Google dùng khối này để hiện Knowledge Panel bên phải kết quả tìm kiếm:
+         giờ mở cửa, địa chỉ, số điện thoại, nút chỉ đường. Đặt trong index.html
+         (không đặt trong component Blazor) vì nó là thông tin của cả doanh
+         nghiệp, không đổi theo trang, và cần bot đọc được kể cả khi không chạy
+         JavaScript.
+         ⚠️ Cập nhật địa chỉ, điện thoại và tọa độ cho khớp với quán thật. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CafeOrCoffeeShop",
+      "name": "Qly Coffee",
+      "description": "Quán cà phê pha phin, trà trái cây tươi và đá xay. Đặt món online, biết trước món còn hay hết.",
+      "url": "https://qlycoffee.vn/",
+      "image": "https://qlycoffee.vn/img/og-cover.jpg",
+      "logo": "https://qlycoffee.vn/favicon.svg",
+      "telephone": "+84901234567",
+      "email": "xinchao@qlycoffee.vn",
+      "priceRange": "20.000₫ – 65.000₫",
+      "currenciesAccepted": "VND",
+      "servesCuisine": ["Cà phê", "Trà trái cây", "Đá xay", "Trà sữa"],
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "123 Nguyễn Huệ",
+        "addressLocality": "Phường Bến Nghé",
+        "addressRegion": "Quận 1, TP. Hồ Chí Minh",
+        "addressCountry": "VN"
+      },
+      "openingHoursSpecification": [{
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+        "opens": "07:00",
+        "closes": "22:00"
+      }],
+      "hasMenu": "https://qlycoffee.vn/menu",
+      "acceptsReservations": "False",
+      "potentialAction": {
+        "@type": "OrderAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://qlycoffee.vn/menu",
+          "actionPlatform": [
+            "http://schema.org/DesktopWebPlatform",
+            "http://schema.org/MobileWebPlatform"
+          ]
+        },
+        "deliveryMethod": "http://purl.org/goodrelations/v1#DeliveryModePickUp"
+      }
+    }
+    </script>
+
+    <!-- Ô tìm kiếm ngay dưới kết quả Google cho tên thương hiệu -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Qly Coffee",
+      "url": "https://qlycoffee.vn/",
+      "inLanguage": "vi-VN",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": { "@type": "EntryPoint", "urlTemplate": "https://qlycoffee.vn/menu?q={search_term_string}" },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Màu thanh trạng thái trên trình duyệt di động — khớp với nền giao diện.
+         Khai báo cả hai chế độ để không bị lệch màu khi người dùng đổi sáng/tối.
+         Giá trị lấy đúng từ token --bg trong design-system.css §1. -->
+    <meta name="theme-color" content="#FCF9F3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#181410" media="(prefers-color-scheme: dark)" />
 
     <base href="/" />
 
     <!-- ĐẶT SCRIPT NÀY TRƯỚC CSS ĐỂ TRÁNH NHẤP NHÁY MÀU.
-         Nếu chờ Blazor khởi động rồi mới áp dụng chủ đề thì người dùng chọn nền tối
-         sẽ thấy một chớp trắng lúc tải trang. Đoạn script đồng bộ này chạy trước khi
-         trình duyệt vẽ khung hình đầu tiên nên không bao giờ nhấp nháy. -->
+         Nếu chờ Blazor khởi động rồi mới áp dụng chủ đề thì người dùng chọn nền
+         tối sẽ thấy một chớp trắng lúc tải trang. Đoạn script đồng bộ này chạy
+         trước khi trình duyệt vẽ khung hình đầu tiên nên không bao giờ nhấp nháy. -->
     <script>
         window.qlyTheme = {
             apply: function (theme) {
@@ -35,13 +147,64 @@
             var saved = localStorage.getItem('qly-theme');
             if (saved) window.qlyTheme.apply(saved);
         } catch (e) { /* chế độ riêng tư chặn localStorage — dùng theo hệ thống */ }
+
+        // --------------------------------------------------------------------
+        //  GỠ BỘ THẺ SEO MẶC ĐỊNH
+        // --------------------------------------------------------------------
+        //  Component SeoHead THÊM thẻ mới vào <head> chứ không thay thế thẻ có
+        //  sẵn — đó là cách <HeadOutlet> của Blazor hoạt động. Kết quả là mỗi
+        //  trang có hai bộ thẻ: bộ mặc định trong file này và bộ của trang.
+        //
+        //  Hàm dưới gỡ bộ mặc định đi, được gọi từ SeoHead sau lần dựng đầu tiên.
+        //  Thời điểm gọi rất quan trọng: gọi SAU khi Blazor đã ghi thẻ của trang,
+        //  nên không bao giờ có khoảnh khắc <head> thiếu thẻ mô tả.
+        //
+        //  Bot không chạy JavaScript không bao giờ thấy hàm này chạy — chúng đọc
+        //  bộ mặc định, đúng như thiết kế.
+        // --------------------------------------------------------------------
+        window.qlySeo = {
+            clearDefaults: function () {
+                var tags = document.querySelectorAll('[data-seo-default]');
+                for (var i = 0; i < tags.length; i++) tags[i].remove();
+                // Gọi lần thứ hai là vô hại: querySelectorAll trả về danh sách rỗng.
+                return tags.length;
+            }
+        };
     </script>
+
+    <!-- =====================================================================
+         PHÔNG CHỮ
+         =====================================================================
+         Be Vietnam Pro — thân bài và giao diện. Được vẽ riêng cho tiếng Việt
+                          nên dấu không bị đè lên chữ hoa hay lệch sang bên.
+         Baloo 2         — tiêu đề. Bo tròn, vui, hợp nhóm khách trẻ.
+
+         preconnect mở sẵn kết nối tới hai máy chủ của Google Fonts ngay từ đầu,
+         tiết kiệm khoảng 100–300ms so với để trình duyệt tự phát hiện.
+         crossorigin trên dòng gstatic là BẮT BUỘC — file font tải theo chế độ
+         CORS, thiếu thuộc tính này thì preconnect vô tác dụng.
+
+         display=swap: hiện ngay bằng font hệ thống rồi mới đổi sang font tải về.
+         Trang không bao giờ trắng chữ chờ font — Google phạt điểm việc đó.
+         Mạng chặn Google Fonts thì rơi về font hệ thống, bố cục vẫn nguyên vẹn
+         vì mọi kích thước tính bằng rem.
+         ===================================================================== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600..800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
+
+    <!-- Ảnh hero là phần tử LCP (Largest Contentful Paint) — chỉ số Google dùng
+         để chấm tốc độ. preload để nó bắt đầu tải song song với WebAssembly
+         thay vì đợi Blazor khởi động xong mới biết cần tải ảnh nào. -->
+    <link rel="preload" as="image" href="img/hero-ca-phe-da.webp" fetchpriority="high" />
 
     <link rel="stylesheet" href="css/design-system.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="css/pages.css" />
     <link rel="stylesheet" href="css/admin.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="img/og-cover.jpg" />
     <link rel="manifest" href="manifest.json" />
 </head>
 
@@ -51,20 +214,43 @@
 
     <div id="app">
         <!-- Màn hình chờ trong lúc tải WebAssembly.
-             Dùng khung xương thay vì vòng xoay để trang không nhảy khi nội dung thật xuất hiện. -->
+             Dùng khung xương thay vì vòng xoay để trang không nhảy khi nội dung
+             thật xuất hiện.
+
+             <noscript> bên dưới KHÔNG chỉ để báo lỗi: nó là nội dung DUY NHẤT
+             mà bot không chạy JavaScript đọc được. Vì vậy nó chứa tên quán,
+             mô tả, địa chỉ và giờ mở cửa dưới dạng HTML thật. -->
         <div class="boot-screen">
             <div class="boot-mark">
                 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
                     <path d="M12 16h24l-3 22a4 4 0 0 1-4 3.5H19a4 4 0 0 1-4-3.5L12 16Z"
-                          stroke="#0A6E63" stroke-width="2.5" stroke-linejoin="round"/>
-                    <path d="M36 20h4a5 5 0 0 1 0 10h-3" stroke="#0A6E63" stroke-width="2.5"/>
+                          stroke="#CB3E0B" stroke-width="2.5" stroke-linejoin="round"/>
+                    <path d="M36 20h4a5 5 0 0 1 0 10h-3" stroke="#CB3E0B" stroke-width="2.5"/>
                     <path d="M20 10c2-3-2-5 0-8M28 10c2-3-2-5 0-8"
-                          stroke="#C8791A" stroke-width="2.5" stroke-linecap="round"/>
+                          stroke="#E8952A" stroke-width="2.5" stroke-linecap="round"/>
                 </svg>
             </div>
             <p class="boot-text">Đang tải Qly Coffee…</p>
         </div>
     </div>
+
+    <noscript>
+        <div class="noscript-content">
+            <h1>Qly Coffee — Cà phê pha phin &amp; trà trái cây</h1>
+            <p>
+                Cà phê pha phin, trà trái cây tươi và đá xay. Mỗi ly làm theo công thức
+                định lượng chuẩn — đong bằng cân, không ước lượng bằng mắt.
+                Đặt trước trên web, tới lấy là có.
+            </p>
+            <p><strong>Địa chỉ:</strong> 123 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM</p>
+            <p><strong>Mở cửa:</strong> 07:00 – 22:00 mỗi ngày</p>
+            <p><strong>Điện thoại:</strong> <a href="tel:0901234567">0901 234 567</a></p>
+            <p>
+                Trang này cần JavaScript để đặt món.
+                Vui lòng bật JavaScript hoặc gọi điện trực tiếp cho quán.
+            </p>
+        </div>
+    </noscript>
 
     <!-- Thông báo lỗi cấp ứng dụng của Blazor, dịch sang tiếng Việt -->
     <div id="blazor-error-ui">
@@ -77,30 +263,41 @@
 
     <style>
         /* Kiểu cho màn hình chờ — viết inline vì phải hiển thị được TRƯỚC khi
-           file CSS bên ngoài tải xong. */
+           file CSS bên ngoài tải xong. Màu lấy đúng từ token --bg / --accent. */
         .boot-screen {
             position: fixed; inset: 0;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             gap: 16px;
-            background: #F1F4F4;
+            background: #FCF9F3;
             font-family: system-ui, "Segoe UI", sans-serif;
         }
         @media (prefers-color-scheme: dark) {
-            .boot-screen { background: #0B1413; }
-            .boot-text { color: #97A8A6 !important; }
+            .boot-screen { background: #181410; }
+            .boot-text { color: #A5998D !important; }
         }
         .boot-mark { animation: boot-pulse 1.8s ease-in-out infinite; }
-        .boot-text { font-size: 14px; color: #7A8B89; margin: 0; }
+        .boot-text { font-size: 15px; color: #806F60; margin: 0; }
         @keyframes boot-pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50%      { opacity: .55; transform: scale(.96); }
         }
         @media (prefers-reduced-motion: reduce) { .boot-mark { animation: none; } }
 
+        /* Nội dung dự phòng khi không có JavaScript. Kiểu tối giản nhưng vẫn
+           đọc được — nó là bản danh thiếp của quán trên các trình duyệt cũ. */
+        .noscript-content {
+            position: relative; z-index: 10;
+            max-width: 640px; margin: 0 auto; padding: 48px 24px;
+            background: #FCF9F3; color: #2C1B11;
+            font-family: system-ui, "Segoe UI", sans-serif; line-height: 1.6;
+        }
+        .noscript-content h1 { font-size: 32px; line-height: 1.2; margin: 0 0 16px; }
+        .noscript-content p  { margin: 0 0 12px; }
+
         /* Liên kết bỏ qua — ẩn cho tới khi nhận focus bằng bàn phím */
         .skip-link {
             position: absolute; left: -9999px; z-index: 999;
-            padding: 12px 20px; background: #0A6E63; color: white;
+            padding: 12px 20px; background: #CB3E0B; color: white;
             border-radius: 0 0 8px 0; text-decoration: none; font-weight: 600;
         }
         .skip-link:focus { left: 0; top: 0; }
@@ -109,8 +306,8 @@
             display: none;
             position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
             padding: 14px 20px;
-            background: #B23A34; color: white;
-            font-family: system-ui, sans-serif; font-size: 14px;
+            background: #C11F2A; color: white;
+            font-family: system-ui, sans-serif; font-size: 15px;
             box-shadow: 0 -2px 12px rgba(0,0,0,.25);
         }
         #blazor-error-ui a { color: white; text-decoration: underline; margin-left: 12px; cursor: pointer; }

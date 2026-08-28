@@ -12,7 +12,11 @@
 @inject AuthStateProvider Auth
 @inject NavigationManager Nav
 
-<PageTitle>Đăng nhập — Qly Coffee</PageTitle>
+@* Trang đăng nhập dành cho nhân viên — không có lý do gì để nó lên Google *@
+<SeoHead Title="Đăng nhập"
+         Description="Đăng nhập trang quản lý Qly Coffee."
+         Path="/dang-nhap"
+         NoIndex="true" />
 
 <div class="auth-page">
     <main class="auth-card">

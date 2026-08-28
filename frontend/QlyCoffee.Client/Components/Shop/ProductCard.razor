@@ -5,20 +5,28 @@
 
     Điểm thiết kế đáng chú ý:
 
-    1. NỀN THẺ PHA TỪ CHÍNH MÀU LY NƯỚC
-       Hai biến --drink và --foam được truyền qua style inline, lấy thẳng từ
-       database. CSS dùng color-mix để pha thành nền chuyển sắc. Kết quả:
-       thẻ cà phê ngả nâu, thẻ matcha ngả xanh, thẻ trà đào ngả cam —
-       lưới menu có nhịp màu thật thay vì một dãy thẻ trắng giống hệt nhau.
+    1. LUÔN LÀ ẢNH CHỤP THẬT
+       Bản trước dựng hình ly nước bằng SVG khi món chưa có ảnh. Giờ thì không:
+       DrinkPhoto.PhotoFor() ưu tiên ảnh quán tự chụp, thiếu thì lấy ảnh mẫu
+       theo danh mục trong wwwroot/img/. Ảnh thật bán được hàng, hình vẽ thì không.
 
-    2. BA TRẠNG THÁI TỒN KHO ĐỀU ĐƯỢC XỬ LÝ
+    2. NỀN Ô ẢNH VẪN PHA TỪ MÀU MÓN TRONG DATABASE
+       Hai biến --drink và --foam truyền qua style inline. Trong khoảnh khắc ảnh
+       chưa tải xong, ô ảnh đã mang đúng sắc của món thay vì một mảng xám —
+       trang không bị "nhấp nháy xám" khi cuộn nhanh qua lưới menu.
+
+    3. BA TRẠNG THÁI TỒN KHO ĐỀU ĐƯỢC XỬ LÝ
        còn nhiều → bình thường
        còn ít    → nhãn "Chỉ còn N ly" màu cảnh báo
-       hết       → làm mờ hình, chữ "Tạm hết", nút bị vô hiệu và có lý do
+       hết       → làm mờ ảnh, chip "Tạm hết", nút bị vô hiệu và có lý do
 
-    3. KHÔNG DÙNG MÀU ĐƠN THUẦN ĐỂ TRUYỀN TIN
+    4. KHÔNG DÙNG MÀU ĐƠN THUẦN ĐỂ TRUYỀN TIN
        Hết hàng vừa đổi màu, vừa có chữ, vừa vô hiệu nút — người mù màu
-       hoặc đọc màn hình vẫn nhận được thông tin.
+       hoặc dùng trình đọc màn hình vẫn nhận được thông tin.
+
+    5. KÍCH THƯỚC ẢNH KHAI BÁO SẴN (width/height)
+       Trình duyệt giữ chỗ đúng bằng ô ảnh trước khi ảnh về, nên lưới không
+       giật khi ảnh tải xong. Đây là chỉ số CLS mà Google dùng để xếp hạng.
     =============================================================================
 *@
 
@@ -30,32 +38,24 @@
 
         <div class="product-visual">
 
-            @* Nhãn góc: best-seller, món mới, đang giảm giá *@
+            @* Nhãn góc: đang giảm giá, bán chạy, món mới.
+               Dùng badge nền đặc vì nhãn nằm đè lên ảnh — nhãn nền nhạt sẽ chìm. *@
             <div class="product-tags">
                 @if (Product.DiscountPercent > 0)
                 {
-                    <span class="badge badge-danger">−@Product.DiscountPercent%</span>
+                    <span class="badge badge-solid">−@Product.DiscountPercent%</span>
                 }
                 @foreach (var tag in Product.Tags.Take(1))
                 {
-                    <span class="badge badge-neutral">@TagLabel(tag)</span>
+                    <span class="badge badge-dark">@TagLabel(tag)</span>
                 }
             </div>
 
-            @* Ảnh chụp thật nếu có; chưa có thì dựng ly nước bằng SVG từ màu trong DB *@
-            @if (!string.IsNullOrEmpty(Product.ImageUrl))
-            {
-                <img src="@Media.Resolve(Product.ImageUrl)" alt="@Product.Name" loading="lazy"
-                     width="320" height="240" />
-            }
-            else
-            {
-                <DrinkGlass DrinkColor="@Product.ColorPrimaryHex"
-                            FoamColor="@Product.ColorAccentHex"
-                            Style="@GuessGlassStyle()"
-                            Size="118"
-                            AriaLabel="@($"Minh họa {Product.Name}")" />
-            }
+            @*  loading="lazy"  — thẻ nằm ngoài màn hình đầu tiên thì hoãn tải.
+                decoding="async" — không chặn luồng dựng trang khi giải mã ảnh.  *@
+            <img src="@PhotoUrl" alt="@PhotoAlt"
+                 loading="lazy" decoding="async"
+                 width="600" height="600" />
 
             @if (!Product.IsAvailable)
             {
@@ -127,19 +127,15 @@
     private const int LowStockThreshold = 5;
 
     /// <summary>
-    /// Đoán kiểu ly từ tên danh mục để hình minh họa hợp với món.
-    /// Khi quán đã upload ảnh thật thì phần này không còn được dùng tới.
+    /// Đường dẫn ảnh và câu mô tả — tính một lần cho mỗi lần dựng thẻ thay vì
+    /// gọi lại trong markup, vì lưới menu có thể dựng hàng chục thẻ cùng lúc.
     /// </summary>
-    private DrinkGlass.GlassStyle GuessGlassStyle()
-    {
-        var c = Product.CategoryName.ToLowerInvariant();
-        if (c.Contains("trà sữa")) return DrinkGlass.GlassStyle.Boba;
-        if (c.Contains("đá xay") || c.Contains("sinh tố")) return DrinkGlass.GlassStyle.Blended;
-        if (Product.Name.Contains("nóng", StringComparison.OrdinalIgnoreCase))
-            return DrinkGlass.GlassStyle.HotCup;
-        return DrinkGlass.GlassStyle.IcedTall;
-    }
+    private string PhotoUrl => DrinkPhoto.PhotoFor(
+        Product.ImageUrl, Product.CategoryName, Product.Name);
 
+    private string PhotoAlt => DrinkPhoto.AltFor(Product.ImageUrl, Product.Name);
+
+    /// <summary>Đổi mã nhãn trong database sang chữ tiếng Việt hiển thị cho khách.</summary>
     private static string TagLabel(string tag) => tag switch
     {
         "best-seller" => "Bán chạy",

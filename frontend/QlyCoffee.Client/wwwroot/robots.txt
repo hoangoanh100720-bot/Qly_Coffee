@@ -1,0 +1,35 @@
+# =============================================================================
+#  robots.txt — Quy tắc cho bot tìm kiếm
+# =============================================================================
+#  ⚠️ Đổi tên miền ở dòng Sitemap khi deploy lên tên miền thật.
+#
+#  Nguyên tắc: CHẶN mọi thứ không phải nội dung công khai.
+#  Trang giỏ hàng, đăng nhập, quản lý đều là nội dung mỏng hoặc riêng tư —
+#  để chúng lên chỉ mục chỉ làm loãng điểm chất lượng của cả site.
+# =============================================================================
+
+User-agent: *
+
+# --- Cho phép: nội dung công khai --------------------------------------------
+Allow: /$
+Allow: /menu
+Allow: /img/
+Allow: /css/
+
+# --- Chặn: khu vực quản lý và trang riêng tư ---------------------------------
+Disallow: /admin
+Disallow: /dang-nhap
+Disallow: /gio-hang
+Disallow: /dat-mon
+Disallow: /don-hang/
+
+# --- Chặn: file kỹ thuật, không có giá trị tìm kiếm --------------------------
+Disallow: /_framework/
+Disallow: /_content/
+
+# --- Cho bot ảnh vào thư mục ảnh ---------------------------------------------
+# Ngành đồ uống có lượng truy cập đáng kể từ Google Images.
+User-agent: Googlebot-Image
+Allow: /img/
+
+Sitemap: https://qlycoffee.vn/sitemap.xml

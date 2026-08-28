@@ -1,11 +1,31 @@
 {
-  "name": "Qly Coffee",
+  "name": "Qly Coffee — Cà phê pha phin & trà trái cây",
   "short_name": "Qly Coffee",
-  "description": "Cà phê pha phin, trà trái cây và đá xay",
+  "description": "Đặt cà phê, trà trái cây và đá xay online. Biết trước món còn hay hết, tới lấy là có.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#F1F4F4",
-  "theme_color": "#0A6E63",
+  "orientation": "portrait-primary",
+  "background_color": "#FCF9F3",
+  "theme_color": "#CB3E0B",
   "lang": "vi",
-  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+  "dir": "ltr",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Xem thực đơn",
+      "short_name": "Thực đơn",
+      "description": "Mở danh sách món đang bán",
+      "url": "/menu"
+    },
+    {
+      "name": "Tra cứu đơn",
+      "short_name": "Đơn hàng",
+      "description": "Kiểm tra tình trạng đơn đã đặt",
+      "url": "/tra-cuu-don"
+    }
+  ]
 }
