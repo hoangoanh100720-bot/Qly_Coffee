@@ -25,7 +25,7 @@
     Trang này có hai đường dẫn (/gio-hang và /dat-mon); Path cố định về
     /gio-hang để cả hai cùng trỏ về một canonical duy nhất.                    *@
 <SeoHead Title="Giỏ hàng"
-         Description="Xem lại món đã chọn và gửi đơn đặt tại Qly Coffee."
+         Description="Xem lại món đã chọn và gửi đơn đặt tại Một Chút Coffee."
          Path="/gio-hang"
          NoIndex="true" />
 
@@ -84,7 +84,7 @@
                             @* Cảnh báo khi tồn kho đã giảm từ lúc khách thêm món *@
                             @if (item.Quantity >= item.MaxServings && item.MaxServings < 9999)
                             {
-                                <span class="xs text-warn">Chỉ còn @item.MaxServings ly</span>
+                                <span class="xs text-warn">Chỉ còn @item.MaxServings phần</span>
                             }
                         </div>
 
@@ -193,7 +193,7 @@
             <section class="card summary-card">
                 <div class="pl-table" style="background: transparent; border: none; padding: 0;">
                     <div class="pl-row">
-                        <span class="pl-label">Tạm tính (@CartSvc.TotalQuantity ly)</span>
+                        <span class="pl-label">Tạm tính (@CartSvc.TotalQuantity phần)</span>
                         <span class="pl-value num">@Money.Format(CartSvc.Subtotal)</span>
                     </div>
                     @if (CartSvc.TotalSaved > 0)
@@ -203,9 +203,20 @@
                             <span class="pl-value pl-positive num">−@Money.Format(CartSvc.TotalSaved)</span>
                         </div>
                     }
+                    @*  Chế độ "giá chưa gồm thuế" cộng thêm thuế vào tổng, nên
+                        dòng này phải hiện thuế riêng thì cộng dồn mới ra đúng.
+                        Với chế độ mặc định (giá đã gồm thuế) khối if bỏ qua và
+                        tổng bằng đúng tạm tính — không có dòng nào thừa.       *@
+                    @if (CartVat.Mode == (int)TaxMode.Exclusive && CartVat.Tax > 0)
+                    {
+                        <div class="pl-row">
+                            <span class="pl-label">@VatPolicy.RateLabel(CartVat.RatePercent)</span>
+                            <span class="pl-value num">@Money.Format(CartVat.Tax)</span>
+                        </div>
+                    }
                     <div class="pl-row pl-total">
                         <span class="pl-label">Tổng cộng</span>
-                        <span class="pl-value num">@Money.Format(CartSvc.Subtotal)</span>
+                        <span class="pl-value num">@Money.Format(CartVat.Gross)</span>
                     </div>
                 </div>
 
@@ -218,7 +229,7 @@
                     }
                     else
                     {
-                        <span>Đặt món · @Money.Format(CartSvc.Subtotal)</span>
+                        <span>Đặt món · @Money.Format(CartVat.Gross)</span>
                     }
                 </button>
 
@@ -231,6 +242,19 @@
 
                 <a href="/menu" class="btn btn-ghost btn-block">Chọn thêm món</a>
             </section>
+
+            @*  ── THUẾ GTGT ────────────────────────────────────────────────
+                Đặt DƯỚI nút đặt món: thứ khách cần để quyết định là tổng tiền,
+                chi tiết thuế là để đối chiếu. Chen lên trên chỉ đẩy nút xuống
+                khỏi tầm nhìn trên điện thoại.
+
+                Khối này vẫn hiện khi chưa nạp được thông tin quán — lúc đó dùng
+                cấu hình mặc định (giá đã gồm thuế 8%), vì hiện sai còn hơn biến
+                mất: khách quen nhìn thấy nó mà lần này không thấy sẽ tưởng quán
+                đang giấu gì đó.                                              *@
+            <VatSummary Vat="CartVat"
+                        TaxCode="@_store?.TaxCode"
+                        StoreName="@_store?.Name" />
         </div>
     }
 </div>
@@ -259,9 +283,33 @@
 
     private bool IsFormValid => !string.IsNullOrWhiteSpace(_name) && IsPhoneValid;
 
+    /// <summary>Thông tin quán, cần cho cấu hình thuế và mã số thuế trên bảng kê.</summary>
+    private StoreInfoDto? _store;
+
+    /// <summary>
+    /// Tách thuế của giỏ hàng hiện tại.
+    /// <para>
+    /// Gọi ĐÚNG hàm mà backend gọi lúc tạo đơn (<c>VatPolicy.Compute</c>), nên số
+    /// khách nhìn ở đây và số chốt vào đơn không thể lệch nhau.
+    /// </para>
+    /// <para>
+    /// Chưa nạp được thông tin quán thì dùng cấu hình mặc định — giá đã gồm thuế
+    /// 8%, đúng với cấu hình mặc định phía backend.
+    /// </para>
+    /// </summary>
+    private VatBreakdown CartVat => VatPolicy.Compute(
+        CartSvc.Subtotal,
+        _store?.TaxMode ?? VatPolicy.DefaultMode,
+        _store?.VatRatePercent ?? VatPolicy.DefaultRatePercent);
+
     protected override async Task OnInitializedAsync()
     {
         CartSvc.OnChange += StateHasChanged;
+
+        // Cấu hình thuế của quán. Lỗi mạng KHÔNG chặn việc đặt món: khối thuế
+        // rơi về mặc định, còn giỏ hàng vẫn dùng được bình thường.
+        var storeRes = await Api.GetStoreInfoAsync();
+        if (storeRes.Success) _store = storeRes.Data;
 
         // Đồng bộ tồn kho: món có thể đã hết từ lúc khách bỏ vào giỏ
         if (CartSvc.Items.Count > 0)

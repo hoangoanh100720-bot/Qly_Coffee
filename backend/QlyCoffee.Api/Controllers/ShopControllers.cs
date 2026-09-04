@@ -51,6 +51,46 @@ public abstract class BaseApiController : ControllerBase
 }
 
 // ==============================================================================
+//  THÔNG TIN CỬA HÀNG
+//
+//  Giỏ hàng cần biết quán tính thuế GTGT thế nào TRƯỚC khi khách bấm đặt, nếu
+//  không thì số thuế chỉ xuất hiện sau khi đơn đã tạo — tức là khách trả tiền
+//  xong mới biết mình vừa trả những gì.
+// ==============================================================================
+
+[Route("api/shop")]
+public class StoreInfoController : BaseApiController
+{
+    private readonly AppDbContext _db;
+
+    public StoreInfoController(AppDbContext db) => _db = db;
+
+    /// <summary>Thông tin công khai của quán: địa chỉ, giờ mở cửa và cấu hình thuế GTGT.</summary>
+    [HttpGet("cua-hang")]
+    public async Task<IActionResult> GetStore(CancellationToken ct)
+    {
+        var store = await _db.Stores
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == CurrentStoreId, ct);
+
+        if (store is null)
+            return Fail<StoreInfoDto>(404, "NOT_FOUND", "Chưa cấu hình cửa hàng.");
+
+        return Ok(new StoreInfoDto(
+            Name:           store.Name,
+            Address:        store.Address,
+            Phone:          store.Phone,
+            Email:          store.Email,
+            TaxCode:        store.TaxCode,
+            TaxMode:        store.TaxMode,
+            VatRatePercent: store.VatRatePercent,
+            OpenTime:       store.OpenTime,
+            CloseTime:      store.CloseTime,
+            IsOpen:         store.IsOpen));
+    }
+}
+
+// ==============================================================================
 //  THỰC ĐƠN
 // ==============================================================================
 
@@ -172,7 +212,8 @@ public class MenuController : BaseApiController
                 l.Group!.Id, l.Group.Name, l.Group.MinSelect, l.Group.MaxSelect, l.Group.IsRequired,
                 l.Group.Modifiers.Where(m => m.IsActive).OrderBy(m => m.SortOrder)
                     .Select(m => new ModifierDto(m.Id, m.Name, m.PriceDelta, m.ColorHex, true))
-                    .ToList()))
+                    .ToList(),
+                l.Group.Kind))
             .ToList();
 
         var now = DateTime.UtcNow;
@@ -184,16 +225,34 @@ public class MenuController : BaseApiController
             .Select(x => (int?)x.Value)
             .MaxAsync(ct) ?? 0;
 
+        // Gọi bằng THAM SỐ CÓ TÊN, không theo vị trí. DTO này có 18 tham số, trong
+        // đó bốn cái liền nhau đều là string? (Description, PairingNote, ImageUrl,
+        // UnavailableReason). Thêm một trường vào giữa mà gọi theo vị trí thì trình
+        // biên dịch KHÔNG báo gì cả — nó chỉ lặng lẽ đẩy mọi giá trị lệch đi một ô,
+        // và lỗi hiện ra thành "mô tả món nằm ở chỗ đường dẫn ảnh".
         return Ok(new ProductDetailDto(
-            p.Id, p.Name, p.Slug, p.Description, p.ImageUrl,
-            p.ColorPrimaryHex, p.ColorAccentHex,
-            p.BasePrice,
-            discount > 0 ? (int)Math.Round(p.BasePrice * (100 - discount) / 100.0) : p.BasePrice,
-            discount,
-            p.IsAvailable, p.MaxServings, p.UnavailableReason,
-            p.Category?.Name ?? "",
-            string.IsNullOrEmpty(p.Tags) ? Array.Empty<string>() : p.Tags.Split(','),
-            variants, groups));
+            Id:                p.Id,
+            Name:              p.Name,
+            Slug:              p.Slug,
+            Description:       p.Description,
+            PairingNote:       p.PairingNote,
+            ImageUrl:          p.ImageUrl,
+            ColorPrimaryHex:   p.ColorPrimaryHex,
+            ColorAccentHex:    p.ColorAccentHex,
+            BasePrice:         p.BasePrice,
+            EffectivePrice:    discount > 0
+                                   ? (int)Math.Round(p.BasePrice * (100 - discount) / 100.0)
+                                   : p.BasePrice,
+            DiscountPercent:   discount,
+            IsAvailable:       p.IsAvailable,
+            MaxServings:       p.MaxServings,
+            UnavailableReason: p.UnavailableReason,
+            CategoryName:      p.Category?.Name ?? "",
+            Tags:              string.IsNullOrEmpty(p.Tags)
+                                   ? Array.Empty<string>()
+                                   : p.Tags.Split(','),
+            Variants:          variants,
+            ModifierGroups:    groups));
     }
 
     /// <summary>
@@ -335,6 +394,7 @@ public class OrdersController : BaseApiController
         (int)o.OrderType, (int)o.Status, OrderService.StatusLabel(o.Status),
         (int)o.PaymentMethod, (int)o.PaymentStatus,
         o.Subtotal, o.DiscountTotal, o.GrandTotal, o.CostTotal,
+        o.TaxMode, o.TaxRatePercent, o.NetAmount, o.TaxAmount,
         o.Note, o.PlacedAt, o.ConfirmedAt, o.ReadyAt, o.CompletedAt,
         o.Items.Select(i => new OrderItemDto(
             i.Id, i.ProductId, i.ProductName, i.VariantName,
@@ -342,7 +402,7 @@ public class OrdersController : BaseApiController
             i.Product?.ColorAccentHex ?? "#C89968",
             i.Quantity, i.UnitPrice, i.LineTotal,
             ParseModifiers(i.ModifiersJson),
-            i.Note)).ToList());
+            i.Note, i.Product?.ImageUrl)).ToList());
 
     private static List<CartModifier> ParseModifiers(string json)
     {

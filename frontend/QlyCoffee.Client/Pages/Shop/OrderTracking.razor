@@ -18,7 +18,7 @@
     một người cụ thể — bắt buộc noindex, nếu không mã đơn của khách sẽ tìm được
     trên Google.                                                               *@
 <SeoHead Title="Tra cứu đơn hàng"
-         Description="Nhập mã đơn để xem tình trạng đơn đã đặt tại Qly Coffee: đang pha, sẵn sàng lấy, hay đã hoàn tất."
+         Description="Nhập mã đơn để xem tình trạng đơn đã đặt tại Một Chút Coffee: đang pha, sẵn sàng lấy, hay đã hoàn tất."
          Path="/tra-cuu-don"
          NoIndex="@(!string.IsNullOrEmpty(Code))" />
 
@@ -180,6 +180,17 @@
                     }
                 </div>
             </section>
+
+            @*  ── THUẾ GTGT ────────────────────────────────────────────────
+                Dựng từ số ĐÃ CHỤP LẠI vào đơn, không tính lại theo thuế suất
+                hôm nay: thuế suất do Quốc hội quyết và có đổi (10% → 8% → …),
+                nên đơn cũ mở lại phải ra đúng con số đã giao cho khách hôm đó.
+
+                Đơn đặt trước khi hệ thống tách thuế có TaxMode = 0, khi đó khối
+                chỉ hiện ghi chú chứ không bịa ra một dòng thuế chưa từng thu. *@
+            <VatSummary Vat="OrderVat"
+                        TaxCode="@_store?.TaxCode"
+                        StoreName="@_store?.Name" />
         </div>
     }
 </div>
@@ -188,10 +199,25 @@
     [Parameter] public string? Code { get; set; }
 
     private OrderDto? _order;
+    private StoreInfoDto? _store;
     private string _searchCode = "";
     private bool _loading;
     private bool _notFound;
     private Timer? _refreshTimer;
+
+    /// <summary>
+    /// Thuế của đơn, dựng lại từ số đã lưu chứ KHÔNG tính lại.
+    /// <para>
+    /// Dùng thẳng NetAmount/TaxAmount/GrandTotal của đơn: đó là con số đã in ra
+    /// và đã giao cho khách. Gọi lại VatPolicy.Compute theo thuế suất hôm nay sẽ
+    /// ra số khác ngay lần đầu nhà nước đổi thuế suất.
+    /// </para>
+    /// </summary>
+    private VatBreakdown OrderVat => _order is null
+        ? default
+        : new VatBreakdown(
+            _order.TaxMode, _order.TaxRatePercent,
+            _order.NetAmount, _order.TaxAmount, _order.GrandTotal);
 
     /// <summary>Bốn bước hiển thị. Trạng thái 1 (đã xác nhận) gộp vào bước "đã nhận đơn".</summary>
     private static readonly (string Label, int Step)[] Steps =
@@ -201,6 +227,14 @@
         ("Món đã xong", 3),
         ("Đã giao",     4)
     };
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Chỉ để lấy tên quán và mã số thuế in kèm bảng kê. Hỏng thì bảng kê vẫn
+        // hiện đủ số tiền, chỉ thiếu phần thông tin bên bán.
+        var res = await Api.GetStoreInfoAsync();
+        if (res.Success) _store = res.Data;
+    }
 
     protected override async Task OnParametersSetAsync()
     {

@@ -29,8 +29,8 @@
     <header class="stack stack-3 menu-header">
         <h1>@PageHeading</h1>
         <p class="lead prose">
-            Cà phê pha phin, trà trái cây và đá xay. Mỗi ly làm tươi theo công thức
-            định lượng chuẩn — không ước lượng bằng mắt.
+            Cà phê pha phin, trà trái cây, đá xay và bánh nhập trong ngày. Mỗi phần
+            làm theo công thức định lượng chuẩn — không ước lượng bằng mắt.
         </p>
     </header>
 
@@ -150,7 +150,7 @@
     //  SEO — thẻ meta đổi theo danh mục đang lọc
     // ==========================================================================
     //  Mỗi danh mục là một trang riêng trên Google. Nếu dùng chung một tiêu đề
-    //  "Thực đơn — Qly Coffee" cho cả /menu lẫn 8 trang danh mục thì Google coi
+    //  "Thực đơn — Một Chút Coffee" cho cả /menu lẫn 8 trang danh mục thì Google coi
     //  chúng là bản trùng lặp và chỉ giữ lại một trang trong chỉ mục.
     // ==========================================================================
 
@@ -171,7 +171,7 @@
         get
         {
             if (ActiveCategory is not { } c)
-                return "Toàn bộ thực đơn Qly Coffee: cà phê pha phin, trà trái cây, "
+                return "Toàn bộ thực đơn Một Chút Coffee: cà phê pha phin, trà trái cây, "
                      + "trà sữa và đá xay. Xem giá, đặt online, biết trước món còn hay hết.";
 
             // Ưu tiên mô tả danh mục do quán tự nhập; thiếu thì ghép câu có số món.
@@ -179,7 +179,7 @@
                 ? $"{c.ProductCount} món {c.Name.ToLowerInvariant()} pha tươi theo công thức định lượng chuẩn"
                 : c.Description.Trim().TrimEnd('.');
 
-            return $"{than}. Xem giá và đặt online tại Qly Coffee, tới lấy là có.";
+            return $"{than}. Xem giá và đặt online tại Một Chút Coffee, tới lấy là có.";
         }
     }
 

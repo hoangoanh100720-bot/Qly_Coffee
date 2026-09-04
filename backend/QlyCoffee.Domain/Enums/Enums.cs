@@ -85,7 +85,18 @@ public enum IngredientCategory
     Packaging = 8,
 
     /// <summary>Khác: đá viên, nước lọc, trứng.</summary>
-    Other = 9
+    Other = 9,
+
+    /// <summary>
+    /// Bánh và đồ ăn nhẹ NHẬP VỀ nguyên cái: croissant, tiramisu, cookie, bánh mì que.
+    /// <para>
+    /// Tách riêng khỏi <see cref="Other"/> vì nhóm này có đặc thù nghiệp vụ khác hẳn
+    /// nguyên liệu pha chế: đơn vị luôn là "cái", hạn dùng tính bằng ngày, và tỷ lệ
+    /// giá vốn trên giá bán chấp nhận được cao hơn đồ uống
+    /// (xem <c>QlyCoffee.Shared.Pricing.FoodCostRatioPercent</c>).
+    /// </para>
+    /// </summary>
+    Bakery = 10
 }
 
 /// <summary>
@@ -160,16 +171,16 @@ public enum OrderStatus
     /// <summary>Khách vừa đặt, chưa xác nhận. CHƯA trừ kho.</summary>
     Pending = 0,
 
-    /// <summary>Đã xác nhận — ĐÃ TRỪ KHO tại thời điểm này.</summary>
+    /// <summary>Đã xác nhận, đã vào hàng pha. CHƯA trừ kho.</summary>
     Confirmed = 1,
 
-    /// <summary>Đang pha chế. Không động vào kho.</summary>
+    /// <summary>Nhân viên đang pha. CHƯA trừ kho.</summary>
     Preparing = 2,
 
-    /// <summary>Đã pha xong, chờ khách nhận. Không động vào kho.</summary>
+    /// <summary>Đã pha xong, chờ khách nhận. CHƯA trừ kho.</summary>
     Ready = 3,
 
-    /// <summary>Đã giao cho khách, đơn hoàn tất. Không động vào kho.</summary>
+    /// <summary>Đã giao cho khách. ĐÂY LÀ LÚC TRỪ KHO.</summary>
     Completed = 4,
 
     /// <summary>Đã hủy. Nếu trước đó đã trừ kho thì hệ thống tự hoàn lại đúng lô.</summary>
@@ -324,4 +335,55 @@ public enum RiskSeverity
 
     /// <summary>Khẩn cấp — hết hạn trong 1 ngày hoặc giá trị rất lớn.</summary>
     Critical = 3
+}
+
+/// <summary>
+/// Đơn đến từ đâu. Tách ra vì hai kênh có luồng khác nhau:
+/// đơn online phải chờ nhân viên xác nhận rồi mới vào hàng pha, còn đơn tại quầy
+/// thì nhân viên đứng trước mặt khách nên vào hàng pha ngay.
+/// Cũng dùng để tách doanh thu online / tại quán trong báo cáo.
+/// </summary>
+public enum OrderChannel
+{
+    /// <summary>Khách tự đặt trên web.</summary>
+    Online = 0,
+
+    /// <summary>Nhân viên bấm máy tại quầy.</summary>
+    InStore = 1
+}
+
+// ------------------------------------------------------------------------------
+//  THANH TOÁN CHUYỂN KHOẢN
+// ------------------------------------------------------------------------------
+
+/// <summary>
+/// Kết quả đối soát một giao dịch ngân hàng do SePay báo về.
+/// <para>
+/// Chỉ <see cref="Matched"/> mới làm đơn chuyển sang đã thanh toán. Mọi giá trị
+/// còn lại đều là "tiền đã vào tài khoản nhưng chưa gán được cho đơn nào" —
+/// phải hiện ra cho chủ quán xử lý tay, tuyệt đối không được bỏ qua im lặng.
+/// </para>
+/// </summary>
+public enum PaymentMatchStatus
+{
+    /// <summary>Chưa đối soát được, chưa rơi vào trường hợp cụ thể nào bên dưới.</summary>
+    Unmatched = 0,
+
+    /// <summary>Khớp đúng đơn, đủ tiền. Đơn đã được đánh dấu đã thanh toán.</summary>
+    Matched = 1,
+
+    /// <summary>Nội dung chuyển khoản không chứa mã tham chiếu nào của quán.</summary>
+    NoReference = 2,
+
+    /// <summary>Dò ra mã tham chiếu nhưng không có đơn nào mang mã đó.</summary>
+    OrderNotFound = 3,
+
+    /// <summary>Đúng đơn nhưng chuyển thiếu tiền. Đơn vẫn để chưa thanh toán.</summary>
+    AmountMismatch = 4,
+
+    /// <summary>Đơn đã được đánh dấu thanh toán từ trước (trả tiền mặt, hoặc trả hai lần).</summary>
+    AlreadyPaid = 5,
+
+    /// <summary>Giao dịch tiền RA, hoặc không liên quan tới thanh toán đơn.</summary>
+    Ignored = 6
 }

@@ -24,12 +24,13 @@
 @page "/"
 @layout ShopLayout
 @inject ApiClient Api
+@implements IDisposable
 
 @* SEO: trang chủ là trang quan trọng nhất, mô tả phải chứa đúng cụm từ khách gõ *@
 <SeoHead Path="/"
          Description="Cà phê pha phin, trà trái cây tươi và đá xay tại TP.HCM. Đặt món online, biết trước món còn hay hết, tới lấy là có. Mở cửa 07:00 – 22:00 mỗi ngày."
          Image="@DrinkPhoto.OgCover"
-         ImageAlt="Ly cà phê sữa đá pha phin của Qly Coffee" />
+         ImageAlt="Ly cà phê sữa đá pha phin của Một Chút Coffee" />
 
 @* ═══ 1. HERO ══════════════════════════════════════════════════════════════
      Hai cột: chữ bên trái, LƯỚI BA ẢNH THẲNG HÀNG bên phải.
@@ -40,11 +41,21 @@
 
         <div class="hero-text">
 
-            @* Chip trạng thái: chấm nhấp nháy + giờ mở cửa.
-               Chấm có aria-hidden vì thông tin đã nằm trong chữ bên cạnh. *@
-            <span class="pill-live">
+            @*  Chip trạng thái: chấm + câu trạng thái, ĐỔI THEO GIỜ THẬT.
+
+                Trong giờ bán: chấm xanh nhấp nháy, chữ "Đang mở cửa".
+                Ngoài giờ bán: chấm đỏ đứng yên, chữ "Đã đóng cửa · Mở lại lúc 07:00".
+
+                Chấm đỏ cố tình KHÔNG nhấp nháy: nhịp đập là dấu hiệu "đang hoạt
+                động", để nó chạy trên trạng thái đóng cửa thì hai tín hiệu đánh
+                nhau. Màu và chữ cùng nói một điều thì khách đọc lướt cũng hiểu.
+
+                aria-live="polite" để trình đọc màn hình thông báo khi trạng thái
+                tự lật lúc tới giờ đóng cửa; chấm màu có aria-hidden vì thông tin
+                của nó đã nằm nguyên trong chữ bên cạnh.                        *@
+            <span class="pill-live @(_isOpen ? "" : "is-closed")" aria-live="polite">
                 <span class="pulse-dot" aria-hidden="true"></span>
-                Mở cửa 07:00 – 22:00 mỗi ngày
+                @StoreHours.StatusLabel(_isOpen)
             </span>
 
             @*  h1 là tiêu đề DUY NHẤT cấp 1 của trang — quy tắc SEO cơ bản.
@@ -67,7 +78,16 @@
                 <a href="/tra-cuu-don" class="btn btn-secondary btn-lg">Tra cứu đơn</a>
             </div>
 
-            @* Ba con số tạo lòng tin. Dùng .num để chữ số thẳng hàng. *@
+            @*  HAI con số tạo lòng tin, không phải ba.
+
+                Ô thứ ba từng là "15h/ngày", sau đổi thành "7/7" — cả hai đều
+                đọc như thông số kỹ thuật dán lên trang bán hàng, và cái nào
+                cũng chỉ nhắc lại điều mà chip trạng thái ngay phía trên đã nói
+                rõ hơn ("Đang mở cửa · 07:00 – 22:00 mỗi ngày"). Bỏ hẳn.
+
+                Hai con số còn lại là hai con số khách thật sự quan tâm trước khi
+                bấm "Xem thực đơn": có bao nhiêu món để chọn, và chờ bao lâu.
+                Dùng .num để chữ số thẳng hàng.                                 *@
             <dl class="hero-stats">
                 <div>
                     <dt>Món trong thực đơn</dt>
@@ -76,10 +96,6 @@
                 <div>
                     <dt>Phút chuẩn bị</dt>
                     <dd class="num">5–8</dd>
-                </div>
-                <div>
-                    <dt>Giờ mở cửa</dt>
-                    <dd class="num">15h/ngày</dd>
                 </div>
             </dl>
         </div>
@@ -97,7 +113,7 @@
             màn hình đầu tiên, hoãn tải nó chỉ làm trang chậm hơn.              *@
         <figure class="hero-photo">
             <img src="@DrinkPhoto.HeroCaPhe"
-                 alt="Ly cà phê sữa đá pha phin tại Qly Coffee"
+                 alt="Ly cà phê sữa đá pha phin tại Một Chút Coffee"
                  fetchpriority="high" decoding="async"
                  width="900" height="675" />
         </figure>
@@ -119,7 +135,7 @@
                 <a href="/menu/danh-muc/@c.Slug" class="cat-item" style="--cat: @c.ColorHex">
                     <img src="@DrinkPhoto.FallbackFor(c.Name, null)"
                          alt="Nhóm món @c.Name" loading="lazy" decoding="async"
-                         width="600" height="600" />
+                         width="900" height="900" />
                     <span class="cat-name">@c.Name</span>
                     <span class="cat-count">@c.ProductCount món</span>
                 </a>
@@ -255,7 +271,7 @@
     <section class="section split-section">
         <figure class="split-photo">
             <img src="@DrinkPhoto.KhongGian"
-                 alt="Không gian quán Qly Coffee với bàn gỗ và nhiều cây xanh"
+                 alt="Không gian quán Một Chút Coffee với bàn gỗ và nhiều cây xanh"
                  loading="lazy" decoding="async" width="1000" height="700" />
         </figure>
 
@@ -268,7 +284,7 @@
             </p>
 
             <ul class="tick-list">
-                <li>Mở cửa <span class="num">07:00 – 22:00</span> tất cả các ngày</li>
+                <li>Mở cửa <span class="num">@StoreHours.OpenLabel – @StoreHours.CloseLabel</span> tất cả các ngày</li>
                 <li>123 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM</li>
                 <li>Nhận đặt món online, chuẩn bị trong <span class="num">5–8</span> phút</li>
             </ul>
@@ -300,6 +316,20 @@
     private int _totalProducts;
     private bool _loading = true;
 
+    // --- Trạng thái mở/đóng cửa ----------------------------------------------
+    /// <summary>Quán có đang mở tại lần vẽ gần nhất không. Xem Services/StoreHours.cs.</summary>
+    private bool _isOpen = StoreHours.IsOpenNow();
+
+    /// <summary>
+    /// Đồng hồ đếm mỗi phút để chip trạng thái tự lật màu.
+    ///
+    /// Không có nó thì một người mở trang lúc 21:58 rồi ngồi đọc thực đơn sẽ
+    /// thấy chấm xanh "đang mở cửa" mãi cho tới khi bấm tải lại — đúng lúc
+    /// thông tin sai gây thiệt hại nhất. Mỗi phút một lần là đủ nhuyễn cho một
+    /// mốc giờ tròn, và rẻ đến mức không cần cân nhắc.
+    /// </summary>
+    private System.Threading.Timer? _clock;
+
     protected override async Task OnInitializedAsync()
     {
         var res = await Api.GetMenuAsync();
@@ -330,5 +360,27 @@
         }
 
         _loading = false;
+
+        // Đặt sau khi tải xong dữ liệu: lúc này component chắc chắn đã gắn vào
+        // cây, InvokeAsync mới có chỗ để đẩy việc vẽ lại về đúng luồng UI.
+        _clock = new System.Threading.Timer(_ => InvokeAsync(RefreshOpenState), null,
+                           TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
     }
+
+    /// <summary>
+    /// Đối chiếu lại giờ hiện tại và CHỈ vẽ lại khi trạng thái thật sự đổi.
+    /// Gọi StateHasChanged mỗi phút cho một chuỗi chữ y hệt là bắt trình duyệt
+    /// dựng lại cả trang chủ 1440 lần mỗi ngày mà không đổi lấy một điểm ảnh.
+    /// </summary>
+    private void RefreshOpenState()
+    {
+        var open = StoreHours.IsOpenNow();
+        if (open == _isOpen) return;
+
+        _isOpen = open;
+        StateHasChanged();
+    }
+
+    /// <summary>Timer là tài nguyên hệ điều hành — rời trang thì phải trả lại.</summary>
+    public void Dispose() => _clock?.Dispose();
 }

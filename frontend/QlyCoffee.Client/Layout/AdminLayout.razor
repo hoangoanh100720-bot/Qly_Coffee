@@ -12,6 +12,8 @@
 @inject NavigationManager Nav
 @inject AlertService Alerts
 @inject ThemeService Theme
+@inject ApiClient Api
+@implements IDisposable
 
 @*  Chặn lập chỉ mục cho TOÀN BỘ khối quản lý, khai báo một lần ở layout thay vì
     lặp lại trên 12 trang con. "nofollow" ở đây (khác với trang giỏ hàng dùng
@@ -33,7 +35,7 @@
         <div class="brand">
             <LogoMark Size="32" />
             <div class="stack" style="gap: 0;">
-                <span class="brand-name">Qly Coffee</span>
+                <span class="brand-name">Một Chút Coffee</span>
                 <span class="brand-sub">Quản lý</span>
             </div>
         </div>
@@ -56,6 +58,20 @@
             </NavLink>
 
             <span class="label nav-group-label">Bán hàng</span>
+
+            @* Hai mục này là việc nhân viên làm CẢ NGÀY nên đặt trên cùng nhóm,
+               trước danh sách đơn — thứ chỉ mở ra khi cần tra lại. *@
+            <NavLink href="/admin/ban-hang" class="nav-link">
+                <CartIcon Size="17" /> Bán tại quầy
+            </NavLink>
+            <NavLink href="/admin/pha-che" class="nav-link">
+                <CupIcon Size="17" /> Pha chế
+                @if (CupsInQueue > 0)
+                {
+                    <span class="badge badge-warn nav-badge">@CupsInQueue</span>
+                }
+            </NavLink>
+
             <NavLink href="/admin/don-hang" class="nav-link">
                 <ReceiptIcon Size="17" /> Đơn hàng
                 @if (PendingOrders > 0)
@@ -76,6 +92,18 @@
                thêm trang CRUD sau. *@
 
             <span class="label nav-group-label">Kho</span>
+
+            @* Sơ chế đứng ĐẦU nhóm Kho vì nó là việc phải làm trước khi mở cửa:
+               chưa ủ trà thì nửa thực đơn không bán được. Huy hiệu đếm số bán
+               thành phẩm đã hết hoặc sắp hết, tức số mẻ cần làm ngay. *@
+            <NavLink href="/admin/so-che" class="nav-link">
+                <CalcIcon Size="17" /> Sơ chế
+                @if (PrepNeeded > 0)
+                {
+                    <span class="badge badge-danger nav-badge">@PrepNeeded</span>
+                }
+            </NavLink>
+
             <NavLink href="/admin/nguyen-lieu" class="nav-link">
                 <JarIcon Size="17" /> Nguyên liệu
             </NavLink>
@@ -150,13 +178,42 @@
     [CascadingParameter(Name = "PageSubtitle")] public string? PageSubtitle { get; set; }
 
     private bool _sidebarOpen;
+    private Timer? _badgeTimer;
 
-    // Các con số huy hiệu — nạp từ API /api/admin/badges, làm mới mỗi 60 giây.
+    // Các con số huy hiệu, nạp từ /api/admin/badges.
     private int UndecidedSuggestions { get; set; }
     private int PendingOrders { get; set; }
+    private int CupsInQueue { get; set; }
     private int CriticalLots { get; set; }
+    private int PrepNeeded { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBadgesAsync();
+
+        // 60 giây một lần. Đủ nhanh để nhân viên thấy đơn mới mà không biến
+        // thanh điều hướng thành nguồn tải cho backend.
+        _badgeTimer = new Timer(async _ => await InvokeAsync(LoadBadgesAsync),
+                                null, 60_000, 60_000);
+    }
+
+    private async Task LoadBadgesAsync()
+    {
+        var res = await Api.GetNavBadgesAsync();
+        if (!res.Success || res.Data is null) return;
+
+        PendingOrders        = res.Data.PendingOrders;
+        CupsInQueue          = res.Data.CupsInQueue;
+        CriticalLots         = res.Data.CriticalLots;
+        PrepNeeded           = res.Data.PrepNeeded;
+        UndecidedSuggestions = res.Data.UndecidedSuggestions;
+
+        StateHasChanged();
+    }
 
     private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
 
     private async Task ToggleTheme() => await Theme.ToggleAsync();
+
+    public void Dispose() => _badgeTimer?.Dispose();
 }

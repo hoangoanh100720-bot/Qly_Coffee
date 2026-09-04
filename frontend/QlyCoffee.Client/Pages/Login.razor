@@ -14,7 +14,7 @@
 
 @* Trang đăng nhập dành cho nhân viên — không có lý do gì để nó lên Google *@
 <SeoHead Title="Đăng nhập"
-         Description="Đăng nhập trang quản lý Qly Coffee."
+         Description="Đăng nhập trang quản lý Một Chút Coffee."
          Path="/dang-nhap"
          NoIndex="true" />
 
@@ -35,7 +35,7 @@
                 <label class="field-label" for="email">Email</label>
                 <input id="email" type="email" class="input"
                        autocomplete="username" inputmode="email"
-                       placeholder="ban@qlycoffee.vn"
+                       placeholder="ban@motchutcoffee.vn"
                        aria-invalid="@(_touched && string.IsNullOrWhiteSpace(_model.Email))"
                        @bind="_model.Email" @bind:event="oninput" />
                 @if (_touched && string.IsNullOrWhiteSpace(_model.Email))
@@ -87,7 +87,7 @@
             </button>
         </EditForm>
 
-        <div class="divider">hoặc</div>
+        <div class="divider divider-center">hoặc</div>
 
         <a href="/" class="btn btn-ghost btn-block">Về trang bán hàng</a>
     </main>

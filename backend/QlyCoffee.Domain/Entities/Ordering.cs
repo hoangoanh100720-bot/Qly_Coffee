@@ -52,8 +52,46 @@ public class Order : StoreScopedEntity
     public string? Note { get; set; }
 
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
+
+    /// <summary>
+    /// Đơn này do khách tự đặt online hay nhân viên bấm tại quầy.
+    /// Đơn tại quầy bỏ qua bước chờ xác nhận — nhân viên đã đứng trước mặt khách rồi.
+    /// </summary>
+    public OrderChannel Channel { get; set; } = OrderChannel.Online;
     public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.Cash;
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
+
+    // --- Đối soát chuyển khoản tự động (SePay) ----------------------------------
+
+    /// <summary>
+    /// Mã tham chiếu dùng làm NỘI DUNG CHUYỂN KHOẢN, VD "MCC7K2M9".
+    /// <para>
+    /// Vì sao không dùng thẳng <see cref="Code"/>: mã đơn có dấu gạch ngang và
+    /// dài 14 ký tự, nhiều app ngân hàng cắt bớt hoặc bỏ ký tự đặc biệt trong
+    /// nội dung. Mã này chỉ gồm chữ in và số, ngắn, và cố tình bỏ các ký tự dễ
+    /// đọc nhầm (0/O, 1/I/L, 5/S, 8/B) để nhân viên đọc qua điện thoại không sai.
+    /// </para>
+    /// <para>
+    /// Đây là chìa khóa để webhook SePay tìm ngược ra đơn — có chỉ mục duy nhất.
+    /// </para>
+    /// </summary>
+    public string? PaymentRef { get; set; }
+
+    /// <summary>Thời điểm ghi nhận đã trả đủ tiền.</summary>
+    public DateTime? PaidAt { get; set; }
+
+    /// <summary>
+    /// Số tiền thực nhận, đơn vị đồng. Có thể LỚN HƠN <see cref="GrandTotal"/>
+    /// khi khách chuyển dư — giữ nguyên số thật để đối soát sổ ngân hàng khớp.
+    /// </summary>
+    public int PaidAmount { get; set; }
+
+    /// <summary>
+    /// Id giao dịch SePay đã thanh toán cho đơn này.
+    /// Có giá trị nghĩa là tiền được xác nhận TỰ ĐỘNG từ ngân hàng, không phải
+    /// nhân viên bấm tay — khác biệt quan trọng khi có tranh chấp.
+    /// </summary>
+    public long? PaymentGatewayId { get; set; }
 
     // --- Tiền (tất cả tính bằng ĐỒNG, kiểu int) ---------------------------------
 
@@ -63,8 +101,28 @@ public class Order : StoreScopedEntity
     /// <summary>Tổng giảm giá đã áp dụng.</summary>
     public int DiscountTotal { get; set; }
 
-    /// <summary>Số tiền khách phải trả = Subtotal − DiscountTotal.</summary>
+    /// <summary>Số tiền khách phải trả = Subtotal − DiscountTotal (+ thuế nếu giá chưa gồm thuế).</summary>
     public int GrandTotal { get; set; }
+
+    // --- Thuế GTGT (chụp lại tại thời điểm đặt) ---------------------------------
+    //
+    //  BA CỘT NÀY LÀ SNAPSHOT, KHÔNG ĐỌC LẠI TỪ BẢNG Stores.
+    //  Thuế suất thay đổi theo nghị quyết của Quốc hội — 10% rồi 8% rồi có thể
+    //  lại 10%. Hóa đơn in lại sau một năm phải ra ĐÚNG con số đã giao cho khách
+    //  hôm đó, nếu không thì sổ sách và chứng từ lệch nhau.
+    //  Cùng lý do với việc OrderItem chụp lại tên món và đơn giá.
+
+    /// <summary>Chế độ thuế đã áp dụng, ứng với <c>QlyCoffee.Shared.TaxMode</c>.</summary>
+    public int TaxMode { get; set; } = 1;
+
+    /// <summary>Thuế suất phần trăm đã áp dụng cho đơn này.</summary>
+    public int TaxRatePercent { get; set; }
+
+    /// <summary>Tiền hàng CHƯA thuế. Với giá đã gồm thuế thì đây là số tách ngược ra.</summary>
+    public int NetAmount { get; set; }
+
+    /// <summary>Tiền thuế GTGT của đơn. Luôn thỏa <c>NetAmount + TaxAmount = GrandTotal</c>.</summary>
+    public int TaxAmount { get; set; }
 
     /// <summary>
     /// Tổng giá vốn nguyên liệu THỰC TẾ đã trừ khỏi kho.
@@ -98,8 +156,19 @@ public class Order : StoreScopedEntity
     /// <summary>Thời điểm khách bấm đặt.</summary>
     public DateTime PlacedAt { get; set; } = DateTime.UtcNow;
 
-    /// <summary>Thời điểm nhân viên xác nhận — cũng là lúc kho bị trừ.</summary>
+    /// <summary>Thời điểm nhân viên xác nhận, tức là lúc đơn vào hàng pha.</summary>
     public DateTime? ConfirmedAt { get; set; }
+
+    /// <summary>
+    /// Thời điểm hệ thống HỨA với khách là món xong, tính lúc đơn vào hàng pha.
+    /// <para>
+    /// Đây là con số đã nói ra miệng với khách nên KHÔNG tính lại về sau. Giữ
+    /// nguyên để đối chiếu với <see cref="CompletedAt"/> mà biết quán đang hứa
+    /// sát hay hứa hão — nếu luôn xong sớm hơn hứa 3 phút thì <c>PrepSeconds</c>
+    /// của các món đang đặt quá cao.
+    /// </para>
+    /// </summary>
+    public DateTime? EstimatedReadyAt { get; set; }
 
     /// <summary>Thời điểm pha xong.</summary>
     public DateTime? ReadyAt { get; set; }

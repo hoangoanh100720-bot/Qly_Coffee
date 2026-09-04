@@ -16,5 +16,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\QlyCoffee.Domain\QlyCoffee.Domain.csproj" />
+    <!-- Chỉ để dùng chung phép tính giá bán đề nghị và thuế GTGT (Tax.cs).
+         Dự án Shared không phụ thuộc thứ gì nên tham chiếu này không tạo vòng lặp. -->
+    <ProjectReference Include="..\..\shared\QlyCoffee.Shared\QlyCoffee.Shared.csproj" />
   </ItemGroup>
 </Project>

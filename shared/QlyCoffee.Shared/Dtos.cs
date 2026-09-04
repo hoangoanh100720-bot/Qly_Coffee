@@ -39,6 +39,39 @@ public record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int Pa
 }
 
 // ------------------------------------------------------------------------------
+//  CỬA HÀNG — thông tin công khai, dùng cho giỏ hàng và hóa đơn
+// ------------------------------------------------------------------------------
+
+/// <summary>
+/// Thông tin cửa hàng mà trang bán hàng cần biết.
+/// <para>
+/// Có riêng một endpoint thay vì nhét vào MenuResponse vì hai lý do: giỏ hàng
+/// cần cấu hình thuế nhưng KHÔNG cần cả thực đơn, và dữ liệu này gần như không
+/// đổi nên trình duyệt cache lại được.
+/// </para>
+/// </summary>
+public record StoreInfoDto(
+    string Name,
+    string Address,
+    string Phone,
+    string? Email,
+
+    /// <summary>Mã số thuế. null hoặc rỗng thì hóa đơn bỏ dòng này.</summary>
+    string? TaxCode,
+
+    /// <summary>Cách xử lý thuế GTGT — giá trị của <see cref="TaxMode"/>.</summary>
+    int TaxMode,
+
+    /// <summary>Thuế suất GTGT phần trăm đang áp dụng.</summary>
+    int VatRatePercent,
+
+    string OpenTime,
+    string CloseTime,
+
+    /// <summary>Đang nhận đơn hay tạm nghỉ.</summary>
+    bool IsOpen);
+
+// ------------------------------------------------------------------------------
 //  MENU — dữ liệu trang bán hàng
 // ------------------------------------------------------------------------------
 
@@ -87,6 +120,12 @@ public record ProductDetailDto(
     string Name,
     string Slug,
     string? Description,
+
+    /// <summary>
+    /// Gợi ý thưởng thức — dùng kèm gì thì ngon hơn. Rỗng thì giao diện ẩn hẳn khối này.
+    /// </summary>
+    string? PairingNote,
+
     string? ImageUrl,
     string ColorPrimaryHex,
     string ColorAccentHex,
@@ -109,13 +148,43 @@ public record VariantDto(
     /// <summary>Số ly tối đa còn làm được RIÊNG cho biến thể này (size L tốn nhiều hơn nên ít hơn).</summary>
     int MaxServings);
 
+/// <summary>
+/// Các loại nhóm tùy chọn mà giao diện phải đối xử đặc biệt.
+/// <para>
+/// Giá trị được lưu thẳng vào cột <c>modifier_groups.kind</c>. Nhóm do quán tự
+/// thêm thì để rỗng và được hiển thị như mọi nhóm bình thường.
+/// </para>
+/// </summary>
+public static class ModifierGroupKinds
+{
+    public const string Topping = "topping";
+    public const string Sugar   = "sugar";
+    public const string Ice     = "ice";
+
+    /// <summary>
+    /// Nhóm "dùng nóng hay dùng đá". Chọn nóng thì nhóm <see cref="Ice"/> bị ẩn đi:
+    /// hỏi khách "bao nhiêu phần trăm đá" cho một ly cà phê nóng là vô nghĩa.
+    /// </summary>
+    public const string Temperature = "temperature";
+
+    /// <summary>
+    /// Lựa chọn "dùng nóng" bên trong nhóm <see cref="Temperature"/> nhận ra bằng tên,
+    /// vì tên là thứ nhân viên quán nhìn thấy và tự sửa được (VD "Nóng", "Uống nóng").
+    /// </summary>
+    public static bool IsHotChoice(string modifierName)
+        => modifierName.Contains("nóng", StringComparison.OrdinalIgnoreCase);
+}
+
 public record ModifierGroupDto(
     Guid Id,
     string Name,
     int MinSelect,
     int MaxSelect,
     bool IsRequired,
-    IReadOnlyList<ModifierDto> Modifiers);
+    IReadOnlyList<ModifierDto> Modifiers,
+
+    /// <summary>Loại nhóm — xem <see cref="ModifierGroupKinds"/>. Rỗng = nhóm thường.</summary>
+    string Kind = "");
 
 public record ModifierDto(
     Guid Id,
@@ -181,6 +250,21 @@ public class CreateOrderRequest
     public int OrderType { get; set; } = 1;
     /// <summary>0 = tiền mặt, 1 = chuyển khoản.</summary>
     public int PaymentMethod { get; set; }
+
+    /// <summary>
+    /// Mã tham chiếu chuyển khoản do màn hình quầy sinh sẵn, VD "MCC7K2M9".
+    /// <para>
+    /// Vì sao cho phép client gửi lên: ở quầy, mã QR hiện NGAY khi nhân viên
+    /// chọn "Chuyển khoản", trước lúc chốt đơn — khách quét và trả tiền trong
+    /// lúc nhân viên còn đang bấm nốt món. Mã in trên QR đó phải chính là mã
+    /// được lưu vào đơn, nếu không webhook sẽ không khớp được.
+    /// </para>
+    /// <para>
+    /// Backend KHÔNG tin tuyệt đối: mã sai định dạng hoặc đã có đơn khác dùng
+    /// thì bị bỏ và backend tự sinh mã mới.
+    /// </para>
+    /// </summary>
+    public string? PaymentRef { get; set; }
     public string? Note { get; set; }
     public List<CreateOrderItem> Items { get; set; } = new();
 }
@@ -224,6 +308,17 @@ public record OrderDto(
     int DiscountTotal,
     int GrandTotal,
     int CostTotal,
+
+    // --- Thuế GTGT đã chụp lại lúc đặt (xem Tax.cs) ---------------------------
+    /// <summary>Chế độ thuế đã áp dụng, ứng với <see cref="TaxMode"/>.</summary>
+    int TaxMode,
+    /// <summary>Thuế suất phần trăm đã áp dụng cho đơn này.</summary>
+    int TaxRatePercent,
+    /// <summary>Tiền hàng chưa thuế. Luôn thỏa NetAmount + TaxAmount = GrandTotal.</summary>
+    int NetAmount,
+    /// <summary>Tiền thuế GTGT của đơn.</summary>
+    int TaxAmount,
+
     string? Note,
     DateTime PlacedAt,
     DateTime? ConfirmedAt,
@@ -242,7 +337,13 @@ public record OrderItemDto(
     int UnitPrice,
     int LineTotal,
     IReadOnlyList<CartModifier> Modifiers,
-    string? Note);
+    string? Note,
+
+    /// <summary>
+    /// Ảnh riêng của món nếu quán đã tải lên. Rỗng thì giao diện dùng ảnh mẫu
+    /// theo nhóm (<c>DrinkPhoto.PhotoFor</c>) — không bao giờ để trống ô ảnh.
+    /// </summary>
+    string? ImageUrl = null);
 
 // ------------------------------------------------------------------------------
 //  KHO
@@ -307,6 +408,110 @@ public record InventoryLotDto(
     int Severity,
     string? SupplierName);
 
+// ------------------------------------------------------------------------------
+//  SƠ CHẾ — XUẤT NGUYÊN LIỆU THÔ ĐỂ LÀM BÁN THÀNH PHẨM
+// ------------------------------------------------------------------------------
+
+/// <summary>
+/// Một công thức sơ chế kèm tình trạng hiện tại — tất cả những gì màn hình
+/// Sơ chế cần để vẽ một thẻ, không phải gọi thêm lần nào nữa.
+/// <list type="bullet">
+/// <item><c>OutputStock</c> — còn bao nhiêu cốt, theo đơn vị cơ sở.</item>
+/// <item><c>ServingsLeft</c> — quy ra còn pha được mấy ly, con số nhân viên thật sự cần.</item>
+/// <item><c>MaxBatches</c> — còn nguyên liệu thô để làm mấy mẻ nữa.</item>
+/// <item><c>BlockingIngredient</c> — thiếu thứ gì thì không ủ được. null = còn đủ.</item>
+/// </list>
+/// </summary>
+public record PrepRecipeDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string? Instructions,
+
+    Guid OutputIngredientId,
+    string OutputName,
+    string OutputColorHex,
+    string OutputIconKey,
+    string UnitLabel,
+
+    /// <summary>Sản lượng một mẻ chuẩn, theo đơn vị cơ sở của bán thành phẩm.</summary>
+    double OutputQuantity,
+    int ShelfLifeHours,
+    int PrepMinutes,
+
+    double OutputStock,
+    int ServingsLeft,
+    double MaxBatches,
+    string? BlockingIngredient,
+
+    IReadOnlyList<PrepInputDto> Inputs,
+    IReadOnlyList<PrepBatchDto> ActiveBatches);
+
+/// <summary>Một dòng nguyên liệu thô của công thức sơ chế, kèm tồn kho hiện có.</summary>
+public record PrepInputDto(
+    Guid IngredientId,
+    string Name,
+    string ColorHex,
+    string IconKey,
+    string UnitLabel,
+    /// <summary>Lượng cần cho MỘT mẻ chuẩn.</summary>
+    double QuantityPerBatch,
+    double StockAvailable,
+    string? Note);
+
+/// <summary>
+/// Một mẻ đang còn dùng được.
+/// <para>
+/// <c>MinutesLeft</c> tính bằng PHÚT chứ không phải ngày: câu nhân viên cần trả
+/// lời là "bình này còn dùng được bao lâu nữa", và với cốt trà thì đơn vị ngày
+/// không nói lên điều gì. Số âm nghĩa là đã quá hạn mà job chưa kịp quét.
+/// </para>
+/// </summary>
+public record PrepBatchDto(
+    Guid LotId,
+    string LotCode,
+    double RemainingQuantity,
+    double ReceivedQuantity,
+    int UnitCost,
+    DateTime ProducedAt,
+    DateTime? ExpiresAt,
+    int MinutesLeft,
+    string? Note);
+
+/// <summary>Dữ liệu form chạy một mẻ sơ chế.</summary>
+public class ProduceBatchRequest
+{
+    public Guid PrepRecipeId { get; set; }
+
+    /// <summary>
+    /// Số mẻ. Cho phép số lẻ (0,5 mẻ) vì giờ vắng nhân viên hay ủ nửa bình —
+    /// ủ cả bình rồi đổ đi một nửa là lãng phí có thật.
+    /// </summary>
+    public double BatchCount { get; set; } = 1;
+
+    public string? Note { get; set; }
+}
+
+/// <summary>Kết quả một mẻ vừa chạy — đủ để báo lại cho nhân viên mà không phải tải lại trang.</summary>
+public record PrepBatchResultDto(
+    Guid LotId,
+    string LotCode,
+    string OutputName,
+    double OutputQuantity,
+    string UnitLabel,
+    DateTime ExpiresAt,
+    /// <summary>Tổng giá vốn nguyên liệu thô đã tiêu tốn cho mẻ này (đồng).</summary>
+    int TotalInputCost,
+    int UnitCost,
+    IReadOnlyList<PrepConsumedDto> Consumed);
+
+/// <summary>Một dòng nguyên liệu thô đã bị trừ khi chạy mẻ.</summary>
+public record PrepConsumedDto(
+    string IngredientName,
+    double Quantity,
+    string UnitLabel,
+    int Cost);
+
 /// <summary>Dữ liệu form nhập kho.</summary>
 public class ReceiveStockRequest
 {
@@ -353,8 +558,35 @@ public record ProductAdminDto(
     string? UnavailableReason,
     int RecipeItemCount,
 
-    /// <summary>Ảnh chụp thật. Rỗng thì giao diện dùng hình vẽ SVG.</summary>
-    string? ImageUrl);
+    /// <summary>Ảnh chụp thật. Rỗng thì giao diện dùng ảnh mẫu theo nhóm món.</summary>
+    string? ImageUrl,
+
+    // --- Định giá -------------------------------------------------------------
+
+    /// <summary>0 = đồ uống đá · 1 = đồ uống nóng · 2 = đồ ăn.</summary>
+    int ServeStyle,
+
+    /// <summary>
+    /// Tỷ lệ giá vốn mục tiêu của nhóm này: đồ uống 30%, đồ ăn 45%.
+    /// Xem <see cref="Pricing"/> để biết vì sao hai con số khác nhau.
+    /// </summary>
+    int TargetCostRatioPercent,
+
+    /// <summary>
+    /// Giá bán ĐỀ NGHỊ tính từ giá vốn, làm tròn lên bội số 1.000đ.
+    /// Chỉ là gợi ý — người dùng luôn được đặt giá khác.
+    /// </summary>
+    int SuggestedPrice,
+
+    /// <summary>Tỷ lệ giá vốn thực tế trên giá đang bán, phần trăm.</summary>
+    int CostRatioPercent,
+
+    /// <summary>-1 đang bán lỗ · 0 biên mỏng · 1 lành mạnh · 2 cao hơn mặt bằng.</summary>
+    int PriceVerdict)
+{
+    /// <summary>Món này là đồ ăn — trang quản lý tách riêng khu vực chỉnh giá cho nhóm này.</summary>
+    public bool IsFood => ServeStyle == 2;
+}
 
 /// <summary>Một dòng công thức khi sửa món.</summary>
 public class RecipeLineDto
@@ -534,7 +766,10 @@ public record TopProductDto(
     string Name,
     string ColorPrimaryHex,
     int UnitsSold,
-    int Revenue);
+    int Revenue,
+
+    /// <summary>Ảnh riêng của món. Rỗng thì giao diện dùng ảnh mẫu theo nhóm.</summary>
+    string? ImageUrl = null);
 
 public record DailyPlanSummaryDto(
     Guid Id,
@@ -579,7 +814,13 @@ public record PromotionDto(
     int Revenue,
 
     /// <summary>Đang thực sự áp dụng ngay lúc này (Active và trong khoảng thời gian).</summary>
-    bool IsRunning);
+    bool IsRunning,
+
+    /// <summary>
+    /// Ảnh riêng của món được khuyến mãi. Rỗng thì giao diện dùng ảnh mẫu theo
+    /// nhóm; khuyến mãi toàn menu (ProductId null) không có ảnh món nào cả.
+    /// </summary>
+    string? ProductImageUrl = null);
 
 // ------------------------------------------------------------------------------
 //  BÁO CÁO
@@ -647,3 +888,253 @@ public record ProductImageResult(
     string? Url,
     long SizeKb = 0,
     string? ReplacedOld = null);
+
+// ------------------------------------------------------------------------------
+//  BÁN HÀNG TẠI QUẦY & MÀN HÌNH PHA CHẾ
+// ------------------------------------------------------------------------------
+
+public record PosCategoryDto(Guid Id, string Name, string Slug, string ColorHex);
+
+public record PosVariantDto(Guid Id, string Name, int PriceDelta, bool IsDefault);
+
+/// <summary>
+/// Một món trên lưới bấm đơn.
+/// <para>
+/// <c>MaxServings</c> ở đây ĐÃ TRỪ phần đang nằm trong hàng pha — khác với
+/// <c>Product.MaxServings</c> trong database chỉ nhìn tồn kho. Nhân viên cần con
+/// số sau khi trừ, vì mấy ly đang chờ pha đã chiếm nguyên liệu rồi.
+/// </para>
+/// </summary>
+public record PosProductDto(
+    Guid Id,
+    Guid CategoryId,
+    string Name,
+    int BasePrice,
+    string ColorPrimaryHex,
+    string ColorAccentHex,
+    string? ImageUrl,
+    int MaxServings,
+    int QuantityInQueue,
+    bool IsAvailable,
+    int PrepSeconds,
+    List<PosVariantDto> Variants);
+
+public record PosMenuDto(List<PosCategoryDto> Categories, List<PosProductDto> Products);
+
+public record EstimateItem(Guid ProductId, int Quantity);
+public record EstimateRequest(List<EstimateItem> Items);
+
+/// <summary>
+/// Thời gian ước tính, kèm số liệu đã dùng để tính ra nó.
+/// Hiện cả <c>QueuedItemsAhead</c> để nhân viên giải thích được với khách vì sao
+/// hôm nay chờ lâu — "đang có 8 ly trước bạn" thuyết phục hơn một con số trơ trọi.
+/// </summary>
+public record EtaDto(
+    int TotalSeconds,
+    int Minutes,
+    int QueuedItemsAhead,
+    int WorkAheadSeconds,
+    int Stations);
+
+public record PosOrderResultDto(
+    Guid Id,
+    string Code,
+    int GrandTotal,
+    int EtaMinutes,
+    DateTime? EstimatedReadyAt,
+    int TotalCups);
+
+public record BarQueueLineDto(
+    Guid OrderId,
+    Guid OrderItemId,
+    string OrderCode,
+    int QueuePosition,
+    string CustomerName,
+    int Channel,
+    string ProductName,
+    string? VariantName,
+    string ColorPrimaryHex,
+    string ColorAccentHex,
+    string? ImageUrl,
+    int Quantity,
+    string? Note,
+    string Modifiers,
+    int Status,
+    DateTime QueuedAt,
+    DateTime? EstimatedReadyAt,
+    int WaitedSeconds,
+    bool IsLate);
+
+public record SoldTodayDto(
+    Guid ProductId,
+    string ProductName,
+    string ColorPrimaryHex,
+    string? ImageUrl,
+    int QuantitySold,
+    int QuantityInQueue,
+    int Revenue);
+
+public record BarQueueDto(
+    string BusinessDate,
+    List<BarQueueLineDto> Queue,
+    List<SoldTodayDto> SoldToday,
+    int TotalCupsInQueue,
+    int TotalCupsSoldToday,
+    int TotalOrdersToday,
+    int RevenueToday,
+    int Stations,
+    int EstimatedClearSeconds);
+
+/// <summary>
+/// Kết quả sau khi bấm Hoàn tất.
+/// <para>
+/// <c>PromisedVsActualSeconds</c> ÂM nghĩa là xong sớm hơn lời hứa, DƯƠNG là trễ.
+/// Đây là thước đo duy nhất cho biết <c>PrepSeconds</c> của các món đang đặt sát
+/// thực tế hay không.
+/// </para>
+/// </summary>
+public record CompleteOrderResultDto(
+    Guid Id,
+    string Code,
+    int Status,
+    int CostTotal,
+    int GrossProfit,
+    int? PromisedVsActualSeconds);
+
+/// <summary>
+/// Năm con số hiện trên thanh điều hướng quản lý.
+/// <para>
+/// <c>CupsInQueue</c> đếm theo LY chứ không theo đơn: người pha cần biết còn
+/// phải làm bao nhiêu ly, còn "3 đơn" thì có thể là 3 ly mà cũng có thể là 15.
+/// </para>
+/// </summary>
+/// <para>
+/// <c>PrepNeeded</c> đếm số bán thành phẩm đã hết hoặc sắp hết — tức số mẻ cần
+/// ủ lại ngay. Việc này phải làm TRƯỚC khi có khách, nên nó cần một con số trên
+/// thanh điều hướng chứ không phải chờ tới lúc món hiện "tạm hết" mới biết.
+/// </para>
+public record NavBadgesDto(
+    int PendingOrders,
+    int CupsInQueue,
+    int CriticalLots,
+    int UndecidedSuggestions,
+    int PrepNeeded = 0);
+
+// ------------------------------------------------------------------------------
+//  THANH TOÁN CHUYỂN KHOẢN (SePay)
+// ------------------------------------------------------------------------------
+
+/// <summary>
+/// Mọi thứ giao diện cần để hiện màn hình "quét mã trả tiền" cho một đơn.
+/// <para>
+/// Ảnh QR do BACKEND dựng đường dẫn chứ không phải frontend tự ghép, vì số tiền
+/// và nội dung chuyển khoản in trên mã phải khớp tuyệt đối với thứ mà webhook
+/// sẽ đối soát. Hai nơi cùng ghép chuỗi là hai nơi có thể lệch nhau.
+/// </para>
+/// </summary>
+public record PaymentInfoDto(
+    string OrderCode,
+
+    /// <summary>0 = tiền mặt, 1 = chuyển khoản.</summary>
+    int PaymentMethod,
+
+    /// <summary>0 = chưa thanh toán, 1 = đã thanh toán, 2 = đã hoàn tiền.</summary>
+    int PaymentStatus,
+
+    string PaymentStatusLabel,
+
+    /// <summary>Số tiền phải trả, đơn vị đồng.</summary>
+    int Amount,
+
+    /// <summary>Số tiền đã thực nhận. Lớn hơn Amount nghĩa là khách chuyển dư.</summary>
+    int PaidAmount,
+
+    DateTime? PaidAt,
+
+    /// <summary>Nội dung chuyển khoản khách phải ghi, VD "MCC7K2M9".</summary>
+    string? Reference,
+
+    string BankCode,
+    string AccountNumber,
+    string AccountName,
+
+    /// <summary>Đường dẫn ảnh QR đã nhúng sẵn số tiền và nội dung. Rỗng nếu chưa cấu hình.</summary>
+    string QrImageUrl,
+
+    /// <summary>
+    /// Đã khai báo đủ tài khoản để dựng QR chưa. Giao diện phải hỏi cờ này TRƯỚC
+    /// khi vẽ thẻ img — chưa cấu hình mà vẫn vẽ thì khách thấy ảnh vỡ ngay tại
+    /// bước trả tiền.
+    /// </summary>
+    bool IsConfigured,
+
+    /// <summary>
+    /// Webhook SePay đã bật chưa. Tắt thì khách vẫn quét QR trả được, chỉ là
+    /// nhân viên phải bấm xác nhận tay — giao diện cần nói rõ điều đó.
+    /// </summary>
+    bool AutoConfirm);
+
+/// <summary>
+/// Payload webhook SePay gửi khi tài khoản có biến động số dư.
+/// <para>
+/// Tên trường giữ ĐÚNG như tài liệu SePay (camelCase) — đây là hợp đồng của bên
+/// thứ ba, không phải chỗ để đặt lại tên cho hợp gu.
+/// </para>
+/// <para>
+/// Mọi trường đều nullable vì đây là dữ liệu từ NGOÀI vào: thiếu trường thì
+/// phải trả lỗi có kiểm soát, không được để ném NullReference giữa chừng rồi
+/// SePay gửi lại bảy lần.
+/// </para>
+/// </summary>
+public class SePayWebhookPayload
+{
+    /// <summary>Id giao dịch trên SePay. Khóa chống xử lý trùng.</summary>
+    public long Id { get; set; }
+
+    /// <summary>Tên ngân hàng. VD: "Vietcombank".</summary>
+    public string? Gateway { get; set; }
+
+    /// <summary>Thời điểm giao dịch, dạng "yyyy-MM-dd HH:mm:ss" theo GIỜ VIỆT NAM.</summary>
+    public string? TransactionDate { get; set; }
+
+    public string? AccountNumber { get; set; }
+
+    /// <summary>
+    /// Mã do SePay tự bóc tách theo cấu hình tiền tố ở trang quản trị.
+    /// Thường null nếu chưa khai báo tiền tố — khi đó ta tự dò trong Content.
+    /// </summary>
+    public string? Code { get; set; }
+
+    /// <summary>Nội dung chuyển khoản.</summary>
+    public string? Content { get; set; }
+
+    /// <summary>"in" = tiền vào, "out" = tiền ra.</summary>
+    public string? TransferType { get; set; }
+
+    /// <summary>Số tiền giao dịch. SePay gửi kiểu số, có thể có phần thập phân.</summary>
+    public decimal TransferAmount { get; set; }
+
+    /// <summary>Số dư lũy kế sau giao dịch. Ghi lại để đối chiếu, không dùng vào nghiệp vụ.</summary>
+    public decimal Accumulated { get; set; }
+
+    public string? SubAccount { get; set; }
+
+    /// <summary>Mã tham chiếu của ngân hàng, VD "MBVCB.3278907687".</summary>
+    public string? ReferenceCode { get; set; }
+
+    public string? Description { get; set; }
+}
+
+/// <summary>Kết quả xử lý một lần webhook — trả về cho SePay và ghi vào log.</summary>
+public record SePayWebhookResult(
+    bool Success,
+    string Message,
+
+    /// <summary>Mã đơn đã khớp, null nếu không khớp đơn nào.</summary>
+    string? OrderCode,
+
+    /// <summary>Giá trị của <c>PaymentMatchStatus</c>.</summary>
+    int MatchStatus,
+
+    /// <summary>true nếu giao dịch này đã được xử lý ở lần gửi trước.</summary>
+    bool Duplicate);

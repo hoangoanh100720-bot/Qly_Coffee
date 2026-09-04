@@ -229,6 +229,7 @@ public class InventoryController : BaseApiController
         IngredientCategory.Powder    => "Bột",
         IngredientCategory.Sweetener => "Chất tạo ngọt",
         IngredientCategory.Packaging => "Bao bì",
+        IngredientCategory.Bakery    => "Bánh & đồ ăn",
         _                            => "Khác"
     };
 
@@ -277,22 +278,91 @@ public class ProductsAdminController : BaseApiController
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
+        // Lấy về rồi mới dựng DTO, KHÔNG Select thẳng trong truy vấn: phần định giá
+        // gọi Pricing.Suggest() và Pricing.Verdict() — hàm C# thuần, EF không dịch
+        // sang SQL được. Bảng món của một quán chỉ vài chục dòng nên nạp hết vô hại.
         var products = await _db.Products
             .AsNoTracking()
             .Include(p => p.Category)
+            .Include(p => p.RecipeItems)
             .Where(p => p.StoreId == CurrentStoreId)
             .OrderBy(p => p.Category!.SortOrder).ThenBy(p => p.SortOrder)
-            .Select(p => new ProductAdminDto(
-                p.Id, p.Name, p.Slug, p.Category!.Name,
-                p.ColorPrimaryHex, p.ColorAccentHex,
-                p.BasePrice, p.ComputedCost,
-                p.BasePrice > 0 ? (int)((p.BasePrice - p.ComputedCost) * 100.0 / p.BasePrice) : 0,
-                p.IsActive, p.IsAvailable, p.MaxServings, p.UnavailableReason,
-                p.RecipeItems.Count, p.ImageUrl))
             .ToListAsync(ct);
 
-        return Ok(products);
+        return Ok(products.Select(MapProduct).ToList());
     }
+
+    /// <summary>
+    /// Dựng DTO món cho trang quản lý, kèm phần gợi ý giá.
+    /// <para>
+    /// Gom về một chỗ vì cả bảng danh sách lẫn màn hình soạn công thức đều cần
+    /// đúng những con số này — tách ra hai nơi là sớm muộn lệch nhau.
+    /// </para>
+    /// </summary>
+    private static ProductAdminDto MapProduct(Domain.Entities.Product p)
+    {
+        var targetRatio = p.ServeStyle == 2
+            ? Pricing.FoodCostRatioPercent
+            : Pricing.DrinkCostRatioPercent;
+
+        return new ProductAdminDto(
+            p.Id, p.Name, p.Slug, p.Category?.Name ?? "",
+            p.ColorPrimaryHex, p.ColorAccentHex,
+            p.BasePrice, p.ComputedCost,
+            Pricing.MarginPercent(p.BasePrice, p.ComputedCost),
+            p.IsActive, p.IsAvailable, p.MaxServings, p.UnavailableReason,
+            p.RecipeItems.Count, p.ImageUrl,
+            p.ServeStyle,
+            targetRatio,
+            Pricing.Suggest(p.ComputedCost, targetRatio),
+            Pricing.CostRatioPercent(p.BasePrice, p.ComputedCost),
+            Pricing.Verdict(p.BasePrice, p.ComputedCost, targetRatio));
+    }
+
+    /// <summary>
+    /// Đổi RIÊNG giá bán của một món, không đụng tới công thức.
+    /// <para>
+    /// Có endpoint riêng thay vì bắt đi qua màn hình soạn công thức vì đổi giá là
+    /// việc làm hàng tuần (theo giá nguyên liệu, theo mùa, theo đối thủ), còn sửa
+    /// công thức là việc làm vài tháng một lần. Bắt mở cả trang công thức chỉ để
+    /// sửa một con số là tạo cơ hội sửa nhầm định lượng.
+    /// </para>
+    /// <para>
+    /// KHÔNG chặn giá thấp hơn giá vốn. Quán có quyền bán lỗ một món để kéo khách
+    /// hoặc để xả nguyên liệu cận hạn — hệ thống chỉ CẢNH BÁO qua PriceVerdict,
+    /// không quyết thay người bán.
+    /// </para>
+    /// </summary>
+    [HttpPatch("{id:guid}/price")]
+    public async Task<IActionResult> UpdatePrice(
+        Guid id, [FromBody] UpdatePriceRequest req, CancellationToken ct)
+    {
+        var product = await _db.Products
+            .Include(p => p.Category)
+            .Include(p => p.RecipeItems)
+            .FirstOrDefaultAsync(p => p.Id == id && p.StoreId == CurrentStoreId, ct);
+
+        if (product is null)
+            return Fail<ProductAdminDto>(404, "NOT_FOUND", "Không tìm thấy món.");
+
+        if (req.BasePrice <= 0)
+            return Fail<ProductAdminDto>(400, "VALIDATION", "Giá bán phải lớn hơn 0.");
+
+        // Trần 10 triệu một phần: không phải quy tắc kinh doanh mà là chốt chặn
+        // lỗi gõ phím — thêm ba số 0 vào 45.000 ra 45.000.000 thì đơn hàng, báo cáo
+        // và biểu đồ doanh thu đều hỏng theo.
+        if (req.BasePrice > 10_000_000)
+            return Fail<ProductAdminDto>(400, "VALIDATION",
+                "Giá bán vượt quá 10.000.000đ một phần. Kiểm tra lại xem có gõ thừa số 0 không.");
+
+        product.BasePrice = req.BasePrice;
+        product.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+
+        return Ok(MapProduct(product));
+    }
+
+    public record UpdatePriceRequest(int BasePrice);
 
     /// <summary>
     /// Nạp một lượt ba khối dữ liệu cho màn hình soạn công thức.
@@ -355,13 +425,10 @@ public class ProductsAdminController : BaseApiController
                 0, null, 0, false, false));
         }
 
-        var dto = new ProductAdminDto(
-            p.Id, p.Name, p.Slug, p.Category?.Name ?? "",
-            p.ColorPrimaryHex, p.ColorAccentHex,
-            p.BasePrice, p.ComputedCost,
-            p.BasePrice > 0 ? (int)((p.BasePrice - p.ComputedCost) * 100.0 / p.BasePrice) : 0,
-            p.IsActive, p.IsAvailable, p.MaxServings, p.UnavailableReason,
-            recipeItems.Count, p.ImageUrl);
+        // p nạp bằng AsNoTracking nên RecipeItems rỗng — gán lại để MapProduct
+        // đếm đúng số dòng công thức thay vì báo 0.
+        p.RecipeItems = recipeItems;
+        var dto = MapProduct(p);
 
         return Ok(new { Product = dto, Lines = lines, Ingredients = ingredientDtos });
     }
@@ -521,6 +588,84 @@ public class DashboardController : BaseApiController
         _risk = risk;
     }
 
+    /// <summary>
+    /// Bốn con số cho huy hiệu trên thanh điều hướng.
+    /// <para>
+    /// Gộp thành MỘT endpoint vì thanh điều hướng gọi lại mỗi 60 giây trên mọi
+    /// trang quản lý. Bốn lần gọi riêng lẻ nhân với số nhân viên đang mở máy là
+    /// lượng truy vấn hoàn toàn vô ích.
+    /// </para>
+    /// </summary>
+    [HttpGet("badges")]
+    [Authorize(Roles = "Staff,Manager,Owner")]
+    public async Task<IActionResult> GetBadges(CancellationToken ct)
+    {
+        var today = VietnamTime.Now().Date;
+        var horizonUtc = VietnamTime.CalendarDayUtc(today.AddDays(2));
+
+        // Đơn online chờ nhân viên bấm xác nhận
+        var pendingOrders = await _db.Orders.CountAsync(
+            o => o.StoreId == CurrentStoreId && o.Status == OrderStatus.Pending, ct);
+
+        // Số LY đang nằm trong hàng pha, không phải số đơn — người pha quan tâm
+        // mình còn phải làm mấy ly, chứ mấy bill thì không nói lên khối lượng.
+        var cupsInQueue = await _db.OrderItems
+            .Where(i => i.Order!.StoreId == CurrentStoreId
+                     && (i.Order.Status == OrderStatus.Confirmed
+                      || i.Order.Status == OrderStatus.Preparing
+                      || i.Order.Status == OrderStatus.Ready))
+            .SumAsync(i => i.Quantity, ct);
+
+        // Lô còn dưới 2 ngày là hết hạn
+        var criticalLots = await _db.InventoryLots.CountAsync(
+            l => l.StoreId == CurrentStoreId
+              && l.Status == LotStatus.Active
+              && l.RemainingQuantity > 0
+              && l.ExpiryDate != null
+              && l.ExpiryDate <= horizonUtc, ct);
+
+        // Đề xuất của kế hoạch mới nhất mà chưa ai duyệt hay bỏ qua
+        var latestPlanId = await _db.DailyPlans
+            .Where(p => p.StoreId == CurrentStoreId)
+            .OrderByDescending(p => p.BusinessDate)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(ct);
+
+        var undecided = 0;
+        if (latestPlanId is Guid planId)
+        {
+            var total = await _db.PlanSuggestions.CountAsync(s => s.DailyPlanId == planId, ct);
+            var decided = await _db.PlanDecisions.CountAsync(d => d.DailyPlanId == planId, ct);
+            undecided = Math.Max(0, total - decided);
+        }
+
+        // Bán thành phẩm CẦN Ủ LẠI: hết sạch, hoặc còn dưới ngưỡng tối thiểu.
+        //
+        //  Ngưỡng tối thiểu của nhóm bán thành phẩm mang nghĩa "sắp phải ủ mẻ mới"
+        //  chứ không phải "sắp phải gọi nhà cung cấp" (xem MenuCatalog §1), nên
+        //  đếm ở đây là đếm đúng số việc nhân viên phải làm ngay.
+        //
+        //  Tính trong bộ nhớ chứ không trong SQL: một quán chỉ có chưa tới hai
+        //  chục bán thành phẩm, mà so tổng tồn với ngưỡng riêng của từng cái
+        //  trong một câu SQL thì phải gom nhóm rồi nối bảng, dài mà chẳng nhanh hơn.
+        var prepared = await _db.Ingredients
+            .AsNoTracking()
+            .Where(i => i.StoreId == CurrentStoreId && i.IsActive && i.IsPrepared)
+            .Select(i => new
+            {
+                i.Id,
+                i.MinStockLevel,
+                Stock = i.Lots
+                    .Where(l => l.Status == LotStatus.Active && l.RemainingQuantity > 0)
+                    .Sum(l => l.RemainingQuantity)
+            })
+            .ToListAsync(ct);
+
+        var prepNeeded = prepared.Count(p => p.Stock <= 0 || p.Stock < p.MinStockLevel);
+
+        return Ok(new NavBadgesDto(pendingOrders, cupsInQueue, criticalLots, undecided, prepNeeded));
+    }
+
     [HttpGet("dashboard")]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
@@ -578,12 +723,15 @@ public class DashboardController : BaseApiController
                      && i.Order.PlacedAt >= from && i.Order.PlacedAt < to
                      && i.Order.Status != OrderStatus.Cancelled
                      && i.Order.Status != OrderStatus.Pending)
-            .GroupBy(i => new { i.ProductId, i.ProductName, i.Product!.ColorPrimaryHex })
+            // Gộp thêm ImageUrl để thẻ "bán chạy" hiện đúng ảnh của món đó, thay
+            // vì một hình ly vẽ chỉ khác nhau ở màu.
+            .GroupBy(i => new { i.ProductId, i.ProductName, i.Product!.ColorPrimaryHex, i.Product.ImageUrl })
             .Select(g => new
             {
                 g.Key.ProductId,
                 g.Key.ProductName,
                 g.Key.ColorPrimaryHex,
+                g.Key.ImageUrl,
                 UnitsSold = g.Sum(x => x.Quantity),
                 Revenue   = g.Sum(x => x.LineTotal)
             })
@@ -593,7 +741,7 @@ public class DashboardController : BaseApiController
 
         var topProducts = topRaw
             .Select(x => new TopProductDto(
-                x.ProductId, x.ProductName, x.ColorPrimaryHex, x.UnitsSold, x.Revenue))
+                x.ProductId, x.ProductName, x.ColorPrimaryHex, x.UnitsSold, x.Revenue, x.ImageUrl))
             .ToList();
 
         // ---- Kế hoạch AI mới nhất -------------------------------------------
@@ -664,13 +812,14 @@ public class DashboardController : BaseApiController
             (int)o.OrderType, (int)o.Status, OrderService.StatusLabel(o.Status),
             (int)o.PaymentMethod, (int)o.PaymentStatus,
             o.Subtotal, o.DiscountTotal, o.GrandTotal, o.CostTotal,
+            o.TaxMode, o.TaxRatePercent, o.NetAmount, o.TaxAmount,
             o.Note, o.PlacedAt, o.ConfirmedAt, o.ReadyAt, o.CompletedAt,
             o.Items.Select(i => new OrderItemDto(
                 i.Id, i.ProductId, i.ProductName, i.VariantName,
                 i.Product?.ColorPrimaryHex ?? "#4A2C17",
                 i.Product?.ColorAccentHex ?? "#C89968",
                 i.Quantity, i.UnitPrice, i.LineTotal,
-                new List<CartModifier>(), i.Note)).ToList()))
+                new List<CartModifier>(), i.Note, i.Product?.ImageUrl)).ToList()))
             .ToList();
 
         return Ok(new PagedResult<OrderDto>(items, total, page, pageSize));

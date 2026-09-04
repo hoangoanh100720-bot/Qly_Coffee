@@ -99,6 +99,14 @@ builder.Services.Configure<PlanningOptions>(o =>
     o.ForecastEwmaAlpha      = EnvDouble("FORECAST_EWMA_ALPHA", 0.25);
 });
 
+builder.Services.Configure<BarOptions>(o =>
+{
+    o.Stations       = EnvInt("BAR_STATIONS", 2);
+    o.HandoffSeconds = EnvInt("BAR_HANDOFF_SECONDS", 45);
+    o.BatchFactor    = EnvDouble("BAR_BATCH_FACTOR", 0.55);
+    o.RoundToSeconds = EnvInt("BAR_ROUND_SECONDS", 60);
+});
+
 builder.Services.Configure<ClaudeOptions>(o =>
 {
     o.ApiKey    = Cfg("ANTHROPIC_API_KEY", "");
@@ -109,11 +117,14 @@ builder.Services.Configure<ClaudeOptions>(o =>
 
 // ---- Dịch vụ nghiệp vụ ------------------------------------------------------
 // Thứ tự đăng ký không quan trọng, nhưng thứ tự phụ thuộc thì có:
+//   Inventory ← Prep
 //   Inventory ← Recipe ← Availability ← Order
 //   WasteRisk + PromotionPlanner + AiNarrator ← DailyPlan
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IPrepService, PrepService>();
 builder.Services.AddScoped<IRecipeService, RecipeService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
+builder.Services.AddScoped<IBarQueueService, BarQueueService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWasteRiskService, WasteRiskService>();
 builder.Services.AddScoped<IPromotionPlanner, PromotionPlanner>();
@@ -169,7 +180,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "Qly Coffee API", Version = "v1" });
+    c.SwaggerDoc("v1", new() { Title = "Một Chút Coffee API", Version = "v1" });
 });
 
 // ---- Job nền ----------------------------------------------------------------
@@ -184,7 +195,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Qly Coffee API v1"));
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Một Chút Coffee API v1"));
 }
 
 app.UseSerilogRequestLogging();
@@ -215,12 +226,108 @@ using (var scope = app.Services.CreateScope())
                 AdminEmail    = Cfg("SEED_ADMIN_EMAIL", "admin@qlycoffee.vn"),
                 AdminPassword = Cfg("SEED_ADMIN_PASSWORD", "Admin@123456"),
                 AdminName     = Cfg("SEED_ADMIN_NAME", "Chủ quán"),
-                StoreName     = Cfg("STORE_NAME", "Qly Coffee"),
-                StoreSlug     = Cfg("STORE_SLUG", "qly-coffee"),
+                StoreName     = Cfg("STORE_NAME", "Một Chút Coffee"),
+                StoreSlug     = Cfg("STORE_SLUG", "mot-chut-coffee"),
                 StoreAddress  = Cfg("STORE_ADDRESS", ""),
                 StorePhone    = Cfg("STORE_PHONE", ""),
-                HistoryDays   = EnvInt("SEED_HISTORY_DAYS", 28)
+                HistoryDays   = EnvInt("SEED_HISTORY_DAYS", 28),
+
+                // Thuế GTGT — xem QlyCoffee.Shared/Tax.cs để biết căn cứ pháp lý
+                TaxMode        = EnvInt("STORE_TAX_MODE", QlyCoffee.Shared.VatPolicy.DefaultMode),
+                VatRatePercent = EnvInt("STORE_VAT_RATE", QlyCoffee.Shared.VatPolicy.DefaultRatePercent),
+                TaxCode        = Cfg("STORE_TAX_CODE", "")
             }, logger);
+        }
+
+        // ---- Đồng bộ thực đơn vào database ĐÃ CÓ dữ liệu -------------------
+        //
+        //  Seeder ở trên chỉ chạy khi database còn trống. Nhưng thực đơn thì lớn
+        //  dần theo thời gian, và quán đang chạy không thể xóa database đi để
+        //  nhận món mới — mất hết đơn hàng và sổ kho.
+        //
+        //  MenuSync bơm phần còn thiếu vào, chạy lại bao nhiêu lần cũng như nhau.
+        //  Nó KHÔNG BAO GIỜ ghi đè giá bán mà chủ quán đã tự chỉnh.
+        if (Cfg("MENU_SYNC_ENABLED", "false") == "true")
+        {
+            var storeId = Guid.TryParse(Cfg("DEFAULT_STORE_ID", ""), out var sid)
+                ? sid
+                : (await db.Stores.OrderBy(s => s.CreatedAt).FirstOrDefaultAsync())?.Id ?? Guid.Empty;
+
+            if (storeId == Guid.Empty)
+            {
+                logger.LogWarning("MENU_SYNC_ENABLED=true nhưng chưa có cửa hàng nào — bỏ qua");
+            }
+            else
+            {
+                var result = await MenuSync.ApplyAsync(
+                    db, storeId, logger,
+                    // Ghi đè công thức của món ĐÃ CÓ. Mặc định tắt vì chủ quán có
+                    // quyền sửa định lượng cho hợp khẩu vị khách của mình.
+                    refreshRecipes: Cfg("MENU_SYNC_RECIPES", "false") == "true",
+                    // Tạo lô tồn kho mở đầu cho nguyên liệu mới. Ở quán thật đây là
+                    // bịa ra hàng hóa không có — chỉ bật ở máy phát triển.
+                    openingStock: Cfg("MENU_SYNC_OPENING_STOCK", "false") == "true");
+
+                // Có món mới hoặc công thức mới thì giá vốn và trạng thái còn bán
+                // được đều phải tính lại, nếu không món mới hiện "tạm hết" mãi mãi.
+                if (result.NewProducts.Count > 0 || result.RefreshedRecipeCount > 0)
+                {
+                    var recipe = scope.ServiceProvider.GetRequiredService<IRecipeService>();
+                    var availability = scope.ServiceProvider.GetRequiredService<IAvailabilityService>();
+
+                    await recipe.RecomputeAllProductCostsAsync(storeId);
+                    await availability.RecomputeAllAsync(storeId);
+
+                    logger.LogInformation("Đã tính lại giá vốn và tồn kho khả dụng cho toàn bộ thực đơn");
+                }
+            }
+        }
+
+        // ---- Thông tin bên bán và cấu hình thuế -----------------------------
+        //
+        //  Đồng bộ từ .env vào bản ghi cửa hàng mỗi lần khởi động, vì hai lý do:
+        //
+        //  1. THUẾ SUẤT DO QUỐC HỘI QUYẾT, không do lập trình viên. Mức 8% hiện
+        //     hành hết hiệu lực 31/12/2026; sau đó nếu không gia hạn thì về 10%.
+        //     Phải đổi được bằng một dòng .env, không phải build lại.
+        //
+        //  2. TÊN VÀ ĐỊA CHỈ BÊN BÁN GIỜ ĐƯỢC IN LÊN BẢNG KÊ TIỀN HÀNG. Trước
+        //     đây các cột này chỉ nằm im trong database nên không ai để ý chúng
+        //     đã lệch khỏi .env — cho tới khi bảng kê hiện ra một cái tên khác
+        //     hẳn tên trên tiêu đề trang. Trên chứng từ giao khách, sai tên bên
+        //     bán không phải lỗi hiển thị mà là sai thông tin.
+        //
+        //  Seeder chỉ đặt các giá trị này ở lần khởi tạo đầu tiên, nên nếu không
+        //  có bước này thì mọi thay đổi trong .env về sau đều không tới nơi.
+        if (Cfg("STORE_INFO_APPLY", "false") == "true")
+        {
+            var store = await db.Stores.OrderBy(s => s.CreatedAt).FirstOrDefaultAsync();
+            if (store is not null)
+            {
+                // Chỉ ghi đè khi .env thực sự có giá trị. Biến để trống nghĩa là
+                // "không quản lý trường này", chứ không phải "xóa nó đi".
+                void ApplyText(string key, Action<string> set)
+                {
+                    var value = Cfg(key, "");
+                    if (!string.IsNullOrWhiteSpace(value)) set(value.Trim());
+                }
+
+                ApplyText("STORE_NAME",       v => store.Name = v);
+                ApplyText("STORE_ADDRESS",    v => store.Address = v);
+                ApplyText("STORE_PHONE",      v => store.Phone = v);
+                ApplyText("STORE_EMAIL",      v => store.Email = v);
+                ApplyText("STORE_OPEN_TIME",  v => store.OpenTime = v);
+                ApplyText("STORE_CLOSE_TIME", v => store.CloseTime = v);
+                ApplyText("STORE_TAX_CODE",   v => store.TaxCode = v);
+
+                store.TaxMode        = EnvInt("STORE_TAX_MODE", store.TaxMode);
+                store.VatRatePercent = EnvInt("STORE_VAT_RATE", store.VatRatePercent);
+
+                await db.SaveChangesAsync();
+                logger.LogInformation(
+                    "Cửa hàng {Name}: chế độ thuế {Mode}, thuế suất {Rate}%",
+                    store.Name, store.TaxMode, store.VatRatePercent);
+            }
         }
     }
     catch (Exception ex)
@@ -230,7 +337,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-Log.Information("Qly Coffee API sẵn sàng tại {Url}", Cfg("API_BASE_URL", "http://localhost:5080"));
+Log.Information("Một Chút Coffee API sẵn sàng tại {Url}", Cfg("API_BASE_URL", "http://localhost:5080"));
 
 await app.RunAsync();
 

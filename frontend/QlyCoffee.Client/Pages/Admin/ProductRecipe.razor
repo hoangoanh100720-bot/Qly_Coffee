@@ -19,7 +19,7 @@
 @inject AlertService Alerts
 @inject NavigationManager Nav
 
-<PageTitle>Công thức @(_product?.Name ?? "") — Qly Coffee</PageTitle>
+<PageTitle>Công thức @(_product?.Name ?? "") — Một Chút Coffee</PageTitle>
 
 @if (_loading)
 {
@@ -45,12 +45,16 @@ else
 
             <div class="row row-between row-wrap" style="gap: var(--space-4);">
                 <div class="row row-4">
-                    @* Minh họa ly nước theo màu đang cấu hình — đổi màu là thấy ngay *@
-                    <DrinkGlass DrinkColor="@_colorPrimary" FoamColor="@_colorAccent"
-                                Size="72" AriaLabel="@($"Minh họa {_product.Name}")" />
+                    @*  Ảnh thật của món, viền tô bằng chính hai màu đang cấu hình bên
+                        dưới — vừa thấy đúng thứ khách nhìn, vừa thấy ngay màu vừa chọn. *@
+                    <img class="recipe-photo"
+                         src="@DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name)"
+                         alt="@($"Ảnh món {_product.Name}")"
+                         style="--drink: @_colorPrimary; --foam: @_colorAccent;"
+                         width="72" height="72" />
                     <div class="stack stack-1">
                         <h2>@_product.Name</h2>
-                        <span class="xs muted">Công thức cho một ly size mặc định</span>
+                        <span class="xs muted">Công thức cho một phần size mặc định</span>
                     </div>
                 </div>
 
@@ -279,9 +283,13 @@ else
             @* ── MÀU MINH HỌA ───────────────────────────────────────────── *@
             <section class="card">
                 <div class="stack stack-1">
-                    <h3 class="card-title">Màu minh họa</h3>
+                    <h3 class="card-title">Màu nhận diện</h3>
+                    @*  Không còn dùng để VẼ ly nước nữa — mọi món giờ đều hiện ảnh chụp.
+                        Hai màu này giờ đi vào nền thẻ món, viền thẻ khuyến mãi và vệt màu
+                        ở dòng giỏ hàng, nên vẫn phải khớp màu thật của ly. *@
                     <span class="xs muted">
-                        Dùng khi món chưa có ảnh chụp. Chọn màu đúng như ly nước thật.
+                        Tô nền thẻ món, thẻ khuyến mãi và dòng giỏ hàng.
+                        Chọn đúng màu thật của ly để nền ăn khớp với ảnh.
                     </span>
                 </div>
 

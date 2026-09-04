@@ -22,7 +22,7 @@
 @inject ApiClient Api
 @inject NavigationManager Nav
 
-<PageTitle>Bảng điều khiển — Qly Coffee</PageTitle>
+<PageTitle>Bảng điều khiển — Một Chút Coffee</PageTitle>
 
 @if (_loading)
 {
@@ -215,12 +215,14 @@ else
                     {
                         var share = _topMax > 0 ? p.UnitsSold * 100.0 / _topMax : 0;
                         <div class="top-product">
-                            <DrinkGlass DrinkColor="@p.ColorPrimaryHex" FoamColor="#F5EDE0"
-                                        Size="34" AriaLabel="" />
+                            <img class="top-product-photo"
+                                 src="@DrinkPhoto.PhotoFor(p.ImageUrl, null, p.Name)"
+                                 alt="" loading="lazy" decoding="async"
+                                 width="34" height="34" />
                             <div class="stack stack-1 grow">
                                 <div class="row row-between">
                                     <span class="small" style="font-weight: 600;">@p.Name</span>
-                                    <span class="xs num muted">@p.UnitsSold ly</span>
+                                    <span class="xs num muted">@p.UnitsSold phần</span>
                                 </div>
                                 <div class="meter">
                                     <div class="meter-fill"

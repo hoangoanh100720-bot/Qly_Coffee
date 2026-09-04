@@ -16,7 +16,7 @@
 @inject ApiClient Api
 @inject AlertService Alerts
 
-<PageTitle>Món &amp; công thức — Qly Coffee</PageTitle>
+<PageTitle>Món &amp; công thức — Một Chút Coffee</PageTitle>
 
 <div class="stack stack-6">
 
@@ -53,7 +53,9 @@
         <div class="stat">
             <span class="stat-label">Biên lợi nhuận TB</span>
             <span class="stat-value">@_avgMargin%</span>
-            <span class="stat-meta">mặt bằng ngành 60–75%</span>
+            @* Hai mốc khác nhau vì hai nhóm định giá khác hẳn nhau: bánh nhập về
+               nguyên cái nên biên thấp hơn đồ uống là bình thường, không phải lỗi. *@
+            <span class="stat-meta">đồ uống 60–75% · đồ ăn 45–55%</span>
         </div>
     </div>
 
@@ -122,24 +124,19 @@
                     {
                         <tr class="@RowClass(p)" @key="p.Id">
 
-                            @* Ảnh chụp thật nếu có; chưa có thì dùng ly vẽ tô đúng màu món.
-                               Viền đứt nhắc rằng đây là hình tạm, chưa phải ảnh thật. *@
+                            @*  Luôn là ảnh chụp: ảnh riêng của món nếu đã có, không thì
+                                ảnh mẫu theo nhóm. Viền đứt và nhãn "Đang dùng ảnh mẫu"
+                                bên cạnh mới là thứ phân biệt hai trường hợp — trước đây
+                                dùng hình ly vẽ để phân biệt, nhưng vậy thì trang quản lý
+                                lại hiện thứ khác hẳn thứ khách đang nhìn thấy. *@
                             <td>
                                 <div class="ingredient-cell">
                                     <button class="photo-slot @(Media.HasPhoto(p.ImageUrl) ? "has-photo" : "no-photo")"
                                             @onclick="() => OpenPhoto(p)"
-                                            title="@(Media.HasPhoto(p.ImageUrl) ? "Đổi ảnh" : "Thêm ảnh chụp thật")"
+                                            title="@(Media.HasPhoto(p.ImageUrl) ? "Đổi ảnh" : "Thêm ảnh chụp riêng của quán")"
                                             aria-label="@($"Quản lý ảnh cho {p.Name}")">
-                                        @if (Media.HasPhoto(p.ImageUrl))
-                                        {
-                                            <img src="@Media.Resolve(p.ImageUrl)" alt="" loading="lazy" />
-                                        }
-                                        else
-                                        {
-                                            <DrinkGlass DrinkColor="@p.ColorPrimaryHex"
-                                                        FoamColor="@p.ColorAccentHex"
-                                                        Size="30" AriaLabel="" />
-                                        }
+                                        <img src="@DrinkPhoto.PhotoFor(p.ImageUrl, p.CategoryName, p.Name)"
+                                             alt="" loading="lazy" decoding="async" />
                                         <span class="photo-slot-hint"><CameraIcon Size="13" /></span>
                                     </button>
                                     <div class="ingredient-meta">
@@ -151,7 +148,7 @@
                                             }
                                             @if (!Media.HasPhoto(p.ImageUrl))
                                             {
-                                                <span class="badge badge-neutral">Chưa có ảnh</span>
+                                                <span class="badge badge-neutral">Đang dùng ảnh mẫu</span>
                                             }
                                             @if (p.RecipeItemCount == 0)
                                             {
@@ -170,7 +167,25 @@
 
                             <td class="small muted">@p.CategoryName</td>
 
-                            <td class="num" style="font-weight: 600;">@Money.Format(p.BasePrice)</td>
+                            @*  Ô giá là ô DUY NHẤT trong bảng bấm được để sửa.
+                                Đổi giá là việc làm hàng tuần — theo giá nguyên liệu,
+                                theo mùa, theo đối thủ — nên không bắt đi vòng qua
+                                màn hình soạn công thức, nơi dễ sửa nhầm định lượng. *@
+                            <td class="num">
+                                <button class="price-edit" @onclick="() => OpenPrice(p)"
+                                        title="Điều chỉnh giá bán"
+                                        aria-label="@($"Điều chỉnh giá bán của {p.Name}, hiện tại {Money.Format(p.BasePrice)}")">
+                                    <span class="price-edit-value">@Money.Format(p.BasePrice)</span>
+                                    <EditIcon Size="12" />
+                                </button>
+                                @if (p.RecipeItemCount > 0 && p.PriceVerdict <= 0)
+                                {
+                                    <div class="xs @(p.PriceVerdict < 0 ? "text-danger" : "text-warn")"
+                                         style="margin-top: 2px;">
+                                        @(p.PriceVerdict < 0 ? "đang bán lỗ" : "biên mỏng")
+                                    </div>
+                                }
+                            </td>
 
                             <td class="num muted">
                                 @if (p.RecipeItemCount == 0)
@@ -180,6 +195,9 @@
                                 else
                                 {
                                     @Money.Format(p.ComputedCost)
+                                    <div class="xs muted" style="margin-top: 2px;">
+                                        đề nghị @Money.Format(p.SuggestedPrice)
+                                    </div>
                                 }
                             </td>
 
@@ -225,7 +243,7 @@
                                 else if (p.MaxServings <= 5)
                                 {
                                     <span class="text-warn" style="font-weight: 600;">
-                                        @p.MaxServings ly
+                                        @p.MaxServings phần
                                     </span>
                                 }
                                 else if (p.MaxServings >= 9999)
@@ -234,7 +252,7 @@
                                 }
                                 else
                                 {
-                                    <span class="muted">@p.MaxServings ly</span>
+                                    <span class="muted">@p.MaxServings phần</span>
                                 }
                             </td>
 
@@ -261,6 +279,139 @@
 </div>
 
 @* ══════════════════════════════════════════════════════════════════════════
+   HỘP THOẠI ĐIỀU CHỈNH GIÁ BÁN
+
+   Ba việc, đúng thứ tự người dùng cần:
+     1. Cho biết giá vốn thật là bao nhiêu
+     2. Gợi ý một mức giá, kèm lý do vì sao là mức đó
+     3. Để người dùng gõ con số của MÌNH — hệ thống không quyết thay
+
+   Hệ thống KHÔNG chặn giá thấp hơn giá vốn: quán có quyền bán lỗ một món để
+   kéo khách hoặc xả nguyên liệu cận hạn. Nó chỉ nói ra hậu quả trước khi lưu.
+   ══════════════════════════════════════════════════════════════════════════ *@
+@if (_priceTarget is not null)
+{
+    <div class="modal-backdrop" @onclick="ClosePrice"></div>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="price-title">
+
+        <div class="stack stack-1">
+            <h3 id="price-title">Điều chỉnh giá bán</h3>
+            <span class="small muted">
+                @_priceTarget.Name
+                @if (_priceTarget.IsFood)
+                {
+                    <span class="badge badge-neutral" style="margin-left: var(--space-2);">Đồ ăn</span>
+                }
+            </span>
+        </div>
+
+        @if (_priceTarget.RecipeItemCount == 0)
+        {
+            <div class="alert alert-warn" role="alert">
+                <WarnIcon Size="16" />
+                <span class="small">
+                    Món chưa có công thức nên chưa tính được giá vốn — không có cơ sở
+                    để gợi ý giá. Soạn công thức trước rồi hãy định giá.
+                </span>
+            </div>
+        }
+
+        @* ── Ô nhập giá ────────────────────────────────────────────────── *@
+        <div class="field">
+            <label class="field-label" for="new-price">Giá bán (đồng)</label>
+            <input id="new-price" type="number" class="input input-num"
+                   min="1000" step="1000" inputmode="numeric"
+                   @bind="_priceInput" @bind:event="oninput"
+                   disabled="@_priceBusy" />
+            <span class="field-hint">Giá của size mặc định. Size L cộng thêm theo biến thể.</span>
+        </div>
+
+        @if (_priceTarget.RecipeItemCount > 0)
+        {
+            @* ── Bảng lãi lỗ cập nhật theo từng phím gõ ─────────────────── *@
+            <div class="pl-table">
+                <div class="pl-row">
+                    <span class="pl-label">Giá vốn nguyên liệu</span>
+                    <span class="pl-value num">@Money.Format(_priceTarget.ComputedCost)</span>
+                </div>
+                <div class="pl-row">
+                    <span class="pl-label">Lãi gộp một phần</span>
+                    <span class="pl-value num @(PreviewProfit < 0 ? "pl-negative" : "pl-positive")">
+                        @Money.FormatSigned(PreviewProfit)
+                    </span>
+                </div>
+                <div class="pl-row">
+                    <span class="pl-label">
+                        Tỷ lệ giá vốn
+                        <span class="xs muted">
+                            (chuẩn nhóm @_priceTarget.TargetCostRatioPercent%)
+                        </span>
+                    </span>
+                    <span class="pl-value num @PreviewRatioClass">@PreviewRatio%</span>
+                </div>
+                <div class="pl-row pl-total">
+                    <span class="pl-label">Biên lợi nhuận</span>
+                    <span class="pl-value num">@PreviewMargin%</span>
+                </div>
+            </div>
+
+            <p class="small @PreviewRatioClass" role="status">@PreviewVerdictText</p>
+
+            @* ── Giá đề nghị ────────────────────────────────────────────── *@
+            <div class="row row-between row-wrap" style="gap: var(--space-3);">
+                <div class="stack stack-1">
+                    <span class="xs muted">Giá đề nghị</span>
+                    <span class="num" style="font-weight: 700; font-size: var(--text-lg);">
+                        @Money.Format(_priceTarget.SuggestedPrice)
+                    </span>
+                </div>
+                <button class="btn btn-secondary btn-sm"
+                        @onclick="() => _priceInput = _priceTarget.SuggestedPrice"
+                        disabled="@_priceBusy">
+                    Dùng giá đề nghị
+                </button>
+            </div>
+
+            <p class="xs muted">
+                Tính bằng giá vốn chia cho tỷ lệ @_priceTarget.TargetCostRatioPercent%, làm tròn lên
+                bội số 1.000đ. Phần chênh KHÔNG phải lãi — nó gánh mặt bằng, điện nước,
+                lương pha chế và hao hụt.
+                @if (_priceTarget.IsFood)
+                {
+                    <text>
+                        Đồ ăn để mức 45% chứ không phải 30% như đồ uống, vì bánh nhập về
+                        nguyên cái — quán không tạo thêm giá trị bằng tay nghề pha chế.
+                    </text>
+                }
+            </p>
+        }
+
+        @if (!string.IsNullOrEmpty(_priceError))
+        {
+            <div class="alert alert-danger" role="alert">
+                <WarnIcon Size="16" />
+                <span class="small">@_priceError</span>
+            </div>
+        }
+
+        <div class="row row-between" style="padding-top: var(--space-2); border-top: 1px solid var(--border);">
+            <button class="btn btn-ghost" @onclick="ClosePrice" disabled="@_priceBusy">Hủy</button>
+            <button class="btn btn-primary" @onclick="SavePriceAsync"
+                    disabled="@(_priceBusy || _priceInput <= 0 || _priceInput == _priceTarget.BasePrice)">
+                @if (_priceBusy)
+                {
+                    <SpinnerIcon Size="16" /> <span>Đang lưu…</span>
+                }
+                else
+                {
+                    <span>Lưu giá mới</span>
+                }
+            </button>
+        </div>
+    </div>
+}
+
+@* ══════════════════════════════════════════════════════════════════════════
    HỘP THOẠI ẢNH MÓN
 
    Hai đường vào ảnh, vì hai tình huống khác nhau:
@@ -285,13 +436,12 @@
             }
             else
             {
-                <div class="photo-preview-empty"
-                     style="--drink: @_photoTarget.ColorPrimaryHex;">
-                    <DrinkGlass DrinkColor="@_photoTarget.ColorPrimaryHex"
-                                FoamColor="@_photoTarget.ColorAccentHex"
-                                Size="84" AriaLabel="" />
-                    <span class="xs muted">Đang dùng hình vẽ</span>
-                </div>
+                @*  Chưa có ảnh riêng thì xem trước ĐÚNG tấm ảnh mẫu mà khách đang
+                    nhìn thấy trên thực đơn, kèm câu nói rõ đó là ảnh dùng chung cho
+                    cả nhóm. Trước đây chỗ này hiện hình ly vẽ — một thứ không còn
+                    xuất hiện ở đâu trên trang bán hàng nữa. *@
+                <img src="@DrinkPhoto.FallbackFor(_photoTarget.CategoryName, _photoTarget.Name)"
+                     alt="Ảnh mẫu đang dùng cho @_photoTarget.Name" />
             }
         </div>
 
@@ -341,7 +491,7 @@
             @if (Media.HasPhoto(_photoTarget.ImageUrl))
             {
                 <button class="btn btn-ghost btn-sm text-danger" @onclick="RemovePhoto" disabled="@_photoBusy">
-                    <TrashIcon Size="14" /> Gỡ ảnh, dùng hình vẽ
+                    <TrashIcon Size="14" /> Gỡ ảnh, dùng ảnh mẫu
                 </button>
             }
             else
@@ -358,6 +508,84 @@
     private bool _loading = true;
     private string _activeFilter = "all";
     private string _search = "";
+
+    // ── Trạng thái hộp thoại giá ──────────────────────────────────────────
+    private ProductAdminDto? _priceTarget;
+    private int _priceInput;
+    private string? _priceError;
+    private bool _priceBusy;
+
+    private void OpenPrice(ProductAdminDto p)
+    {
+        _priceTarget = p;
+        _priceInput  = p.BasePrice;
+        _priceError  = null;
+    }
+
+    private void ClosePrice()
+    {
+        _priceTarget = null;
+        _priceError  = null;
+    }
+
+    // Ba số xem trước, tính lại theo TỪNG PHÍM GÕ. Dùng chính hàm mà backend
+    // dùng (QlyCoffee.Shared.Pricing) nên số xem trước và số sau khi lưu bằng nhau.
+    private int PreviewProfit => _priceTarget is null ? 0 : _priceInput - _priceTarget.ComputedCost;
+    private int PreviewMargin => _priceTarget is null ? 0 : Pricing.MarginPercent(_priceInput, _priceTarget.ComputedCost);
+    private int PreviewRatio  => _priceTarget is null ? 0 : Pricing.CostRatioPercent(_priceInput, _priceTarget.ComputedCost);
+
+    private int PreviewVerdict => _priceTarget is null
+        ? 0
+        : Pricing.Verdict(_priceInput, _priceTarget.ComputedCost, _priceTarget.TargetCostRatioPercent);
+
+    private string PreviewRatioClass => PreviewVerdict switch
+    {
+        -1 => "text-danger",
+        0  => "text-warn",
+        _  => "muted"
+    };
+
+    private string PreviewVerdictText => PreviewVerdict switch
+    {
+        -1 => "Giá này thấp hơn giá vốn — mỗi phần bán ra là một phần lỗ. "
+            + "Chỉ nên dùng khi cố ý xả nguyên liệu cận hạn.",
+        0  => $"Biên mỏng hơn chuẩn nhóm ({_priceTarget?.TargetCostRatioPercent}% giá vốn). "
+            + "Đủ trả nguyên liệu nhưng còn ít cho mặt bằng và nhân công.",
+        2  => "Cao hơn mặt bằng ngành. Lãi tốt, nhưng kiểm tra xem giá có còn cạnh tranh "
+            + "với quán xung quanh không.",
+        _  => "Mức giá lành mạnh: đủ gánh chi phí vận hành và vẫn cạnh tranh."
+    };
+
+    /// <summary>
+    /// Lưu giá mới. Backend trả về bản DTO đã cập nhật nên bảng vẽ lại đúng
+    /// biên lợi nhuận mới mà không phải nạp lại toàn bộ danh sách.
+    /// </summary>
+    private async Task SavePriceAsync()
+    {
+        if (_priceTarget is null) return;
+
+        _priceBusy = true;
+        _priceError = null;
+        try
+        {
+            var res = await Api.UpdateProductPriceAsync(_priceTarget.Id, _priceInput);
+
+            if (res.Success && res.Data is not null)
+            {
+                var idx = _items.FindIndex(x => x.Id == res.Data.Id);
+                if (idx >= 0) _items[idx] = res.Data;
+
+                RecomputeStats();
+                Alerts.Success($"Đã đổi giá {res.Data.Name} thành {Money.Format(res.Data.BasePrice)}.");
+                ClosePrice();
+            }
+            else
+            {
+                _priceError = res.Error?.Message ?? "Không lưu được giá mới.";
+            }
+        }
+        finally { _priceBusy = false; }
+    }
 
     // ── Trạng thái hộp thoại ảnh ──────────────────────────────────────────
     private ProductAdminDto? _photoTarget;
@@ -467,7 +695,7 @@
             if (res.Success)
             {
                 ApplyNewImage(null);
-                Alerts.Info($"{_photoTarget.Name} quay về dùng hình vẽ.");
+                Alerts.Info($"{_photoTarget.Name} quay về dùng ảnh mẫu theo nhóm.");
             }
             else
             {
@@ -500,6 +728,11 @@
     private static readonly FilterDef[] Filters =
     {
         new("all",        "Tất cả"),
+        new("drink",      "Đồ uống"),
+        // Đồ ăn tách riêng vì cách định giá KHÁC HẲN đồ uống: bánh nhập về nguyên
+        // cái nên tỷ lệ giá vốn mục tiêu là 45% chứ không phải 30%. Lọc chung một
+        // rổ thì mọi món bánh đều bị bảng "biên thấp" tô đỏ oan.
+        new("food",       "Đồ ăn"),
         new("unavailable","Tạm hết"),
         new("no-recipe",  "Chưa có công thức"),
         new("no-photo",   "Chưa có ảnh"),
@@ -515,10 +748,14 @@
 
             q = _activeFilter switch
             {
+                "drink"       => q.Where(p => !p.IsFood),
+                "food"        => q.Where(p => p.IsFood),
                 "unavailable" => q.Where(p => !p.IsAvailable && p.IsActive),
                 "no-recipe"   => q.Where(p => p.RecipeItemCount == 0),
                 "no-photo"    => q.Where(p => !Media.HasPhoto(p.ImageUrl)),
-                "low-margin"  => q.Where(p => p.RecipeItemCount > 0 && p.MarginPercent < 50),
+                // "Biên thấp" so với chuẩn CỦA NHÓM ĐÓ, không phải một ngưỡng chung:
+                // biên 55% của một chiếc croissant là lành mạnh, của một ly cà phê thì không.
+                "low-margin"  => q.Where(p => p.RecipeItemCount > 0 && p.PriceVerdict <= 0),
                 "inactive"    => q.Where(p => !p.IsActive),
                 _             => q
             };
@@ -544,6 +781,16 @@
         var res = await Api.GetAdminProductsAsync();
         _items = res.Success && res.Data is not null ? res.Data : new();
 
+        RecomputeStats();
+        _loading = false;
+    }
+
+    /// <summary>
+    /// Tính lại ba thẻ tổng quan. Gọi cả sau khi đổi giá, vì đổi giá làm biên
+    /// lợi nhuận trung bình thay đổi ngay lập tức.
+    /// </summary>
+    private void RecomputeStats()
+    {
         _unavailable = _items.Count(p => !p.IsAvailable && p.IsActive);
         _noRecipe    = _items.Count(p => p.RecipeItemCount == 0);
 
@@ -553,16 +800,16 @@
         _avgMargin = withRecipe.Count > 0
             ? (int)Math.Round(withRecipe.Average(p => p.MarginPercent))
             : 0;
-
-        _loading = false;
     }
 
     private int CountFor(string key) => key switch
     {
+        "drink"       => _items.Count(p => !p.IsFood),
+        "food"        => _items.Count(p => p.IsFood),
         "unavailable" => _unavailable,
         "no-recipe"   => _noRecipe,
         "no-photo"    => _items.Count(p => !Media.HasPhoto(p.ImageUrl)),
-        "low-margin"  => _items.Count(p => p.RecipeItemCount > 0 && p.MarginPercent < 50),
+        "low-margin"  => _items.Count(p => p.RecipeItemCount > 0 && p.PriceVerdict <= 0),
         "inactive"    => _items.Count(p => !p.IsActive),
         _             => _items.Count
     };

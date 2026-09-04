@@ -80,6 +80,26 @@
   100% { box-shadow: 0 0 0 0   color-mix(in srgb, var(--ok) 0%, transparent); }
 }
 
+/* Ngoài giờ bán — chấm đỏ, viền và nền ngả đỏ nhạt.
+   Trang chủ đọc giờ máy khách rồi gắn .is-closed vào chip (xem Home.razor và
+   Services/StoreHours.cs); toàn bộ phần đổi hình thức nằm gọn ở đây.
+
+   Chấm đỏ TẮT hẳn animation chứ không chỉ đổi màu. Nhịp đập là quy ước cho
+   "đang hoạt động" — giữ nó lại trên trạng thái đóng cửa thì màu nói một đằng,
+   chuyển động nói một nẻo, và người đọc lướt sẽ tin cái chuyển động.
+
+   Chữ giữ --text-2 chứ không nhuộm đỏ theo: cả dòng đỏ đọc như thông báo lỗi
+   hệ thống, trong khi đây chỉ là thông tin bình thường về giờ giấc. */
+.pill-live.is-closed {
+  border-color: var(--danger-border);
+  background: color-mix(in srgb, var(--danger-soft) 70%, var(--surface));
+}
+.pill-live.is-closed .pulse-dot {
+  background: var(--danger);
+  box-shadow: none;
+  animation: none;
+}
+
 /* --- Ba con số tạo lòng tin ------------------------------------------------ */
 .hero-stats {
   display: flex; flex-wrap: wrap; gap: var(--space-8);
@@ -354,6 +374,27 @@
   .detail-visual { position: static; aspect-ratio: 4 / 3; }
 }
 
+/* Gợi ý thưởng thức — "uống nóng ngon hơn", "ăn kèm bánh mì que".
+   Dùng sắc vàng --sun chứ KHÔNG dùng .alert: đây là lời mời, không phải cảnh
+   báo. Trên trang này .alert-warn đang mang nghĩa "sắp hết hàng", nên hai thứ
+   phải nhìn ra khác nhau ngay từ màu.                                        */
+.serving-tip {
+  display: flex; gap: var(--space-3); align-items: flex-start;
+  padding: var(--space-4);
+  background: var(--sun-soft);
+  border: 1px solid color-mix(in srgb, var(--sun) 35%, transparent);
+  border-radius: var(--radius);
+}
+.serving-tip-icon { color: var(--warn); flex: none; margin-top: 1px; }
+.serving-tip-label {
+  display: block;
+  font-size: var(--text-xs); font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--warn);
+  margin-bottom: 2px;
+}
+.serving-tip p { margin: 0; font-size: var(--text-sm); color: var(--text-2); }
+
 .add-to-cart {
   display: flex; align-items: stretch; gap: var(--space-3);
   padding-top: var(--space-2);
@@ -401,7 +442,62 @@
   .cart-thumb { grid-area: thumb; }
 }
 
-.summary-card { position: sticky; bottom: var(--space-4); box-shadow: var(--shadow); }
+/* Thẻ tổng tiền.
+
+   TỪNG dính đáy màn hình (position: sticky; bottom) để nút "Đặt món" luôn trong
+   tầm tay. Đã bỏ khi khối thuế GTGT được thêm vào NGAY DƯỚI nó: một phần tử
+   sticky-bottom chỉ nhả ra khi chạm đáy vùng chứa, nên suốt lúc cuộn nó sẽ nổi
+   đè lên chính khối thuế — khách cuộn xuống xem tiền thuế thì thấy nó bị che.
+
+   Đổi lại bằng đổ bóng để thẻ vẫn nổi lên khỏi nền và bắt được mắt. Trang giỏ
+   hàng vốn ngắn (vài dòng món cộng một form), nên mất phần dính đáy không đáng
+   kể so với việc che mất thông tin bắt buộc phải hiển thị. */
+.summary-card { box-shadow: var(--shadow); }
+
+/* -----------------------------------------------------------------------------
+   Khối thuế GTGT (component VatSummary)
+
+   Cố ý TRẦM hơn thẻ tổng tiền ngay trên nó: nền chìm, không đổ bóng, không dính
+   đáy màn hình. Đây là thông tin để đối chiếu và lưu chứng từ, không phải thứ
+   cạnh tranh sự chú ý với nút "Đặt món".
+----------------------------------------------------------------------------- */
+.vat-card {
+  background: var(--surface-2);
+  box-shadow: none;
+  gap: var(--space-3);
+}
+
+.vat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.vat-note {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--text-2);
+}
+
+/* Dòng miễn trừ về hóa đơn điện tử — vẫn phải đọc được, nhưng đứng sau
+   câu giải thích chính về thuế. */
+.vat-note-quiet {
+  color: var(--muted);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* Cặp "nhãn – giá trị" của bên bán. Dùng <dl> vì đó đúng là danh sách định
+   nghĩa, và trình đọc màn hình đọc được cặp đôi thay vì hai mẩu chữ rời. */
+.vat-issuer {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-xs);
+}
+.vat-issuer dt { color: var(--muted); }
+.vat-issuer dd { margin: 0; color: var(--text); font-weight: 600; }
 
 /* =============================================================================
    §4  TIẾN TRÌNH ĐƠN

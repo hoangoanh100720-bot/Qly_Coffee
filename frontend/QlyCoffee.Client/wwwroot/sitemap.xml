@@ -3,7 +3,7 @@
   =============================================================================
    sitemap.xml — Danh sách trang gửi cho Google
   =============================================================================
-   ⚠️ Đổi https://qlycoffee.vn thành tên miền thật khi deploy.
+   ⚠️ Đổi https://motchutcoffee.vn thành tên miền thật khi deploy.
 
    File này liệt kê các trang TĨNH — những đường dẫn không đổi theo dữ liệu.
    Trang chi tiết từng món (/menu/{slug}) KHÔNG có ở đây vì danh sách món thay
@@ -23,23 +23,23 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 
   <url>
-    <loc>https://qlycoffee.vn/</loc>
+    <loc>https://motchutcoffee.vn/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://qlycoffee.vn/img/og-cover.jpg</image:loc>
-      <image:title>Cà phê sữa đá pha phin tại Qly Coffee</image:title>
+      <image:loc>https://motchutcoffee.vn/img/og-cover.jpg</image:loc>
+      <image:title>Cà phê sữa đá pha phin tại Một Chút Coffee</image:title>
     </image:image>
   </url>
 
   <url>
-    <loc>https://qlycoffee.vn/menu</loc>
+    <loc>https://motchutcoffee.vn/menu</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://qlycoffee.vn/tra-cuu-don</loc>
+    <loc>https://motchutcoffee.vn/tra-cuu-don</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>

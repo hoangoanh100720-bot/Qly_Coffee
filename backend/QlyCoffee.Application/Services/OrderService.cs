@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -13,15 +14,26 @@ namespace QlyCoffee.Application.Services;
 //
 //  VÒNG ĐỜI VÀ TÁC ĐỘNG LÊN KHO:
 //
-//     Pending    ─┐  chưa trừ kho
+//     Pending    ─┐  đơn online chờ nhân viên xác nhận. Chưa trừ kho.
 //                 │
-//     Confirmed  ─┤  ⭐ TRỪ KHO TẠI ĐÂY (một transaction duy nhất)
+//     Confirmed  ─┤  vào hàng pha, hẹn giờ với khách. Chưa trừ kho.
+//     Preparing  ─┤  đang pha.                        Chưa trừ kho.
+//     Ready      ─┤  pha xong, chờ khách nhận.        Chưa trừ kho.
 //                 │
-//     Preparing  ─┤  không động vào kho
-//     Ready      ─┤  không động vào kho
-//     Completed  ─┘  không động vào kho
+//     Completed  ─┘  ⭐ TRỪ KHO TẠI ĐÂY (một transaction Serializable)
 //
-//     Cancelled  ───  HOÀN KHO nếu trước đó đã trừ
+//     Cancelled  ───  HOÀN KHO, nhưng chỉ khi đơn đã Completed rồi mới hủy.
+//                     Hủy lúc đang pha thì không phải hoàn gì — chưa trừ bao giờ.
+//
+//  TẠI SAO TRỪ Ở COMPLETED CHỨ KHÔNG PHẢI CONFIRMED:
+//  Nguyên liệu chỉ thật sự rời khỏi kho khi nhân viên thật sự pha ra ly nước.
+//  Trừ sớm ở Confirmed thì mỗi đơn hủy giữa chừng đều phải hoàn kho, mà hoàn kho
+//  là đường dễ sai nhất (hoàn nhầm lô, hoàn hai lần, hoàn sau khi lô đã hết hạn).
+//
+//  CÁI GIÁ PHẢI TRẢ, VÀ CÁCH TRẢ:
+//  Từ lúc nhận đơn tới lúc pha xong, kho vẫn báo đủ dù mấy ly trong hàng chờ đã
+//  chiếm phần. Giờ cao điểm sẽ nhận vượt. Nên EnsureIngredientsAvailableAsync
+//  lấy tồn kho TRỪ ĐI phần các đơn đang trong hàng pha đã xí trước.
 //
 //  Không có trạng thái nào khác chạm vào kho. Nếu bạn thấy mình định thêm
 //  logic trừ kho ở chỗ khác trong file này thì gần như chắc chắn là sai.
@@ -33,6 +45,12 @@ public interface IOrderService
     Task<Order> ConfirmOrderAsync(Guid orderId, Guid actorId, CancellationToken ct = default);
     Task<Order> UpdateStatusAsync(Guid orderId, OrderStatus status, Guid actorId, string? reason, CancellationToken ct = default);
     Task<Order> CancelOrderAsync(Guid orderId, Guid actorId, string reason, CancellationToken ct = default);
+
+    /// <summary>Nhân viên bấm đơn tại quầy — vào thẳng hàng pha, không chờ xác nhận.</summary>
+    Task<Order> CreateInStoreOrderAsync(CreateOrderRequest req, Guid storeId, Guid actorId, CancellationToken ct = default);
+
+    /// <summary>Pha xong, giao khách — ĐÂY là lúc trừ kho.</summary>
+    Task<Order> CompleteOrderAsync(Guid orderId, Guid actorId, CancellationToken ct = default);
 }
 
 public class OrderService : IOrderService
@@ -41,6 +59,7 @@ public class OrderService : IOrderService
     private readonly IRecipeService _recipe;
     private readonly IInventoryService _inventory;
     private readonly IAvailabilityService _availability;
+    private readonly IBarQueueService _queue;
     private readonly ILogger<OrderService> _logger;
 
     public OrderService(
@@ -48,12 +67,14 @@ public class OrderService : IOrderService
         IRecipeService recipe,
         IInventoryService inventory,
         IAvailabilityService availability,
+        IBarQueueService queue,
         ILogger<OrderService> logger)
     {
         _db = db;
         _recipe = recipe;
         _inventory = inventory;
         _availability = availability;
+        _queue = queue;
         _logger = logger;
     }
 
@@ -84,7 +105,8 @@ public class OrderService : IOrderService
                     item.ProductId,
                     product?.Name ?? "Món không xác định",
                     maxServings,
-                    maxServings == 0 ? $"Hết {blocking}" : $"Chỉ còn {maxServings} ly"));
+                    // blocking đã là câu hoàn chỉnh — xem IAvailabilityService.
+                    maxServings == 0 ? blocking ?? "Tạm hết" : $"Chỉ còn {maxServings} ly"));
             }
         }
 
@@ -105,6 +127,11 @@ public class OrderService : IOrderService
             Status        = OrderStatus.Pending,
             PlacedAt      = DateTime.UtcNow
         };
+
+        // Đơn chuyển khoản phải có mã tham chiếu, đó là khóa duy nhất để webhook
+        // SePay tìm ngược ra đơn khi tiền về. Đơn tiền mặt để null cho sạch.
+        if (order.PaymentMethod == PaymentMethod.BankTransfer)
+            order.PaymentRef = await ResolvePaymentRefAsync(req.PaymentRef, ct);
 
         var subtotal = 0;
 
@@ -160,8 +187,35 @@ public class OrderService : IOrderService
             });
         }
 
-        order.Subtotal   = subtotal;
-        order.GrandTotal = subtotal - order.DiscountTotal;
+        order.Subtotal = subtotal;
+
+        // ---- Thuế GTGT ------------------------------------------------------
+        //
+        //  Cấu hình thuế lấy từ cửa hàng NHƯNG được CHỤP LẠI vào đơn. Thuế suất
+        //  thay đổi theo nghị quyết của Quốc hội — hóa đơn in lại sau một năm
+        //  phải ra đúng con số đã giao cho khách hôm đó.
+        //
+        //  Với chế độ mặc định (giá niêm yết đã gồm thuế, Luật Giá 2023 Điều 29)
+        //  GrandTotal KHÔNG đổi: thuế chỉ được tách ngược ra khỏi tổng, không
+        //  cộng thêm. Đây là lý do phép tính nằm ở QlyCoffee.Shared để giỏ hàng
+        //  bên frontend hiện đúng từng đồng con số này.
+        var storeTax = await _db.Stores
+            .AsNoTracking()
+            .Where(s => s.Id == storeId)
+            .Select(s => new { s.TaxMode, s.VatRatePercent })
+            .FirstOrDefaultAsync(ct);
+
+        var payable = subtotal - order.DiscountTotal;
+        var vat = VatPolicy.Compute(
+            payable,
+            storeTax?.TaxMode ?? VatPolicy.DefaultMode,
+            storeTax?.VatRatePercent ?? VatPolicy.DefaultRatePercent);
+
+        order.TaxMode        = vat.Mode;
+        order.TaxRatePercent = vat.RatePercent;
+        order.NetAmount      = vat.Net;
+        order.TaxAmount      = vat.Tax;
+        order.GrandTotal     = vat.Gross;
 
         _db.Orders.Add(order);
         await _db.SaveChangesAsync(ct);
@@ -173,18 +227,106 @@ public class OrderService : IOrderService
     }
 
     // ==========================================================================
-    //  XÁC NHẬN ĐƠN — ⭐ TRỪ KHO TẠI ĐÂY
+    //  XÁC NHẬN ĐƠN — ĐƯA VÀO HÀNG PHA
     // ==========================================================================
 
     /// <summary>
-    /// Xác nhận đơn và trừ kho theo công thức định lượng.
+    /// Xác nhận đơn online: đưa vào hàng pha và chốt giờ hẹn với khách.
     /// <para>
-    /// Toàn bộ nằm trong MỘT transaction mức Serializable. Nếu bất kỳ nguyên liệu
-    /// nào thiếu, toàn bộ được hoàn tác và đơn vẫn ở trạng thái Pending —
-    /// không có chuyện trừ được nửa chừng rồi dừng.
+    /// KHÔNG trừ kho ở đây — việc đó để tới lúc bấm Hoàn tất. Nhưng có kiểm tra
+    /// nguyên liệu ngay, vì nhận một đơn biết chắc không pha nổi rồi mười phút
+    /// sau mới báo hết hàng là cách nhanh nhất để mất khách.
     /// </para>
     /// </summary>
     public async Task<Order> ConfirmOrderAsync(
+        Guid orderId, Guid actorId, CancellationToken ct = default)
+    {
+        var order = await _db.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.Id == orderId, ct)
+            ?? throw new BusinessRuleException("Không tìm thấy đơn hàng");
+
+        if (order.Status != OrderStatus.Pending)
+            throw new BusinessRuleException(
+                $"Đơn {order.Code} đã được xử lý trước đó (trạng thái: {StatusLabel(order.Status)})");
+
+        // Kiểm tra nguyên liệu NGAY BÂY GIỜ dù chưa trừ. Nhận một đơn mà biết
+        // chắc không pha nổi là cách nhanh nhất để mất khách: nó nằm trong hàng
+        // chờ mười phút rồi mới báo hết hàng.
+        await EnsureIngredientsAvailableAsync(order, ct);
+
+        var eta = await _queue.EstimateAsync(
+            order.StoreId,
+            order.Items.Select(i => (i.ProductId, i.Quantity)).ToList(), ct);
+
+        order.Status           = OrderStatus.Confirmed;
+        order.ConfirmedAt      = DateTime.UtcNow;
+        order.EstimatedReadyAt = eta.ReadyAtUtc;
+        order.UpdatedAt        = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Đơn {Code} vào hàng pha, hẹn {Minutes} phút ({Ahead} ly đang chờ trước)",
+            order.Code, eta.Minutes, eta.QueuedItemsAhead);
+
+        return order;
+    }
+
+    // ==========================================================================
+    //  ĐẶT ĐƠN TẠI QUẦY
+    // ==========================================================================
+
+    /// <summary>
+    /// Nhân viên bấm đơn cho khách đứng trước mặt.
+    /// <para>
+    /// Khác đơn online ở chỗ KHÔNG có bước chờ xác nhận: nhân viên vừa nhận tiền
+    /// vừa bấm máy, nên đơn vào thẳng hàng pha. Bắt bấm "xác nhận" thêm một lần
+    /// nữa chỉ là thao tác thừa ngay trước mặt khách.
+    /// </para>
+    /// </summary>
+    public async Task<Order> CreateInStoreOrderAsync(
+        CreateOrderRequest req, Guid storeId, Guid actorId, CancellationToken ct = default)
+    {
+        var order = await CreateOrderAsync(req, storeId, actorId, ct);
+
+        order.Channel = OrderChannel.InStore;
+
+        var eta = await _queue.EstimateAsync(
+            storeId, order.Items.Select(i => (i.ProductId, i.Quantity)).ToList(), ct);
+
+        order.Status           = OrderStatus.Confirmed;
+        order.ConfirmedAt      = DateTime.UtcNow;
+        order.EstimatedReadyAt = eta.ReadyAtUtc;
+        order.UpdatedAt        = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Đơn quầy {Code}: {Cups} ly, {Total}đ, hẹn {Minutes} phút",
+            order.Code, order.Items.Sum(i => i.Quantity), order.GrandTotal, eta.Minutes);
+
+        return order;
+    }
+
+    // ==========================================================================
+    //  HOÀN TẤT ĐƠN — TRỪ KHO
+    // ==========================================================================
+
+    /// <summary>
+    /// Pha xong, giao khách. ĐÂY LÀ CHỖ DUY NHẤT TRỪ KHO.
+    /// <para>
+    /// Trừ vào lúc này chứ không phải lúc xác nhận, vì chỉ khi món thật sự được
+    /// làm ra thì nguyên liệu mới thật sự rời khỏi kho. Đơn hủy giữa chừng vì thế
+    /// không cần hoàn kho — nó chưa bao giờ bị trừ.
+    /// </para>
+    /// <para>
+    /// Toàn bộ nằm trong MỘT transaction Serializable. Thiếu bất kỳ nguyên liệu
+    /// nào thì hoàn tác sạch, đơn vẫn nằm trong hàng pha — không có chuyện trừ
+    /// được nửa chừng rồi dừng.
+    /// </para>
+    /// </summary>
+    public async Task<Order> CompleteOrderAsync(
         Guid orderId, Guid actorId, CancellationToken ct = default)
     {
         // Serializable là mức cô lập cao nhất. Chậm hơn ReadCommitted một chút
@@ -199,15 +341,20 @@ public class OrderService : IOrderService
                 .FirstOrDefaultAsync(o => o.Id == orderId, ct)
                 ?? throw new BusinessRuleException("Không tìm thấy đơn hàng");
 
-            // ---- Hai chốt chặn chống xử lý trùng ---------------------------
-            if (order.Status != OrderStatus.Pending)
-                throw new BusinessRuleException(
-                    $"Đơn {order.Code} đã được xử lý trước đó (trạng thái: {order.Status})");
+            // ---- Ba chốt chặn chống xử lý trùng -----------------------------
+            if (order.Status == OrderStatus.Completed)
+                throw new BusinessRuleException($"Đơn {order.Code} đã hoàn tất trước đó rồi");
+
+            if (order.Status == OrderStatus.Cancelled)
+                throw new BusinessRuleException($"Đơn {order.Code} đã bị hủy, không hoàn tất được");
 
             if (order.StockDeducted)
                 throw new BusinessRuleException($"Đơn {order.Code} đã trừ kho rồi");
 
-            // ---- Gộp nhu cầu nguyên liệu của cả đơn -------------------------
+            // ---- Gộp nhu cầu nguyên liệu của CẢ BILL -------------------------
+            // Gộp trước rồi mới trừ, chứ không trừ từng món một. Hai món cùng
+            // dùng sữa thì gộp lại thành một lần trừ — vừa ít bút toán hơn, vừa
+            // tránh trường hợp trừ được món đầu rồi món sau mới báo thiếu.
             var requests = order.Items.Select(i => new ExplodeRequest(
                 i.ProductId,
                 i.VariantId,
@@ -235,17 +382,22 @@ public class OrderService : IOrderService
             }
 
             // ---- Cập nhật đơn ------------------------------------------------
-            order.Status        = OrderStatus.Confirmed;
-            order.ConfirmedAt   = DateTime.UtcNow;
+            order.Status        = OrderStatus.Completed;
+            order.CompletedAt   = DateTime.UtcNow;
+            order.ReadyAt     ??= DateTime.UtcNow;
             order.StockDeducted = true;
             order.CostTotal     = costTotal;
             order.UpdatedAt     = DateTime.UtcNow;
+
+            // Khách nhận hàng thì coi như đã trả tiền (tiền mặt tại quầy)
+            if (order.PaymentStatus == PaymentStatus.Unpaid)
+                order.PaymentStatus = PaymentStatus.Paid;
 
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
 
             _logger.LogInformation(
-                "Xác nhận đơn {Code}, đã trừ kho, giá vốn {Cost}đ, lãi gộp {Profit}đ",
+                "Hoàn tất đơn {Code}, đã trừ kho, giá vốn {Cost}đ, lãi gộp {Profit}đ",
                 order.Code, costTotal, order.GrandTotal - costTotal);
 
             // ---- Cập nhật khả dụng SAU transaction --------------------------
@@ -263,6 +415,75 @@ public class OrderService : IOrderService
         }
     }
 
+    /// <summary>
+    /// Kiểm tra nguyên liệu đủ cho cả đơn, KHÔNG trừ gì cả.
+    /// <para>
+    /// Vì kho chỉ bị trừ lúc hoàn tất, những ly đang nằm trong hàng pha vẫn chưa
+    /// bị trừ. Nên phép kiểm tra phải lấy tồn kho TRỪ ĐI phần các đơn đang chờ đã
+    /// chiếm chỗ — nếu không, giờ cao điểm sẽ nhận nhiều đơn hơn số ly pha nổi.
+    /// </para>
+    /// </summary>
+    private async Task EnsureIngredientsAvailableAsync(Order order, CancellationToken ct)
+    {
+        var requirements = await _recipe.AggregateOrderAsync(
+            order.Items.Select(i => new ExplodeRequest(
+                i.ProductId, i.VariantId, ParseModifierIds(i.ModifiersJson), i.Quantity)), ct);
+
+        // Phần nguyên liệu đã bị các đơn trong hàng pha "xí" trước
+        var reserved = await GetReservedIngredientsAsync(order.StoreId, order.Id, ct);
+
+        foreach (var req in requirements)
+        {
+            var onHand = await _db.InventoryLots
+                .Where(l => l.StoreId == order.StoreId
+                         && l.IngredientId == req.IngredientId
+                         && l.Status == LotStatus.Active
+                         && l.RemainingQuantity > 0)
+                .SumAsync(l => (double)l.RemainingQuantity, ct);
+
+            var taken = reserved.TryGetValue(req.IngredientId, out var r) ? r : 0;
+            var usable = onHand - taken;
+
+            if (usable < req.Quantity)
+            {
+                var name = await _db.Ingredients
+                    .Where(i => i.Id == req.IngredientId)
+                    .Select(i => i.Name)
+                    .FirstOrDefaultAsync(ct) ?? "nguyên liệu";
+
+                throw new InsufficientStockException(
+                    req.IngredientId, name, (double)req.Quantity, (double)Math.Max(0, usable));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Lượng nguyên liệu mà các đơn ĐANG TRONG HÀNG PHA sẽ tiêu thụ khi hoàn tất.
+    /// Bỏ qua chính đơn đang xét để nó không tự trừ phần của mình hai lần.
+    /// </summary>
+    private async Task<Dictionary<Guid, double>> GetReservedIngredientsAsync(
+        Guid storeId, Guid excludeOrderId, CancellationToken ct)
+    {
+        var queued = await _db.OrderItems
+            .AsNoTracking()
+            .Where(i => i.Order!.StoreId == storeId
+                     && i.OrderId != excludeOrderId
+                     && !i.Order.StockDeducted
+                     && (i.Order.Status == OrderStatus.Confirmed
+                      || i.Order.Status == OrderStatus.Preparing
+                      || i.Order.Status == OrderStatus.Ready))
+            .Select(i => new { i.ProductId, i.VariantId, i.ModifiersJson, i.Quantity })
+            .ToListAsync(ct);
+
+        if (queued.Count == 0) return new Dictionary<Guid, double>();
+
+        var reqs = await _recipe.AggregateOrderAsync(
+            queued.Select(q => new ExplodeRequest(
+                q.ProductId, q.VariantId, ParseModifierIds(q.ModifiersJson), q.Quantity)), ct);
+
+        return reqs.ToDictionary(r => r.IngredientId, r => r.Quantity);
+    }
+
     // ==========================================================================
     //  ĐỔI TRẠNG THÁI
     // ==========================================================================
@@ -270,8 +491,10 @@ public class OrderService : IOrderService
     public async Task<Order> UpdateStatusAsync(
         Guid orderId, OrderStatus status, Guid actorId, string? reason, CancellationToken ct = default)
     {
-        // Hai trạng thái đặc biệt có tác động lên kho — chuyển sang hàm riêng
+        // Ba trạng thái có xử lý riêng — chuyển sang hàm chuyên trách.
+        // Completed nằm ở đây vì nó là chỗ TRỪ KHO, cần transaction Serializable.
         if (status == OrderStatus.Confirmed) return await ConfirmOrderAsync(orderId, actorId, ct);
+        if (status == OrderStatus.Completed) return await CompleteOrderAsync(orderId, actorId, ct);
         if (status == OrderStatus.Cancelled)
             return await CancelOrderAsync(orderId, actorId, reason ?? "Không rõ lý do", ct);
 
@@ -286,13 +509,6 @@ public class OrderService : IOrderService
         order.UpdatedAt = DateTime.UtcNow;
 
         if (status == OrderStatus.Ready) order.ReadyAt = DateTime.UtcNow;
-        if (status == OrderStatus.Completed)
-        {
-            order.CompletedAt = DateTime.UtcNow;
-            // Khách nhận hàng thì coi như đã thanh toán (tiền mặt tại quầy)
-            if (order.PaymentStatus == PaymentStatus.Unpaid)
-                order.PaymentStatus = PaymentStatus.Paid;
-        }
 
         await _db.SaveChangesAsync(ct);
         return order;
@@ -410,6 +626,70 @@ public class OrderService : IOrderService
 
         return $"QC-{vnNow:yyMMdd}-{count + 1:D4}";
     }
+
+    // ==========================================================================
+    //  MÃ THAM CHIẾU CHUYỂN KHOẢN
+    // ==========================================================================
+
+    /// <summary>
+    /// Bảng chữ cái của mã tham chiếu. Trùng khớp với BankQr.NewReference() bên
+    /// frontend — hai nơi lệch nhau thì mã máy quầy in ra QR sẽ bị backend coi là
+    /// sai định dạng và thay bằng mã khác, khách quét một mã mà đơn lưu mã khác.
+    ///
+    /// Cố tình bỏ 0/O, 1/I/L, 5/S, 8/B: nhân viên phải đọc mã này để đối chiếu
+    /// với thông báo ngân hàng, mà đó là những cặp hay đọc nhầm nhất.
+    /// </summary>
+    private const string RefAlphabet = "ACDEFGHJKMNPQRTUVWXY2346789";
+
+    /// <summary>Mã tham chiếu hợp lệ: MCC + đúng 5 ký tự trong bảng trên.</summary>
+    private static readonly Regex RefPattern =
+        new($"^MCC[{RefAlphabet}]{{5}}$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Chốt mã tham chiếu cho một đơn chuyển khoản.
+    ///
+    /// Ưu tiên dùng đúng mã máy quầy đã in lên QR — khách quét mã nào thì đơn
+    /// phải mang mã đó, nếu không webhook không khớp được. Chỉ bỏ mã của client
+    /// trong hai trường hợp thật sự không dùng được: sai định dạng (dữ liệu do
+    /// bên ngoài gửi, không bao giờ tin sẵn) hoặc đã có đơn khác giữ mã đó
+    /// (cột payment_ref có chỉ mục duy nhất, để nguyên là vỡ lúc lưu).
+    /// </summary>
+    private async Task<string> ResolvePaymentRefAsync(string? requested, CancellationToken ct)
+    {
+        var wanted = requested?.Trim().ToUpperInvariant();
+
+        if (!string.IsNullOrEmpty(wanted) && RefPattern.IsMatch(wanted))
+        {
+            if (!await RefTakenAsync(wanted, ct)) return wanted;
+
+            _logger.LogWarning(
+                "Mã tham chiếu {Ref} máy quầy gửi lên đã có đơn khác dùng — cấp mã mới. "
+              + "Khách có thể đã quét mã cũ, cần đối soát tay giao dịch này.", wanted);
+        }
+
+        // Tự sinh. Thử vài lần rồi thôi: không gian mã là 27^5 ≈ 14,3 triệu nên
+        // đụng nhau đã hiếm, đụng liên tiếp năm lần thì gần như chắc chắn là lỗi
+        // ở chỗ khác chứ không phải xui.
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var candidate = NewRef();
+            if (!await RefTakenAsync(candidate, ct)) return candidate;
+        }
+
+        throw new BusinessRuleException(
+            "Không cấp được mã tham chiếu chuyển khoản. Thử lại hoặc thu tiền mặt.");
+    }
+
+    private async Task<bool> RefTakenAsync(string reference, CancellationToken ct)
+        => await _db.Orders
+            .IgnoreQueryFilters()
+            .AnyAsync(o => o.PaymentRef == reference, ct);
+
+    private static string NewRef()
+        => "MCC" + new string(Enumerable
+            .Range(0, 5)
+            .Select(_ => RefAlphabet[Random.Shared.Next(RefAlphabet.Length)])
+            .ToArray());
 
     /// <summary>Chuẩn hóa số điện thoại về dạng 0xxxxxxxxx.</summary>
     private static string NormalizePhone(string phone)

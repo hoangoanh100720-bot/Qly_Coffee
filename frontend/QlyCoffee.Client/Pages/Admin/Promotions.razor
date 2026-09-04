@@ -16,7 +16,7 @@
 @inject ApiClient Api
 @inject AlertService Alerts
 
-<PageTitle>Khuyến mãi — Qly Coffee</PageTitle>
+<PageTitle>Khuyến mãi — Một Chút Coffee</PageTitle>
 
 <div class="stack stack-6">
 
@@ -103,10 +103,15 @@
                          @key="p.Id">
 
                     <div class="promo-visual">
-                        @if (p.ProductColorHex is not null)
+                        @*  Khuyến mãi gắn với MỘT món thì hiện ảnh món đó; khuyến mãi
+                            áp cho toàn menu không có món nào để chụp nên giữ biểu
+                            tượng thẻ giá — đó là khác biệt có thật, không phải thiếu ảnh. *@
+                        @if (p.ProductName is not null)
                         {
-                            <DrinkGlass DrinkColor="@p.ProductColorHex" FoamColor="#F5EDE0"
-                                        Size="52" AriaLabel="" />
+                            <img class="promo-photo"
+                                 src="@DrinkPhoto.PhotoFor(p.ProductImageUrl, null, p.ProductName)"
+                                 alt="" loading="lazy" decoding="async"
+                                 width="52" height="52" />
                         }
                         else
                         {

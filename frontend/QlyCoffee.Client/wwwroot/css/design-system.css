@@ -469,6 +469,15 @@ p { margin: 0; }
 }
 .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 
+/* Biến thể CĂN GIỮA — thêm đường kẻ bên trái để chữ nằm chính giữa.
+
+   Vì sao là biến thể chứ không phải mặc định: .divider đang gánh hai vai khác
+   nhau. Ở trang đăng nhập nó là dải phân cách giữa hai lối vào ("hoặc"), chữ
+   phải nằm giữa. Ở trang thực đơn nó là NHÃN NHÓM ("Tạm hết hôm nay") đứng đầu
+   một lưới món — nhãn nhóm căn trái mới thẳng hàng với nội dung nó gán nhãn,
+   căn giữa sẽ trôi khỏi mép lưới và đọc như một tiêu đề trang trí. */
+.divider-center::before { content: ""; flex: 1; height: 1px; background: var(--border); }
+
 /* =============================================================================
    §5  BUTTON & FORM
 ============================================================================= */
@@ -570,6 +579,10 @@ p { margin: 0; }
 
 .input-num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* Ô nhập thấp hơn, dùng khi input nằm lọt trong một khối dày đặc (khay ghi chú
+   ở giỏ hàng quầy) chứ không đứng riêng thành một trường của biểu mẫu. */
+.input-sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+
 /* Ô nhập có đơn vị đi kèm: "180  ml" */
 .input-group { display: flex; align-items: stretch; }
 .input-group .input { border-radius: var(--radius) 0 0 var(--radius); }
@@ -602,6 +615,14 @@ legend { padding: 0; }
   font-weight: 600;
 }
 .choice:disabled { opacity: .45; cursor: not-allowed; text-decoration: line-through; }
+
+/* Nút chọn nhỏ — dùng khi có nhiều lựa chọn ngắn xếp thành lưới trong một khối
+   hẹp (các ý ghi chú "Ít đá", "Không ngọt"… ở giỏ hàng quầy). Vẫn giữ chiều cao
+   đủ để bấm trúng bằng ngón tay trên máy tính bảng. */
+.choice-sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
 
 /* Chấm màu — hiển thị màu thật của topping/nguyên liệu cạnh tên */
 .swatch {
@@ -996,6 +1017,10 @@ legend { padding: 0; }
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
+  /* Tên quán ba chữ ("Một Chút Coffee") đủ dài để xuống dòng trên màn hình hẹp,
+     và một cái tên bị bẻ đôi giữa thanh điều hướng trông như lỗi hiển thị.
+     Ép một dòng: thanh nav thà chật một chút còn hơn logo méo mó. */
+  white-space: nowrap;
 }
 .brand-sub  { font-size: var(--text-2xs); color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
 

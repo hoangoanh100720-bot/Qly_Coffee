@@ -1,0 +1,541 @@
+@*
+    =============================================================================
+    MÀN HÌNH PHA CHẾ
+    =============================================================================
+    Archetype: màn hình treo, nhìn từ xa, chạm bằng tay ướt.
+
+    Đây là màn hình duy nhất trong hệ thống được đọc từ khoảng cách 1–2 mét, nên
+    chữ to hơn hẳn mọi trang khác và mỗi dòng chỉ mang MỘT thông tin.
+
+    Ba điều quyết định cách bày:
+
+    1. THỨ TỰ LÀ THÔNG TIN QUAN TRỌNG NHẤT. Số thứ tự to đặt ngoài cùng bên trái,
+       vì câu hỏi đầu tiên của người pha luôn là "làm ly nào trước".
+
+    2. TRỄ HẸN PHẢI ĐẬP VÀO MẮT. Đơn quá giờ đã hứa được đánh dấu bằng cả màu,
+       viền, VÀ chữ "trễ N phút" — không bao giờ chỉ bằng màu.
+
+    3. NÚT HOÀN TẤT LÀ NÚT TRỪ KHO. Bấm nhầm không sập hệ thống (hủy đơn sẽ hoàn
+       lại) nhưng vẫn là thao tác ghi sổ thật, nên nó to, tách hẳn khỏi các nút
+       khác, và không nằm cạnh nút hủy.
+    =============================================================================
+*@
+@page "/admin/pha-che"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+@implements IDisposable
+
+<PageTitle>Pha chế — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-5">
+
+    @* ══ SỐ LIỆU ĐẦU NGÀY ══════════════════════════════════════════════════ *@
+    <div class="grid grid-stats">
+        <div class="stat @(_data?.TotalCupsInQueue > 8 ? "stat-warn" : "")">
+            <span class="stat-label">Đang chờ pha</span>
+            <span class="stat-value">@(_data?.TotalCupsInQueue ?? 0)</span>
+            <span class="stat-meta">
+                @if (_data is not null && _data.EstimatedClearSeconds > 0)
+                {
+                    <span>hết hàng chờ trong ~@(_data.EstimatedClearSeconds / 60) phút</span>
+                }
+                else
+                {
+                    <span>quầy đang trống</span>
+                }
+            </span>
+        </div>
+
+        <div class="stat">
+            <span class="stat-label">Đã bán hôm nay</span>
+            <span class="stat-value">@(_data?.TotalCupsSoldToday ?? 0)</span>
+            <span class="stat-meta">ly, qua @(_data?.TotalOrdersToday ?? 0) đơn</span>
+        </div>
+
+        <div class="stat">
+            <span class="stat-label">Doanh thu hôm nay</span>
+            <span class="stat-value">@Money.Format(_data?.RevenueToday ?? 0)</span>
+            <span class="stat-meta">chỉ tính đơn đã hoàn tất</span>
+        </div>
+
+        <div class="stat @(_lateCount > 0 ? "stat-critical" : "stat-ok")">
+            <span class="stat-label">Trễ hẹn</span>
+            <span class="stat-value">@_lateCount</span>
+            <span class="stat-meta">
+                @(_lateCount > 0 ? "cần làm ngay" : "đang đúng hẹn")
+            </span>
+        </div>
+    </div>
+
+    <div class="bar-layout">
+
+        @* ══════════════════════════════════════════════════════════════════
+           CỘT TRÁI — HÀNG CHỜ PHA
+           ══════════════════════════════════════════════════════════════════ *@
+        <section class="stack stack-4">
+
+            <div class="row row-between row-wrap" style="gap: var(--space-3);">
+                <div class="stack stack-1">
+                    <h2>Hàng chờ pha</h2>
+                    <span class="xs muted">
+                        Xếp theo thứ tự vào hàng — ai nhận trước pha trước.
+                        Tự làm mới mỗi 15 giây.
+                    </span>
+                </div>
+                <div class="row row-2">
+                    @if (_refreshing)
+                    {
+                        <span class="spinner" aria-hidden="true"></span>
+                    }
+                    <a href="/admin/ban-hang" class="btn btn-primary btn-sm">
+                        <PlusIcon Size="14" /> Bấm đơn mới
+                    </a>
+                </div>
+            </div>
+
+            @if (_loading)
+            {
+                <div class="stack stack-3" aria-busy="true">
+                    @for (int i = 0; i < 4; i++)
+                    {
+                        <div class="skeleton" style="height: 96px; border-radius: var(--radius-lg);"></div>
+                    }
+                </div>
+            }
+            else if (_data is null || _data.Queue.Count == 0)
+            {
+                <div class="empty">
+                    <CheckIcon Size="48" CssClass="empty-icon" />
+                    <span class="empty-title">Hết hàng chờ</span>
+                    <span class="empty-text">
+                        Không còn ly nào phải pha. Đơn mới sẽ hiện ở đây ngay khi nhận.
+                    </span>
+                </div>
+            }
+            else
+            {
+                @* Gộp theo ĐƠN chứ không liệt kê từng dòng món rời rạc: nút Hoàn
+                   tất trừ kho cho cả bill, nên bill phải là đơn vị hiển thị. *@
+                @foreach (var g in _data.Queue.GroupBy(q => q.OrderId))
+                {
+                    var first = g.First();
+                    var late = g.Any(x => x.IsLate);
+
+                    <article class="brew-card @(late ? "is-late" : "") @StatusClass(first.Status)"
+                             @key="first.OrderId">
+
+                        @* ── Số thứ tự ─────────────────────────────────────── *@
+                        <div class="brew-pos">
+                            <span class="brew-pos-num num">@first.QueuePosition</span>
+                        </div>
+
+                        @* ── Nội dung đơn ──────────────────────────────────── *@
+                        <div class="stack stack-3 grow" style="min-width: 0;">
+
+                            <div class="row row-between row-wrap" style="gap: var(--space-2);">
+                                <div class="row row-2">
+                                    <span class="mono" style="font-weight: 700;">@first.OrderCode</span>
+                                    <span class="badge @(first.Channel == 1 ? "badge-accent" : "badge-neutral")">
+                                        @(first.Channel == 1 ? "Tại quầy" : "Online")
+                                    </span>
+                                    <span class="badge @StatusBadge(first.Status)">
+                                        @StatusLabel(first.Status)
+                                    </span>
+                                </div>
+
+                                @* Trễ hẹn: màu + viền + CHỮ, ba cách cùng lúc *@
+                                @if (late)
+                                {
+                                    <span class="brew-late">
+                                        <WarnIcon Size="14" />
+                                        Trễ @LateMinutes(g) phút
+                                    </span>
+                                }
+                                else if (first.EstimatedReadyAt.HasValue)
+                                {
+                                    <span class="xs muted">
+                                        Hẹn @first.EstimatedReadyAt.Value.ToLocalTime().ToString("HH:mm")
+                                        · chờ @(first.WaitedSeconds / 60) phút
+                                    </span>
+                                }
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(first.CustomerName))
+                            {
+                                <span class="small muted">Khách: @first.CustomerName</span>
+                            }
+
+                            @* ── Các món phải pha ────────────────────────── *@
+                            <div class="brew-items">
+                                @foreach (var line in g)
+                                {
+                                    <div class="brew-item" style="--drink: @line.ColorPrimaryHex;">
+                                        <span class="brew-qty num">@line.Quantity×</span>
+
+                                        @*  Ảnh chụp thật: pha chế nhận ra món bằng ảnh
+                                            nhanh hơn bằng chữ khi hàng chờ dài.      *@
+                                        <img class="brew-item-photo"
+                                             src="@DrinkPhoto.PhotoFor(line.ImageUrl, null, line.ProductName)"
+                                             alt="" loading="lazy" decoding="async"
+                                             width="30" height="30" />
+
+                                        <div class="stack stack-1 grow" style="min-width: 0;">
+                                            <span class="brew-item-name">@line.ProductName</span>
+                                            @if (!string.IsNullOrEmpty(line.VariantName)
+                                              || !string.IsNullOrEmpty(line.Modifiers))
+                                            {
+                                                <span class="xs muted">
+                                                    @line.VariantName
+                                                    @if (!string.IsNullOrEmpty(line.Modifiers))
+                                                    {
+                                                        <span> · @line.Modifiers</span>
+                                                    }
+                                                </span>
+                                            }
+                                            @if (!string.IsNullOrEmpty(line.Note))
+                                            {
+                                                <span class="brew-note">“@line.Note”</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            @* ── Hành động ───────────────────────────────── *@
+                            <div class="brew-actions">
+                                @if (first.Status == 1)
+                                {
+                                    <button class="btn btn-secondary"
+                                            @onclick="() => StartAsync(first.OrderId)"
+                                            disabled="@(_busyOrder == first.OrderId)">
+                                        Bắt đầu pha
+                                    </button>
+                                }
+
+                                @* Nút TRỪ KHO. To, đứng riêng, cách xa nút hủy. *@
+                                <button class="btn btn-primary btn-lg brew-done"
+                                        @onclick="() => CompleteAsync(first.OrderId, first.OrderCode)"
+                                        disabled="@(_busyOrder == first.OrderId)">
+                                    @if (_busyOrder == first.OrderId)
+                                    {
+                                        <span class="spinner" aria-hidden="true"></span>
+                                        <span>Đang trừ kho…</span>
+                                    }
+                                    else
+                                    {
+                                        <CheckIcon Size="18" />
+                                        <span>Hoàn tất &amp; trừ kho</span>
+                                    }
+                                </button>
+
+                                <div class="grow"></div>
+
+                                <button class="btn btn-ghost btn-sm text-danger"
+                                        @onclick="() => AskCancel(first.OrderId, first.OrderCode)"
+                                        disabled="@(_busyOrder == first.OrderId)">
+                                    Hủy đơn
+                                </button>
+                            </div>
+                        </div>
+                    </article>
+                }
+            }
+        </section>
+
+        @* ══════════════════════════════════════════════════════════════════
+           CỘT PHẢI — ĐÃ BÁN HÔM NAY
+           ══════════════════════════════════════════════════════════════════ *@
+        <aside class="bar-sold">
+            <div class="card">
+                <div class="card-header">
+                    <div class="stack stack-1">
+                        <h3 class="card-title">Đã bán hôm nay</h3>
+                        <span class="xs muted">
+                            Chỉ đếm đơn đã hoàn tất. Số trong ngoặc là đang chờ pha.
+                        </span>
+                    </div>
+                </div>
+
+                @if (_data is null || _data.SoldToday.Count == 0)
+                {
+                    <div class="empty" style="padding: var(--space-8) var(--space-4);">
+                        <CupIcon Size="32" CssClass="empty-icon" />
+                        <span class="empty-text">Hôm nay chưa bán ly nào.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="stack stack-2">
+                        @foreach (var s in _data.SoldToday)
+                        {
+                            var share = _maxSold > 0 ? s.QuantitySold * 100.0 / _maxSold : 0;
+                            <div class="sold-row" style="--drink: @s.ColorPrimaryHex;">
+
+                                <div class="sold-thumb">
+                                    <img src="@DrinkPhoto.PhotoFor(s.ImageUrl, null, s.ProductName)"
+                                         alt="" loading="lazy" decoding="async" />
+                                </div>
+
+                                <div class="stack stack-1 grow" style="min-width: 0;">
+                                    <div class="row row-between">
+                                        <span class="small truncate">@s.ProductName</span>
+                                        <span class="sold-count num">
+                                            @s.QuantitySold
+                                            @if (s.QuantityInQueue > 0)
+                                            {
+                                                <span class="sold-queued">(+@s.QuantityInQueue)</span>
+                                            }
+                                        </span>
+                                    </div>
+                                    <div class="meter">
+                                        <div class="meter-fill"
+                                             style="width: @share.ToString("0.#")%;
+                                                    --meter-color: @s.ColorPrimaryHex;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="card-footer">
+                        <div class="row row-between small">
+                            <span class="muted">Tổng</span>
+                            <span style="font-weight: 700;">
+                                @_data.TotalCupsSoldToday ly
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </aside>
+    </div>
+</div>
+
+@* ══ HỘP THOẠI HỦY ĐƠN ═════════════════════════════════════════════════════
+   Hủy đơn BẮT BUỘC nhập lý do. Không phải để làm khó nhân viên mà vì "hủy 12
+   đơn trong tháng" là con số vô nghĩa, còn "hủy 12 đơn vì hết trân châu" thì
+   nói cho chủ quán biết phải nhập thêm bao nhiêu.
+   ══════════════════════════════════════════════════════════════════════════ *@
+@if (_cancelOrderId is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseCancel"></div>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cancel-title">
+        <div class="stack stack-1">
+            <h3 id="cancel-title">Hủy đơn @_cancelOrderCode</h3>
+            <span class="small muted">
+                Đơn chưa trừ kho nên không phải hoàn lại nguyên liệu.
+            </span>
+        </div>
+
+        <div class="field">
+            <label class="field-label">Lý do hủy <span class="req">*</span></label>
+            <div class="row row-2 row-wrap">
+                @foreach (var r in CancelReasons)
+                {
+                    <button class="chip @(_cancelReason == r ? "is-active" : "")"
+                            @onclick="() => _cancelReason = r">@r</button>
+                }
+            </div>
+        </div>
+
+        <div class="field">
+            <label class="field-label" for="cancel-note">Ghi chú thêm</label>
+            <input id="cancel-note" type="text" class="input" maxlength="200"
+                   placeholder="Không bắt buộc" @bind="_cancelNote" />
+        </div>
+
+        <div class="row row-between" style="padding-top: var(--space-2); border-top: 1px solid var(--border);">
+            <button class="btn btn-secondary" @onclick="CloseCancel">Quay lại</button>
+            <button class="btn btn-danger" @onclick="ConfirmCancelAsync"
+                    disabled="@string.IsNullOrEmpty(_cancelReason)">
+                Xác nhận hủy
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private BarQueueDto? _data;
+    private bool _loading = true;
+    private bool _refreshing;
+    private Guid? _busyOrder;
+    private int _lateCount;
+    private int _maxSold;
+
+    private Timer? _timer;
+
+    // ── Hủy đơn ─────────────────────────────────────────────────────────────
+    private Guid? _cancelOrderId;
+    private string _cancelOrderCode = "";
+    private string _cancelReason = "";
+    private string _cancelNote = "";
+
+    private static readonly string[] CancelReasons =
+    {
+        "Khách đổi ý",
+        "Hết nguyên liệu",
+        "Bấm nhầm món",
+        "Khách không tới lấy",
+        "Pha hỏng, làm lại"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+
+        // Tự làm mới 15 giây một lần. Chọn 15 chứ không phải 5 vì hàng pha đổi
+        // theo nhịp phút, còn gọi API 5 giây một lần thì tốn pin máy tính bảng
+        // mà chẳng thêm thông tin gì.
+        _timer = new Timer(async _ => await InvokeAsync(RefreshAsync),
+                           null, 15_000, 15_000);
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        await FetchAsync();
+        _loading = false;
+    }
+
+    /// <summary>
+    /// Làm mới nền. Bỏ qua nếu nhân viên đang bấm dở một đơn — dữ liệu nhảy
+    /// dưới tay là cách chắc chắn để bấm nhầm nút.
+    /// </summary>
+    private async Task RefreshAsync()
+    {
+        if (_busyOrder is not null || _cancelOrderId is not null) return;
+
+        _refreshing = true;
+        StateHasChanged();
+        await FetchAsync();
+        _refreshing = false;
+        StateHasChanged();
+    }
+
+    private async Task FetchAsync()
+    {
+        var res = await Api.GetBarQueueAsync();
+        if (res.Success && res.Data is not null)
+        {
+            _data = res.Data;
+            _lateCount = _data.Queue.Select(q => q.OrderId)
+                                    .Distinct()
+                                    .Count(id => _data.Queue.Any(q => q.OrderId == id && q.IsLate));
+            _maxSold = _data.SoldToday.Count > 0 ? _data.SoldToday.Max(s => s.QuantitySold) : 0;
+        }
+    }
+
+    // ── HÀNH ĐỘNG ───────────────────────────────────────────────────────────
+
+    private async Task StartAsync(Guid orderId)
+    {
+        _busyOrder = orderId;
+        try
+        {
+            var res = await Api.StartBrewingAsync(orderId);
+            if (res.Success) await FetchAsync();
+            else Alerts.Error(res.Error?.Message ?? "Không đổi được trạng thái.");
+        }
+        finally { _busyOrder = null; }
+    }
+
+    /// <summary>
+    /// Hoàn tất đơn — ĐÂY LÀ THAO TÁC TRỪ KHO.
+    /// Báo lại luôn chênh lệch hứa/thực để quán biết PrepSeconds đặt sát chưa.
+    /// </summary>
+    private async Task CompleteAsync(Guid orderId, string code)
+    {
+        _busyOrder = orderId;
+        try
+        {
+            var res = await Api.CompleteBarOrderAsync(orderId);
+
+            if (res.Success && res.Data is not null)
+            {
+                var d = res.Data;
+                var timing = d.PromisedVsActualSeconds switch
+                {
+                    null => "",
+                    < -60 => $" (xong sớm {Math.Abs(d.PromisedVsActualSeconds.Value) / 60} phút)",
+                    > 60  => $" (trễ {d.PromisedVsActualSeconds.Value / 60} phút)",
+                    _     => " (đúng hẹn)"
+                };
+
+                Alerts.Success($"Xong đơn {code}, đã trừ kho{timing}.");
+                await FetchAsync();
+            }
+            else
+            {
+                Alerts.Error(res.Error?.Message ?? "Không hoàn tất được đơn.");
+            }
+        }
+        finally { _busyOrder = null; }
+    }
+
+    private void AskCancel(Guid orderId, string code)
+    {
+        _cancelOrderId = orderId;
+        _cancelOrderCode = code;
+        _cancelReason = "";
+        _cancelNote = "";
+    }
+
+    private void CloseCancel() => _cancelOrderId = null;
+
+    private async Task ConfirmCancelAsync()
+    {
+        if (_cancelOrderId is not Guid id || string.IsNullOrEmpty(_cancelReason)) return;
+
+        var reason = string.IsNullOrWhiteSpace(_cancelNote)
+            ? _cancelReason
+            : $"{_cancelReason} — {_cancelNote.Trim()}";
+
+        var res = await Api.CancelBarOrderAsync(id, reason);
+        if (res.Success)
+        {
+            Alerts.Info($"Đã hủy đơn {_cancelOrderCode}.");
+            _cancelOrderId = null;
+            await FetchAsync();
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không hủy được đơn.");
+        }
+    }
+
+    // ── HIỂN THỊ ────────────────────────────────────────────────────────────
+
+    private static int LateMinutes(IEnumerable<BarQueueLineDto> lines)
+    {
+        var eta = lines.Select(l => l.EstimatedReadyAt).FirstOrDefault(e => e.HasValue);
+        return eta.HasValue ? Math.Max(1, (int)(DateTime.UtcNow - eta.Value).TotalMinutes) : 0;
+    }
+
+    private static string StatusLabel(int s) => s switch
+    {
+        1 => "Chờ pha",
+        2 => "Đang pha",
+        3 => "Pha xong",
+        _ => "—"
+    };
+
+    private static string StatusBadge(int s) => s switch
+    {
+        1 => "badge-info",
+        2 => "badge-warn",
+        3 => "badge-ok",
+        _ => "badge-neutral"
+    };
+
+    private static string StatusClass(int s) => s switch
+    {
+        1 => "brew-waiting",
+        2 => "brew-active",
+        3 => "brew-ready",
+        _ => ""
+    };
+
+    public void Dispose() => _timer?.Dispose();
+}

@@ -9,6 +9,7 @@
    §3  Bố cục form 2 cột   §7  Phân tích hao hụt
    §4  Thanh đo hai lớp    §8  In ấn
    §9  Ô ảnh món           §10 Xem trước ảnh
+   §11 Bán tại quầy        §12 Màn hình pha chế
 ============================================================================= */
 
 /* =============================================================================
@@ -148,8 +149,41 @@
   width: 60px; height: 60px; flex: none;
   display: grid; place-items: center;
   border-radius: var(--radius);
+  overflow: hidden;
   background: color-mix(in srgb, var(--drink, var(--accent)) 14%, var(--surface-2));
   color: var(--accent);
+}
+.promo-visual .promo-photo { width: 100%; height: 100%; object-fit: cover; }
+
+/* =============================================================================
+   §5b  Ô ẢNH MÓN CỠ NHỎ TRONG CÁC MÀN HÌNH QUẢN LÝ
+
+   Hàng chờ pha, danh sách đơn, bảng bán chạy và màn hình soạn công thức trước
+   đây đều vẽ một hình ly SVG tô theo màu món. Vấn đề: 56 món chỉ khác nhau ở
+   màu, mà nhiều món lại gần trùng màu (ba loại trà sữa đều be, hai loại cacao
+   đều nâu) — nhân viên nhìn lướt không phân biệt nổi, trong khi trang bán hàng
+   khách nhìn thì đã là ảnh chụp. Hai bên nhìn hai thứ khác nhau về cùng một món.
+
+   Giờ tất cả dùng ảnh chụp. Nền vẫn pha từ màu món để lúc ảnh chưa tải xong ô
+   không bị nháy xám, và để ảnh nền trong suốt vẫn có nền đúng tông.
+============================================================================= */
+.brew-item-photo,
+.order-item-photo,
+.top-product-photo,
+.recipe-photo {
+  flex: none;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--drink, var(--accent)) 12%, var(--surface-2));
+}
+
+/* Ảnh ở màn hình soạn công thức to hơn và có viền tô bằng chính hai màu đang
+   chỉnh bên dưới — đổi màu là thấy ngay, thay cho phần xem trước ly vẽ đã bỏ. */
+.recipe-photo {
+  border-radius: var(--radius);
+  border: 2px solid color-mix(in srgb, var(--drink) 55%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--foam) 70%, transparent);
+  outline-offset: -4px;
 }
 
 .promo-stats {
@@ -235,6 +269,42 @@
 }
 
 /* =============================================================================
+   §8b  Ô GIÁ BÁN BẤM ĐƯỢC
+
+   Trông như chữ thường cho tới khi rê chuột vào, lúc đó mới lộ ra là bấm được.
+   Cố ý: bảng món có bảy cột, tô nút cho mọi ô giá sẽ biến cột giá thành thứ ồn
+   ào nhất bảng trong khi cột đáng nhìn nhất vẫn là biên lợi nhuận.
+   Biểu tượng bút chì luôn hiện — mờ thôi — vì "rê chuột mới thấy" thì trên màn
+   hình cảm ứng không bao giờ thấy.
+============================================================================= */
+.price-edit {
+  appearance: none;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  margin: -2px calc(var(--space-2) * -1);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  transition: background var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out);
+}
+.price-edit svg { opacity: .35; flex: none; }
+
+.price-edit:hover,
+.price-edit:focus-visible {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.price-edit:hover svg,
+.price-edit:focus-visible svg { opacity: .9; }
+
+.price-edit-value { font-variant-numeric: tabular-nums; }
+
+/* =============================================================================
    §9  Ô ẢNH MÓN
    Nút bấm được vì bấm vào ảnh để đổi ảnh là điều người dùng thử trước tiên,
    trước cả khi đi tìm một nút riêng.
@@ -312,3 +382,355 @@
 }
 @keyframes spin { to { rotate: 360deg; } }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } }
+
+/* =============================================================================
+   §11  BÁN HÀNG TẠI QUẦY
+   =============================================================================
+   Màn hình chạm, dùng liên tục cả ngày, nhiều khi bằng tay ướt. Mọi vùng bấm
+   đều ≥ 44px — dưới mức đó là bấm trượt, mà bấm trượt trước mặt khách thì vừa
+   chậm vừa mất tự tin.
+============================================================================= */
+.pos-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.pos-menu { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+.pos-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  position: sticky; top: 0; z-index: 5;
+  padding-block: var(--space-2);
+  background: var(--bg);
+}
+
+/* auto-fill chứ không phải số cột cố định: quầy có thể là máy tính bảng nhỏ
+   hay màn hình lớn, lưới phải tự co giãn theo. */
+.pos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--space-3);
+}
+
+.pos-tile {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  min-height: 150px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--dur) var(--ease-out),
+              transform var(--dur) var(--ease-out);
+}
+.pos-tile:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--drink) 55%, transparent);
+}
+/* Phản hồi khi bấm phải THẤY ĐƯỢC: không có tiếng động, không có rung, nên
+   cái nhún nhẹ này là tín hiệu duy nhất báo rằng máy đã nhận. */
+.pos-tile:active:not(:disabled) { transform: scale(.96); }
+.pos-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.pos-tile.is-out { opacity: .42; cursor: not-allowed; }
+
+.pos-tile-visual {
+  position: relative;
+  width: 68px; height: 68px;
+  display: grid; place-items: center;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--drink) 10%, var(--surface-2));
+}
+.pos-tile-visual img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Số ly đã có trong giỏ, đè lên ảnh món */
+.pos-tile-count {
+  position: absolute; inset-block-start: 0; inset-inline-end: 0;
+  min-width: 24px; height: 24px;
+  display: grid; place-items: center;
+  padding-inline: 5px;
+  background: var(--accent); color: #fff;
+  font-size: var(--text-sm); font-weight: 800;
+  border-radius: 0 var(--radius) 0 var(--radius);
+}
+
+.pos-tile-name {
+  font-size: var(--text-sm); font-weight: 600; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pos-tile-price { font-size: var(--text-sm); color: var(--accent); font-weight: 700; }
+
+.pos-tile-flag {
+  position: absolute; inset-block-start: var(--space-2); inset-inline-start: var(--space-2);
+  padding: 1px 6px;
+  font-size: 10px; font-weight: 700;
+  background: var(--danger); color: #fff;
+  border-radius: var(--radius-sm);
+}
+.pos-tile-flag.warn { background: var(--warn); color: hsl(26 40% 12%); }
+
+/* ---- Giỏ hàng ------------------------------------------------------------ */
+.pos-cart {
+  position: sticky; top: var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-3);
+  max-height: calc(100dvh - var(--shell-topbar) - var(--space-8));
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.pos-cart-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-2);
+}
+.pos-cart-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+  padding: var(--space-10) var(--space-4);
+  text-align: center;
+}
+.pos-cart-lines {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  overflow-y: auto;
+  /* Chỉ vùng này cuộn — tổng tiền và nút chốt đơn luôn nằm trong tầm mắt */
+  min-height: 0; flex: 1;
+}
+/* Vỏ ngoài bọc dòng món + khay ghi chú của nó.
+   Vạch màu và nền chuyển lên đây để khi khay mở ra, cả cụm vẫn đọc như MỘT
+   dòng đơn — nếu để vạch màu ở .pos-line thì khay ghi chú rơi ra ngoài vạch,
+   trông như một khối lạ chen vào giữa giỏ. */
+.pos-line-wrap {
+  border-left: 3px solid var(--drink, var(--accent));
+  background: var(--surface-2);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+/* Dòng đang sửa ghi chú được nhấc lên khỏi nền: nhân viên biết chắc mình đang
+   gõ cho ly nào, nhất là lúc trong giỏ có ba ly cùng tên. */
+.pos-line-wrap.is-editing {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  outline: 1px solid var(--accent-border);
+}
+
+.pos-line {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2);
+}
+.pos-line-name  { font-size: var(--text-sm); font-weight: 600; }
+.pos-line-total { font-size: var(--text-sm); font-weight: 700; min-width: 72px; text-align: right; }
+
+/* Ghi chú tóm tắt dưới tên món. Nghiêng + màu nhấn để tách khỏi tên và size,
+   nhưng KHÔNG cắt cụt bằng ellipsis: ghi chú bị cắt mất vế sau ("ít đá, không
+   đường" thành "ít đá, khô…") là đúng loại lỗi làm người pha làm sai ly nước. */
+.pos-line-note-text {
+  font-size: var(--text-xs);
+  font-style: italic;
+  color: var(--accent);
+  line-height: 1.35;
+}
+
+/* Nút mở khay. Có ghi chú rồi thì tô nền nhấn — lướt mắt xuống cột giỏ là thấy
+   ngay những dòng có yêu cầu riêng, không phải mở từng cái ra kiểm tra. */
+.pos-note-btn.has-note {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Khay ghi chú, thụt vào cho thẳng hàng với tên món phía trên. */
+.pos-note-tray {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-3);
+  border-top: 1px dashed var(--border);
+  margin-top: 0;
+  padding-top: var(--space-3);
+}
+
+/* ---- Thời gian chờ ------------------------------------------------------- */
+.pos-eta {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+/* Chờ trên 10 phút thì đổi sang tông cảnh báo — nhân viên cần chủ động nói
+   trước với khách chứ không để khách tự phát hiện. */
+.pos-eta.is-long {
+  background: color-mix(in srgb, var(--warn) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+  color: var(--warn);
+}
+.pos-eta-main { font-size: var(--text-base); }
+
+.pos-customer { display: flex; flex-direction: column; gap: var(--space-2); }
+
+/* ---- Mã QR chuyển khoản --------------------------------------------------
+   Nằm ngay dưới hai nút Tiền mặt / Chuyển khoản, hiện khi chọn chuyển khoản. */
+.pos-qr {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+/* Nền TRẮNG ĐẶC và viền trắng quanh mã, kể cả ở giao diện tối.
+   Hai thứ này bắt buộc, không phải trang trí:
+     · Máy quét đọc bằng tương phản đen trên trắng — đặt mã lên nền tối thì
+       khách phải rê điện thoại vài lần mới bắt được.
+     · Chuẩn QR đòi hỏi một "vùng yên tĩnh" trắng bao quanh mã. Ảnh qronly cắt
+       sát mép nên khoảng trắng đó phải do padding ở đây tạo ra.
+   Không đặt image-rendering: ảnh gốc lớn hơn ô hiển thị vài lần, để trình duyệt
+   thu nhỏ mượt cho ra mép sạch hơn là ép giữ nguyên điểm ảnh. */
+.pos-qr-img {
+  width: 124px; height: 124px;
+  flex: none;
+  background: #fff;
+  padding: var(--space-2);
+  border-radius: var(--radius);
+}
+.pos-qr-amount { font-size: var(--text-lg); font-weight: 800; line-height: 1.1; }
+/* Mã tham chiếu: nhân viên phải đọc và so từng ký tự với thông báo ngân hàng,
+   nên dùng chữ đều nét và giãn ký tự cho dễ dò. */
+.pos-qr-ref {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.pos-checkout {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Biên lai vừa nhận --------------------------------------------------- */
+.pos-receipt {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3);
+  background: color-mix(in srgb, var(--ok) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--ok) 38%, transparent);
+  border-radius: var(--radius);
+}
+.pos-receipt-eta { font-size: var(--text-sm); }
+
+@media (max-width: 1100px) {
+  .pos-layout { grid-template-columns: 1fr; }
+  .pos-cart { position: static; max-height: none; }
+}
+
+/* =============================================================================
+   §12  MÀN HÌNH PHA CHẾ
+   =============================================================================
+   Đọc từ 1–2 mét nên chữ to hơn hẳn mọi trang khác. Mỗi dòng mang đúng một
+   thông tin: số thứ tự, tên món, ghi chú.
+============================================================================= */
+.bar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-5);
+  align-items: start;
+}
+.bar-sold { position: sticky; top: var(--space-4); }
+
+.brew-card {
+  display: flex; gap: var(--space-4);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+.brew-waiting { border-left-color: var(--info); }
+.brew-active  { border-left-color: var(--warn); }
+.brew-ready   { border-left-color: var(--ok); }
+
+/* Trễ hẹn mã hóa BA cách cùng lúc: viền đỏ, nền ám đỏ, và chữ trễ N phút.
+   Người mù màu vẫn nhận ra, mà nhìn lướt từ xa cũng nhận ra. */
+.brew-card.is-late {
+  border-color: var(--danger);
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+}
+
+.brew-pos {
+  flex: none;
+  width: 52px; height: 52px;
+  display: grid; place-items: center;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+.brew-pos-num { font-size: var(--text-2xl); font-weight: 800; line-height: 1; }
+
+.brew-late {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  font-size: var(--text-sm); font-weight: 700;
+  color: #fff; background: var(--danger);
+  border-radius: var(--radius-sm);
+}
+
+.brew-items {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+}
+.brew-item { display: flex; align-items: center; gap: var(--space-3); }
+
+/* Số lượng to và đậm: pha nhầm 1 ly thành 3 ly là lỗi tốn nguyên liệu thật */
+.brew-qty {
+  min-width: 34px;
+  font-size: var(--text-lg); font-weight: 800;
+  color: var(--accent);
+}
+.brew-item-name { font-size: var(--text-base); font-weight: 600; }
+
+.brew-note {
+  font-size: var(--text-sm);
+  padding: 2px 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  align-self: flex-start;
+}
+
+.brew-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+/* Nút trừ kho: rộng tối thiểu để không bao giờ bị bấm nhầm sang nút bên cạnh */
+.brew-done { min-width: 220px; }
+
+/* ---- Đã bán hôm nay ------------------------------------------------------ */
+.sold-row { display: flex; align-items: center; gap: var(--space-3); }
+.sold-thumb {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--drink) 12%, var(--surface-2));
+}
+.sold-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.sold-count { font-weight: 700; font-size: var(--text-sm); }
+/* Số đang chờ pha nhạt hơn hẳn: nó là dự báo, chưa phải doanh số */
+.sold-queued { color: var(--muted); font-weight: 500; margin-left: 2px; }
+
+@media (max-width: 1100px) {
+  .bar-layout { grid-template-columns: 1fr; }
+  .bar-sold { position: static; }
+}

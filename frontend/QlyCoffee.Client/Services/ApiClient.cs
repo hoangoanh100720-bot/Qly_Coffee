@@ -34,6 +34,17 @@ public class ApiClient
     }
 
     // ==========================================================================
+    //  CỬA HÀNG
+    // ==========================================================================
+
+    /// <summary>
+    /// Thông tin quán, trong đó có cấu hình thuế GTGT mà giỏ hàng cần để hiện
+    /// đúng số thuế TRƯỚC khi khách bấm đặt.
+    /// </summary>
+    public Task<ApiResponse<StoreInfoDto>> GetStoreInfoAsync()
+        => GetAsync<StoreInfoDto>("api/shop/cua-hang");
+
+    // ==========================================================================
     //  MENU — trang bán hàng
     // ==========================================================================
 
@@ -95,6 +106,24 @@ public class ApiClient
         => PostAsync<bool>($"api/inventory/lots/{lotId}/dispose", new { });
 
     // ==========================================================================
+    //  SƠ CHẾ — bước đứng TRƯỚC bán hàng
+    // ==========================================================================
+
+    /// <summary>
+    /// Mọi công thức sơ chế kèm tình trạng: còn bao nhiêu cốt, mẻ nào sắp hết
+    /// hạn, còn nguyên liệu thô để ủ mấy mẻ nữa. Một lần gọi là đủ vẽ cả trang.
+    /// </summary>
+    public Task<ApiResponse<List<PrepRecipeDto>>> GetPrepRecipesAsync()
+        => GetAsync<List<PrepRecipeDto>>("api/prep/recipes");
+
+    /// <summary>
+    /// Chạy một mẻ sơ chế. Backend TRỪ NGUYÊN LIỆU THÔ tại đây và tạo một lô
+    /// bán thành phẩm mới — giao diện không tự tính tồn kho.
+    /// </summary>
+    public Task<ApiResponse<PrepBatchResultDto>> ProduceBatchAsync(ProduceBatchRequest req)
+        => PostAsync<PrepBatchResultDto>("api/prep/produce", req);
+
+    // ==========================================================================
     //  MÓN & CÔNG THỨC
     // ==========================================================================
 
@@ -122,6 +151,14 @@ public class ApiClient
 
     public Task<ApiResponse<bool>> SaveRecipeAsync(Guid productId, object payload)
         => PutAsync<bool>($"api/admin/products/{productId}/recipe", payload);
+
+    /// <summary>
+    /// Đổi RIÊNG giá bán một món, không mở màn hình soạn công thức.
+    /// Trả về bản DTO đã cập nhật để bảng vẽ lại biên lợi nhuận ngay.
+    /// </summary>
+    public Task<ApiResponse<ProductAdminDto>> UpdateProductPriceAsync(Guid productId, int basePrice)
+        => PatchAsync<ProductAdminDto>($"api/admin/products/{productId}/price",
+            new { BasePrice = basePrice });
 
     // ==========================================================================
     //  KẾ HOẠCH AI
@@ -165,6 +202,46 @@ public class ApiClient
 
     public Task<ApiResponse<ReportDto>> GetReportAsync(string fromDate, string toDate)
         => GetAsync<ReportDto>($"api/admin/reports?from={fromDate}&to={toDate}");
+
+    /// <summary>Bốn con số cho huy hiệu thanh điều hướng. Gọi lại mỗi 60 giây.</summary>
+    public Task<ApiResponse<NavBadgesDto>> GetNavBadgesAsync()
+        => GetAsync<NavBadgesDto>("api/admin/badges");
+
+    // ==========================================================================
+    //  BÁN HÀNG TẠI QUẦY
+    // ==========================================================================
+
+    /// <summary>Lưới món cho màn hình bấm đơn. Số ly còn lại đã trừ hàng đang pha.</summary>
+    public Task<ApiResponse<PosMenuDto>> GetPosMenuAsync()
+        => GetAsync<PosMenuDto>("api/pos/menu");
+
+    /// <summary>
+    /// Hỏi trước xem đơn này mất bao lâu, để nhân viên nói ngay với khách.
+    /// Gọi lại mỗi lần giỏ đổi — rẻ vì chỉ đọc, không ghi gì.
+    /// </summary>
+    public Task<ApiResponse<EtaDto>> EstimateEtaAsync(List<EstimateItem> items)
+        => PostAsync<EtaDto>("api/pos/estimate", new EstimateRequest(items));
+
+    /// <summary>Chốt đơn tại quầy. Đơn vào thẳng hàng pha.</summary>
+    public Task<ApiResponse<PosOrderResultDto>> CreatePosOrderAsync(CreateOrderRequest req)
+        => PostAsync<PosOrderResultDto>("api/pos/orders", req);
+
+    // ==========================================================================
+    //  MÀN HÌNH PHA CHẾ
+    // ==========================================================================
+
+    public Task<ApiResponse<BarQueueDto>> GetBarQueueAsync()
+        => GetAsync<BarQueueDto>("api/bar/queue");
+
+    public Task<ApiResponse<object>> StartBrewingAsync(Guid orderId)
+        => PostAsync<object>($"api/bar/orders/{orderId}/start", new { });
+
+    /// <summary>Bấm hoàn tất — đây là lúc kho bị trừ.</summary>
+    public Task<ApiResponse<CompleteOrderResultDto>> CompleteBarOrderAsync(Guid orderId)
+        => PostAsync<CompleteOrderResultDto>($"api/bar/orders/{orderId}/complete", new { });
+
+    public Task<ApiResponse<object>> CancelBarOrderAsync(Guid orderId, string reason)
+        => PostAsync<object>($"api/bar/orders/{orderId}/cancel", new { reason });
 
     // ==========================================================================
     //  ẢNH MÓN
@@ -221,6 +298,14 @@ public class ApiClient
 
     private Task<ApiResponse<T>> PutAsync<T>(string url, object body)
         => SendAsync<T>(() => _http.PutAsJsonAsync(url, body));
+
+    /// <summary>
+    /// PATCH cho những thay đổi chỉ đụng MỘT trường, như đổi giá bán một món.
+    /// HttpClient không có PatchAsJsonAsync nên phải dựng request bằng tay.
+    /// </summary>
+    private Task<ApiResponse<T>> PatchAsync<T>(string url, object body)
+        => SendAsync<T>(() => _http.PatchAsync(url,
+            System.Net.Http.Json.JsonContent.Create(body)));
 
     /// <summary>
     /// Bọc mọi lời gọi HTTP: bắt lỗi mạng, đọc lỗi nghiệp vụ từ backend,

@@ -261,10 +261,28 @@ public class ScheduledJobsService : BackgroundService
         }
 
         // ---- Job mỗi 15 phút — đồng bộ khả dụng ----------------------------
+        //
+        //  Quét hạn dùng CHẠY LẠI Ở ĐÂY, không chỉ ở mốc 08:00.
+        //
+        //  Lý do: từ khi có sơ chế, kho chứa cả những lô hết hạn theo GIỜ — bình
+        //  cốt trà ủ lúc 08:30 hỏng lúc 14:30 chứ không phải nửa đêm. Job mỗi
+        //  ngày một lần thì suốt buổi chiều hệ thống vẫn cho bán trà đã thiu.
+        //
+        //  Đặt ngay TRƯỚC phần tính lại khả dụng để hai việc ăn khớp: mẻ vừa bị
+        //  đánh dấu hết hạn thì món dùng nó lập tức chuyển sang "chưa sơ chế".
+        //  Hàm chạy lại bao nhiêu lần cũng vô hại — lô đã Expired không lọt vào
+        //  truy vấn nữa.
         var interval = TimeSpan.FromMinutes(EnvInt("AVAILABILITY_REFRESH_MINUTES", 15));
         if (DateTime.UtcNow - _lastAvailabilityRun >= interval)
         {
+            var inventory = scope.ServiceProvider.GetRequiredService<IInventoryService>();
             var availability = scope.ServiceProvider.GetRequiredService<IAvailabilityService>();
+
+            var expired = await inventory.ExpireOverdueLotsAsync(storeId, ct);
+            if (expired > 0)
+                _logger.LogInformation(
+                    "Quét giữa ngày: {Count} lô vừa hết hạn (thường là mẻ sơ chế quá giờ)", expired);
+
             await availability.RecomputeAllAsync(storeId, ct);
             _lastAvailabilityRun = DateTime.UtcNow;
         }

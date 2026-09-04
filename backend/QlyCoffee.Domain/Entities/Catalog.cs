@@ -52,6 +52,40 @@ public class Store : SoftDeletableEntity
     /// <summary>Đang nhận đơn hay tạm nghỉ. Tắt thì trang bán hàng hiện thông báo.</summary>
     public bool IsOpen { get; set; } = true;
 
+    // --- Thuế giá trị gia tăng --------------------------------------------------
+    //
+    //  Ba cột dưới đây quyết định phần "Thuế GTGT" hiện ra thế nào ở giỏ hàng và
+    //  trên hóa đơn. Phép tính nằm ở QlyCoffee.Shared/Tax.cs — đọc phần đầu file
+    //  đó để biết căn cứ pháp lý của từng chế độ.
+    //
+    //  Đây là cấu hình của CẢ QUÁN chứ không của từng món: thuế suất áp theo
+    //  ngành nghề kinh doanh, không theo mặt hàng.
+
+    /// <summary>
+    /// Cách xử lý thuế GTGT, ứng với <c>QlyCoffee.Shared.TaxMode</c>.
+    /// <para>
+    /// Mặc định 1 = Inclusive, tức giá niêm yết đã gồm thuế — đúng Luật Giá 2023
+    /// Điều 29. Hộ kinh doanh nộp thuế theo phương pháp trực tiếp phải đổi về 0.
+    /// </para>
+    /// <para>
+    /// Lưu bằng <c>int</c> chứ không bằng enum của Domain vì giá trị này đi thẳng
+    /// ra DTO cho frontend, và frontend chỉ tham chiếu dự án Shared.
+    /// </para>
+    /// </summary>
+    public int TaxMode { get; set; } = 1;
+
+    /// <summary>
+    /// Thuế suất GTGT phần trăm. Mặc định 8% theo Nghị quyết 204/2025/QH15,
+    /// hiệu lực tới hết 31/12/2026; sau mốc đó phải xem lại (xem Tax.cs).
+    /// </summary>
+    public int VatRatePercent { get; set; } = 8;
+
+    /// <summary>
+    /// Mã số thuế của hộ hoặc doanh nghiệp. In lên hóa đơn giao khách.
+    /// Để trống thì phần hóa đơn chỉ bỏ dòng này, không báo lỗi.
+    /// </summary>
+    public string? TaxCode { get; set; }
+
     public ICollection<Category> Categories { get; set; } = new List<Category>();
 }
 
@@ -99,6 +133,17 @@ public class Product : StoreScopedEntity
     /// <summary>Mô tả bán hàng, hiển thị ở trang chi tiết món.</summary>
     public string? Description { get; set; }
 
+    /// <summary>
+    /// Gợi ý thưởng thức: món này ngon hơn khi dùng kèm thứ gì, hoặc nên uống thế nào.
+    /// VD cà phê kem trứng: "Ngon nhất khi dùng nóng, kèm bánh quẩy hoặc bánh mì chấm kem trứng."
+    /// <para>
+    /// Đây là câu bán hàng chứ không phải mô tả: nó vừa dạy khách cách thưởng thức
+    /// đúng kiểu, vừa kéo thêm một món bánh vào đơn. Để trống thì giao diện ẩn hẳn
+    /// khối gợi ý — thà không có còn hơn có một câu chung chung cho mọi món.
+    /// </para>
+    /// </summary>
+    public string? PairingNote { get; set; }
+
     /// <summary>Đường dẫn ảnh món. Nếu trống, giao diện tự dựng minh họa từ dải màu bên dưới.</summary>
     public string? ImageUrl { get; set; }
 
@@ -136,6 +181,21 @@ public class Product : StoreScopedEntity
     public int MarginPercent =>
         BasePrice > 0 ? (int)Math.Round((BasePrice - ComputedCost) * 100.0 / BasePrice) : 0;
 
+    /// <summary>
+    /// Cách phục vụ: 0 = đồ uống đá · 1 = đồ uống nóng · 2 = đồ ăn · 3 = khách chọn nóng hay đá.
+    /// Ứng với <c>QlyCoffee.Infrastructure.Seed.ServeStyle</c>.
+    /// <para>
+    /// Quyết định ba thứ, nên KHÔNG suy ra từ tên danh mục được:
+    /// (1) món có size M/L và tùy chọn mức đá hay không — một chiếc croissant thì không;
+    /// (2) tỷ lệ giá vốn mục tiêu khi gợi ý giá bán — đồ ăn 45%, đồ uống 30%;
+    /// (3) trang quản lý tách riêng khu vực chỉnh giá cho đồ ăn.
+    /// </para>
+    /// <para>
+    /// Mặc định 0 vì toàn bộ món có trước khi cột này ra đời đều là đồ uống đá.
+    /// </para>
+    /// </summary>
+    public int ServeStyle { get; set; }
+
     // --- Trạng thái hiển thị ----------------------------------------------------
 
     public bool IsActive { get; set; } = true;
@@ -162,6 +222,20 @@ public class Product : StoreScopedEntity
     /// </para>
     /// </summary>
     public int MaxServings { get; set; } = 9999;
+
+    /// <summary>
+    /// Thời gian một nhân viên pha xong MỘT ly món này, tính bằng giây.
+    /// <para>
+    /// Đây là con số duy nhất quyết định thời gian báo cho khách. Đo bằng đồng hồ
+    /// bấm giờ vào giờ bình thường (không phải giờ cao điểm, không phải lúc vắng),
+    /// tính từ khi cầm ly tới khi đặt lên quầy trả.
+    /// </para>
+    /// <para>
+    /// Mặc định 90 giây là mức trung bình của một món pha máy. Món phin hoặc món
+    /// đá xay lâu hơn nhiều — sửa lại cho đúng thì thời gian báo khách mới sát.
+    /// </para>
+    /// </summary>
+    public int PrepSeconds { get; set; } = 90;
 
     /// <summary>
     /// Nhãn hiển thị trên thẻ món, ngăn cách bởi dấu phẩy.
@@ -251,6 +325,18 @@ public class RecipeItem : BaseEntity
 public class ModifierGroup : StoreScopedEntity
 {
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Loại nhóm, để giao diện nhận ra nhóm nào có ý nghĩa đặc biệt:
+    /// <c>topping</c> · <c>sugar</c> · <c>ice</c> · <c>temperature</c> · rỗng = nhóm thường.
+    /// Xem <c>QlyCoffee.Shared.ModifierGroupKinds</c>.
+    /// <para>
+    /// Cần thiết vì trang đặt món phải ẨN nhóm "Mức đá" khi khách chọn dùng nóng —
+    /// mà nhận ra nhóm nào là nhóm đá bằng cách so tên tiếng Việt thì hỏng ngay
+    /// lần đầu có người đổi tên nhóm.
+    /// </para>
+    /// </summary>
+    public string Kind { get; set; } = string.Empty;
 
     /// <summary>Số lựa chọn tối thiểu. 1 nghĩa là bắt buộc chọn.</summary>
     public int MinSelect { get; set; }

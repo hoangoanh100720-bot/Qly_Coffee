@@ -55,7 +55,7 @@
                 decoding="async" — không chặn luồng dựng trang khi giải mã ảnh.  *@
             <img src="@PhotoUrl" alt="@PhotoAlt"
                  loading="lazy" decoding="async"
-                 width="600" height="600" />
+                 width="900" height="900" />
 
             @if (!Product.IsAvailable)
             {
@@ -79,7 +79,7 @@
         {
             <span class="low-stock">
                 <WarnIcon Size="13" />
-                Chỉ còn @Product.MaxServings ly
+                Chỉ còn @Product.MaxServings phần
             </span>
         }
         else if (!Product.IsAvailable && !string.IsNullOrEmpty(Product.UnavailableReason))

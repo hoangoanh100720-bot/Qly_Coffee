@@ -33,7 +33,7 @@
 }
 else
 {
-    <PageTitle>Món — Qly Coffee</PageTitle>
+    <PageTitle>Món — Một Chút Coffee</PageTitle>
 }
 
 @if (_loading)
@@ -80,7 +80,7 @@ else
                 <img src="@DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name)"
                      alt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name)"
                      fetchpriority="high" decoding="async"
-                     width="600" height="600" />
+                     width="900" height="900" />
             </div>
 
             @* ── THÔNG TIN & LỰA CHỌN ───────────────────────────────────── *@
@@ -136,8 +136,24 @@ else
                 {
                     <div class="alert alert-warn" role="status">
                         <ClockIcon Size="18" />
-                        <span>Chỉ còn <strong>@CurrentMaxServings ly</strong> với size đang chọn.</span>
+                        <span>Chỉ còn <strong>@CurrentMaxServings phần</strong> với size đang chọn.</span>
                     </div>
+                }
+
+                @*  ── GỢI Ý THƯỞNG THỨC ──────────────────────────────────────
+                    Đặt TRƯỚC phần chọn size chứ không nhét xuống cuối trang:
+                    câu này thường khuyên uống nóng hay ăn kèm bánh nào, mà khách
+                    chỉ đổi được lựa chọn khi chưa bấm thêm vào giỏ.
+                    Món chưa có gợi ý thì bỏ hẳn khối, không hiện khung rỗng.   *@
+                @if (!string.IsNullOrWhiteSpace(_product.PairingNote))
+                {
+                    <aside class="serving-tip">
+                        <SparkIcon Size="18" CssClass="serving-tip-icon" />
+                        <div>
+                            <span class="serving-tip-label">Gợi ý thưởng thức</span>
+                            <p>@_product.PairingNote</p>
+                        </div>
+                    </aside>
                 }
 
                 @* ── CHỌN SIZE ──────────────────────────────────────────── *@
@@ -164,8 +180,11 @@ else
                     </fieldset>
                 }
 
-                @* ── NHÓM TÙY CHỌN ──────────────────────────────────────── *@
-                @foreach (var group in _product.ModifierGroups)
+                @*  ── NHÓM TÙY CHỌN ──────────────────────────────────────────
+                    Nhóm "Mức đá" bị LỌC RA khi khách đang chọn dùng nóng — xem
+                    IsVisible. Hỏi "bao nhiêu phần trăm đá" cho một ly cà phê
+                    nóng vừa vô nghĩa vừa làm bếp pha sai.                      *@
+                @foreach (var group in _product.ModifierGroups.Where(IsVisible))
                 {
                     <fieldset class="field">
                         <legend class="field-label">
@@ -190,7 +209,7 @@ else
                                         class="choice @(selected ? "is-selected" : "")"
                                         aria-pressed="@selected"
                                         @onclick="() => ToggleModifier(group, m)">
-                                    @if (m.ColorHex != "#D9B368" && m.ColorHex != "#DCEAF2")
+                                    @if (ShowSwatch(group, m))
                                     {
                                         <span class="swatch" style="--swatch-color: @m.ColorHex"></span>
                                     }
@@ -281,9 +300,12 @@ else
     private bool CanAddToCart =>
         _product is not null && CurrentMaxServings > 0 && AllRequiredGroupsSelected;
 
+    // Chỉ xét nhóm ĐANG HIỆN. Nhóm bị ẩn (mức đá của một ly uống nóng) mà vẫn
+    // tính là bắt buộc thì nút thêm vào giỏ chết cứng kèm câu "Vui lòng chọn:
+    // Mức đá" trong khi trên màn hình không có ô nào để bấm.
     private bool AllRequiredGroupsSelected =>
         _product?.ModifierGroups
-            .Where(g => g.IsRequired)
+            .Where(g => g.IsRequired && IsVisible(g))
             .All(g => g.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)))
         ?? false;
 
@@ -292,13 +314,79 @@ else
         get
         {
             var missing = _product?.ModifierGroups
-                .Where(g => g.IsRequired && !g.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)))
+                .Where(g => g.IsRequired && IsVisible(g)
+                         && !g.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)))
                 .Select(g => g.Name)
                 .ToList();
 
             return missing is { Count: > 0 }
                 ? $"Vui lòng chọn: {string.Join(", ", missing)}"
                 : "";
+        }
+    }
+
+    // ── Nóng hay đá ────────────────────────────────────────────────────────
+    //
+    //  Món pha được cả hai kiểu có thêm một nhóm "Dùng nóng hay đá". Chọn nóng
+    //  thì nhóm mức đá biến mất, và mọi lựa chọn mức đá đang giữ bị bỏ theo —
+    //  nếu không, đơn gửi xuống bếp là "cà phê kem trứng nóng, 100% đá".
+    //
+    //  Nhận diện nhóm bằng CỘT KIND chứ không bằng tên: quán đổi tên nhóm thành
+    //  "Đá nhiều hay ít" thì mọi thứ vẫn chạy đúng.
+
+    private ModifierGroupDto? TemperatureGroup =>
+        _product?.ModifierGroups.FirstOrDefault(g => g.Kind == ModifierGroupKinds.Temperature);
+
+    /// <summary>Khách đang chọn dùng nóng. Món không có nhóm nóng/đá thì luôn false.</summary>
+    private bool ServedHot =>
+        TemperatureGroup is { } temp
+        && temp.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)
+                                && ModifierGroupKinds.IsHotChoice(m.Name));
+
+    /// <summary>Đã chọn nóng hay đá chưa. Món chỉ có một kiểu phục vụ thì coi như rồi.</summary>
+    private bool TemperatureChosen =>
+        TemperatureGroup is not { } temp
+        || temp.Modifiers.Any(m => _selectedModifiers.Contains(m.Id));
+
+    /// <summary>
+    /// Mức đá chỉ hiện khi đã biết ly này là ly đá. Chưa chọn nóng hay đá thì
+    /// cũng chưa hiện: hỏi "bao nhiêu phần trăm đá" trước câu "có đá không" là
+    /// hỏi ngược thứ tự.
+    /// </summary>
+    private bool IsVisible(ModifierGroupDto group) =>
+        group.Kind != ModifierGroupKinds.Ice
+        || (TemperatureChosen && !ServedHot);
+
+    /// <summary>
+    /// Chấm màu chỉ có nghĩa với thứ CÓ MÀU THẬT — topping. Mức đường, mức đá,
+    /// nóng/đá thì màu là quy ước chứ không phải màu của đồ ăn nên không vẽ chấm.
+    /// </summary>
+    private static bool ShowSwatch(ModifierGroupDto group, ModifierDto modifier)
+        => group.Kind is not (ModifierGroupKinds.Sugar
+                              or ModifierGroupKinds.Ice
+                              or ModifierGroupKinds.Temperature)
+           // Nhóm sinh ra trước khi có cột Kind thì kind rỗng — vẫn phải lọc
+           // được, nên giữ lại phép so màu quy ước cũ làm lưới đỡ.
+           && modifier.ColorHex != "#D9B368" && modifier.ColorHex != "#DCEAF2";
+
+    /// <summary>
+    /// Giữ mức đá khớp với lựa chọn nóng/đá: đang ẩn thì bỏ hết lựa chọn cũ,
+    /// vừa hiện ra thì chọn sẵn mức đầu tiên vì đây là nhóm bắt buộc.
+    /// </summary>
+    private void SyncIceWithTemperature()
+    {
+        var iceGroup = _product?.ModifierGroups
+            .FirstOrDefault(g => g.Kind == ModifierGroupKinds.Ice);
+        if (iceGroup is null) return;
+
+        if (!IsVisible(iceGroup))
+        {
+            foreach (var m in iceGroup.Modifiers) _selectedModifiers.Remove(m.Id);
+        }
+        else if (!iceGroup.Modifiers.Any(m => _selectedModifiers.Contains(m.Id)))
+        {
+            var first = iceGroup.Modifiers.FirstOrDefault();
+            if (first is not null) _selectedModifiers.Add(first.Id);
         }
     }
 
@@ -319,13 +407,25 @@ else
             _variantId = _product.Variants.FirstOrDefault(v => v.IsDefault)?.Id
                       ?? _product.Variants.FirstOrDefault()?.Id;
 
-            // Chọn sẵn lựa chọn đầu tiên của mỗi nhóm bắt buộc, để khách
-            // không phải bấm thêm nếu đồng ý mặc định
-            foreach (var g in _product.ModifierGroups.Where(g => g.IsRequired))
+            //  Chọn sẵn lựa chọn đầu tiên của mỗi nhóm bắt buộc, để khách
+            //  không phải bấm thêm nếu đồng ý mặc định.
+            //
+            //  TRỪ NHÓM NÓNG/ĐÁ — nhóm này CỐ Ý để trống.
+            //  Mức đường mặc định 100% mà khách không để ý thì cùng lắm ngọt hơn
+            //  ý muốn; còn nhận nhầm ly nóng khi đang muốn uống đá là đổi hẳn
+            //  món. Mà không có mặc định nào đúng cho cả menu: bạc xỉu thì gần
+            //  như ai cũng gọi đá, cà phê kem trứng thì phải nóng mới đúng vị.
+            //  Nên bắt chọn tay — nút thêm vào giỏ đã tự khóa kèm lý do sẵn.
+            foreach (var g in _product.ModifierGroups
+                         .Where(g => g.IsRequired && g.Kind != ModifierGroupKinds.Temperature))
             {
                 var first = g.Modifiers.FirstOrDefault();
                 if (first is not null) _selectedModifiers.Add(first.Id);
             }
+
+            // Món có hỏi nóng/đá thì mức đá chưa được hiện ra, nên bỏ luôn mức
+            // đá vừa chọn sẵn ở vòng lặp trên.
+            SyncIceWithTemperature();
         }
 
         _loading = false;
@@ -369,6 +469,10 @@ else
                 _selectedModifiers.Add(modifier.Id);
             }
         }
+
+        // Vừa đổi nóng ↔ đá thì mức đá phải theo cho khớp, nếu không đơn xuống
+        // bếp mang theo mức đá của lựa chọn cũ.
+        if (group.Kind == ModifierGroupKinds.Temperature) SyncIceWithTemperature();
     }
 
     private void ChangeQty(int delta)
@@ -430,7 +534,7 @@ else
             ? $"{p.Name} thuộc nhóm {p.CategoryName}, pha theo công thức định lượng chuẩn"
             : p.Description.Trim().TrimEnd('.');
 
-        return $"{than}. Giá từ {gia}. Đặt online tại Qly Coffee, tới lấy là có.";
+        return $"{than}. Giá từ {gia}. Đặt online tại Một Chút Coffee, tới lấy là có.";
     }
 
     private static string TagLabel(string tag) => tag switch

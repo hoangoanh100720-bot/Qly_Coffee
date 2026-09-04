@@ -78,7 +78,8 @@ public class PromotionsController : BaseApiController
                 IsFromAi: p.SourcePlanId != null,
                 UnitsSold: stats?.Units ?? 0,
                 Revenue: stats?.Revenue ?? 0,
-                IsRunning: p.Status == PromotionStatus.Active && p.StartsAt <= now && p.EndsAt >= now));
+                IsRunning: p.Status == PromotionStatus.Active && p.StartsAt <= now && p.EndsAt >= now,
+                ProductImageUrl: p.Product?.ImageUrl));
         }
 
         return Ok(result);
@@ -224,7 +225,7 @@ public class ReportsController : BaseApiController
         var products = await _db.Products
             .AsNoTracking()
             .Where(p => productIds.Contains(p.Id))
-            .ToDictionaryAsync(p => p.Id, p => new { p.Name, p.ColorPrimaryHex }, ct);
+            .ToDictionaryAsync(p => p.Id, p => new { p.Name, p.ColorPrimaryHex, p.ImageUrl }, ct);
 
         var topProducts = salesRows
             .GroupBy(s => s.ProductId)
@@ -233,7 +234,8 @@ public class ReportsController : BaseApiController
                 products.TryGetValue(g.Key, out var p) ? p.Name : "Món đã xóa",
                 products.TryGetValue(g.Key, out var p2) ? p2.ColorPrimaryHex : "#4A2C17",
                 g.Sum(x => x.UnitsSold),
-                g.Sum(x => x.Revenue)))
+                g.Sum(x => x.Revenue),
+                products.TryGetValue(g.Key, out var p3) ? p3.ImageUrl : null))
             .OrderByDescending(x => x.Revenue)
             .Take(15)
             .ToList();

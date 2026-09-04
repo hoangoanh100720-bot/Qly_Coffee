@@ -18,7 +18,7 @@
 docker compose up -d
 ```
 
-**Bước 2 — Backend.** Tự áp dụng migration rồi seed 22 món, 29 nguyên liệu,
+**Bước 2 — Backend.** Tự áp dụng migration rồi seed 56 món, 60 nguyên liệu,
 28 ngày lịch sử tiêu thụ:
 
 ```bash
@@ -122,17 +122,98 @@ Ba lớp bảo vệ: prompt cấm tính lại số, JSON schema không có trư�
 - Toàn bộ nằm trong **transaction Serializable**. Thiếu một nguyên liệu thì rollback sạch,
   không có chuyện trừ nửa chừng.
 
-### 3. Kho chỉ bị trừ tại trạng thái `Confirmed`
+### 3. Kho chỉ bị trừ tại trạng thái `Completed`
 
 ```
 Pending → Confirmed → Preparing → Ready → Completed
-             ↑
-        TRỪ KHO tại đây
+                                              ↑
+                                         TRỪ KHO tại đây
 ```
 
-Trừ lúc `Pending` thì khách bỏ giỏ hàng làm kho bị trừ oan. Trừ lúc `Completed` thì trong
-lúc đang pha hệ thống vẫn tưởng còn hàng nên bán quá số lượng. `Confirmed` là đúng lúc quán
-cam kết làm món. Hủy đơn đã trừ thì hoàn về **đúng những lô** đã bị trừ.
+Trừ lúc `Pending` thì khách bỏ giỏ hàng làm kho bị trừ oan. `Completed` là lúc món **thật sự
+đã pha xong và giao đi**, tức là lúc nguyên liệu thật sự rời khỏi kho — nhờ vậy đơn hủy giữa
+chừng không cần hoàn kho, vì nó chưa bao giờ bị trừ.
+
+### 4. Sơ chế — bước đứng trước bán hàng
+
+Ngoài đời không ai cân 8g lá trà cho từng ly: người ta ủ một bình 2 lít rồi rót dần cho ba
+mươi ly, và bình đó hỏng sau vài tiếng dù còn nguyên. Vì vậy kho có **hai bước**, không phải một:
+
+```
+Nhập kho  ──────▶  SƠ CHẾ  ──────▶  Bán hàng
+mua 1kg lá         80g lá trà        200ml cốt
+hồng trà về        → 2000ml cốt      → một ly trà sữa
+                   hạn 6 tiếng
+                   ProductionOut     SaleOut
+                   + ProductionIn    (FEFO như thường)
+```
+
+- **Bán thành phẩm là `Ingredient` bình thường**, chỉ khác cờ `is_prepared`. Nhờ vậy FEFO,
+  sổ cái, cảnh báo hạn dùng, giá vốn và phép "còn làm được mấy ly" dùng lại được nguyên vẹn,
+  không phải viết đường đi riêng nào.
+- **Hạn dùng tính bằng GIỜ** (`prep_recipes.shelf_life_hours`), không phải ngày — cốt trà 6
+  tiếng, cà phê phin 12 tiếng, cold brew 7 ngày. Job quét hạn vì thế chạy lại mỗi 15 phút chứ
+  không chỉ lúc 08:00.
+- **Giá vốn mẻ = tổng giá vốn thật của các lô đã bị trừ** chia cho sản lượng, không lấy giá
+  bình quân — mẻ ủ từ lô trà cận hạn giá rẻ phải rẻ đúng như vậy.
+- Hết cốt thì món hiện **"Chưa sơ chế Cốt hồng trà"** chứ không phải "Hết hàng": một bên là
+  đi ủ mẻ mới, một bên là gọi nhà cung cấp — hai hành động khác nhau.
+
+Chín công thức mẻ có sẵn: 5 loại cốt trà, cà phê phin, cold brew, nước đường, kem muối.
+Màn hình ở `/admin/so-che`.
+
+Việc bán quá số lượng trong lúc đang pha được chặn ở chỗ khác: phép kiểm tra tồn kho lấy tồn
+thật **trừ đi phần các đơn đang chờ đã chiếm chỗ** (`EnsureIngredientsAvailableAsync`).
+
+Trừ theo **đúng gram** trong công thức, nhân hệ số size và cộng cả nguyên liệu của topping
+khách chọn thêm, rồi nhân tỷ lệ hao hụt của từng nguyên liệu. Cả bill được **gộp trước rồi
+mới trừ một lần**: hai món cùng dùng sữa thì chỉ sinh một bút toán. Hủy đơn đã trừ thì hoàn
+về **đúng những lô** đã bị trừ.
+
+---
+
+## Giá bán, giá vốn và thuế GTGT
+
+**Giá vốn không nhập tay.** Nó là số dẫn xuất từ công thức định lượng:
+
+```
+giá vốn = Σ (định lượng × đơn giá nguyên liệu × (1 + hao hụt))
+```
+
+Toàn bộ công thức của 56 món nằm trong một file duy nhất:
+[`backend/QlyCoffee.Infrastructure/Seed/MenuCatalog.cs`](backend/QlyCoffee.Infrastructure/Seed/MenuCatalog.cs).
+Mỗi dòng ghi rõ định lượng và quy đổi thực tế — *"2 miếng đào ngâm, mỗi miếng ≈ 30g"*,
+*"2 lát cam vàng cả vỏ, mỗi lát ≈ 15g"* — để nhân viên mới đứng quầy đọc là làm được.
+
+**Giá bán thì luôn là quyền của người bán.** Hệ thống chỉ *gợi ý*:
+
+| | Đồ uống | Đồ ăn kèm |
+|---|---|---|
+| Tỷ lệ giá vốn mục tiêu | 35% | 50% |
+| Giá đề nghị | `giá vốn ÷ tỷ lệ`, làm tròn **lên** bội số 1.000đ | |
+
+Đồ ăn để mức cao hơn vì bánh **nhập về nguyên cái** — quán không tạo thêm giá trị bằng tay
+nghề pha chế. Trang `/admin/mon` có bộ lọc **Đồ uống / Đồ ăn** riêng vì chung một ngưỡng thì
+mọi món bánh đều bị tô cảnh báo oan.
+
+Sửa giá: vào `/admin/mon`, **bấm thẳng vào ô giá**. Hộp thoại hiện giá vốn, giá đề nghị và
+biên lợi nhuận cập nhật theo từng phím gõ. Hệ thống **không chặn** giá thấp hơn giá vốn —
+quán có quyền bán lỗ một món để kéo khách hoặc xả nguyên liệu cận hạn — nó chỉ nói trước
+hậu quả.
+
+**Thuế GTGT.** Mặc định: **giá niêm yết đã bao gồm thuế**, thuế suất **8%**. Tổng tiền khách
+trả không đổi, khối thuế dưới nút "Đặt món" chỉ **tách ngược** ra tiền hàng và tiền thuế.
+Căn cứ pháp lý của từng chế độ ghi ở đầu
+[`shared/QlyCoffee.Shared/Tax.cs`](shared/QlyCoffee.Shared/Tax.cs); đổi chế độ và thuế suất
+bằng `STORE_TAX_MODE` / `STORE_VAT_RATE` trong `.env`, không phải sửa mã nguồn.
+
+> ⚠️ Hộ kinh doanh nộp thuế theo **phương pháp trực tiếp** phải đặt `STORE_TAX_MODE=0`.
+> Nhóm này dùng hóa đơn bán hàng, trên chứng từ không có dòng thuế GTGT tách riêng.
+
+**Thêm món mới vào quán đang chạy.** Seeder chỉ chạy khi database còn trống. Món thêm vào
+`MenuCatalog.cs` sau ngày khai trương đi vào database qua `MenuSync` — bật
+`MENU_SYNC_ENABLED=true` rồi khởi động lại. Nó **chỉ thêm phần còn thiếu** và **không bao
+giờ ghi đè giá bán** chủ quán đã chỉnh.
 
 ---
 
@@ -159,7 +240,14 @@ Không phụ thuộc file ảnh ngoài → không có ảnh vỡ, sắc nét ở
 
 ### Ảnh chụp thật
 
-**19/22 món đã có ảnh chụp thật**, tải sẵn về `wwwroot/uploads/products/`.
+**55/56 món có ảnh chụp RIÊNG**, nằm ở `wwwroot/uploads/products/`.
+Món duy nhất chưa có là **Cà phê cốt dừa** — nó mượn ảnh mẫu theo nhóm trong
+`wwwroot/img/`, vì kho ảnh CC0 không có tấm cà phê cốt dừa nào dùng được.
+
+Bộ ảnh mẫu theo nhóm (18 tấm) vẫn giữ làm **lớp đỡ**: món mới thêm vào chưa kịp
+chụp thì đã có sẵn một tấm đúng nhóm, không bao giờ có ô ảnh trống. Quy tắc ghép
+nằm gọn trong `Services/DrinkPhoto.cs` — thứ tự các nhánh ở đó **là một phần của
+logic**, đọc chú thích trước khi sắp xếp lại.
 
 | | |
 |---|---|
@@ -167,15 +255,14 @@ Không phụ thuộc file ảnh ngoài → không có ảnh vỡ, sắc nét ở
 | Giấy phép | **CC0** — dùng thương mại tự do, không cần ghi công tác giả |
 | Loại ảnh | Chụp bằng máy ảnh thật, không phải ảnh dựng bằng AI |
 
-Ba món còn dùng hình vẽ: **trà sữa trân châu đường đen, trà sữa matcha, matcha latte**.
-Kho ảnh CC0 miễn phí không có ảnh trà sữa trân châu và matcha latte nào dùng được —
-kết quả trả về toàn ảnh sai món hoặc ảnh quảng cáo có in số điện thoại. Ảnh sai món
-tệ hơn hình vẽ, nên để nguyên hình vẽ và chờ ảnh chụp thật của quán.
+Ba món từng phải dùng hình vẽ (**trà sữa trân châu đường đen, trà sữa matcha,
+matcha latte**) nay đều đã có ảnh chụp riêng, đúng thứ trong ly.
 
-Toàn bộ 22 tấm đều được **xem tận mắt trước khi gán**, không chọn theo thứ hạng tìm
-kiếm. Lượt chọn tự động đầu tiên đã loại được 4 tấm dính logo Starbucks và một loạt
-ảnh sai chủ đề (laptop, chai bia, bàn ăn sáng) — nhưng vẫn lọt lưới 3 tấm, phải soát
-tay mới phát hiện.
+**Mọi tấm đều được xem tận mắt trước khi gán**, không lấy theo thứ hạng tìm kiếm.
+Đợt đầu (22 tấm) loại 4 tấm dính logo Starbucks và một loạt ảnh sai chủ đề; đợt mở
+rộng (36 tấm) loại thêm ảnh dính logo McCafé, Tim Hortons, TEASPOON, TruMoo, và một
+ly trà ổi in tên quán khác trên lót ly — tấm đó **chỉ lộ ra sau khi cắt vuông**, nên
+bước soát phải nhìn ảnh ĐÃ CẮT chứ không phải ảnh gốc.
 
 Ba script tái lập lại quy trình nằm ở [`scripts/`](scripts/):
 `tai-ung-vien.sh` → `ghep-bang-anh.ps1` → `gan-anh-da-chon.sh`.
@@ -233,6 +320,7 @@ thanh đo + chữ "còn N ngày". Người mù màu và trình đọc màn hình
 | `/admin/don-hang` | Xác nhận đơn = trừ kho. Tự làm mới 15s. Hủy đơn bắt buộc lý do |
 | `/admin/mon` | Biên lợi nhuận dạng thanh đo, đánh dấu món chưa có công thức |
 | `/admin/mon/{id}/cong-thuc` | Giá vốn và biên lợi nhuận tính lại **ngay khi gõ** |
+| `/admin/so-che` | Ủ cốt trà, cà phê phin, nấu nước đường. Đếm ngược hạn từng bình theo phút |
 | `/admin/nguyen-lieu` | Thanh đo mức tồn (100% = gấp đôi ngưỡng tối thiểu) |
 | `/admin/lo-hang` | Sắp FEFO, mã hóa khẩn cấp 3 cách cùng lúc |
 | `/admin/nhap-kho` | Nhập theo kg/lít, hệ thống tự quy đổi. Cảnh báo khi đơn giá lệch > 40% |

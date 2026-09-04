@@ -381,6 +381,11 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsPrepared")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_prepared")
+                        .HasComment("true = BÁN THÀNH PHẨM do quán tự nấu/ủ (cốt trà, cà phê phin, nước đường). Chỉ vào kho qua màn hình Sơ chế, không nhập từ nhà cung cấp.");
+
                     b.Property<double>("MinStockLevel")
                         .HasPrecision(18, 4)
                         .HasColumnType("double precision")
@@ -480,6 +485,11 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("note");
 
+                    b.Property<Guid?>("PrepRecipeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("prep_recipe_id")
+                        .HasComment("Công thức sơ chế đã tạo ra lô này. NULL = lô mua từ nhà cung cấp.");
+
                     b.Property<Guid?>("PurchaseOrderItemId")
                         .HasColumnType("uuid")
                         .HasColumnName("purchase_order_item_id");
@@ -524,6 +534,8 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IngredientId");
+
+                    b.HasIndex("PrepRecipeId");
 
                     b.HasIndex("SupplierId");
 
@@ -618,6 +630,15 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_required");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("")
+                        .HasColumnName("kind")
+                        .HasComment("topping · sugar · ice · temperature · rỗng = nhóm thường. Giao diện đọc cột này để biết nhóm nào phải ẩn khi khách chọn dùng nóng — KHÔNG so theo tên nhóm.");
+
                     b.Property<int>("MaxSelect")
                         .HasColumnType("integer")
                         .HasColumnName("max_select");
@@ -648,7 +669,7 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
 
                     b.ToTable("modifier_groups", null, t =>
                         {
-                            t.HasComment("Nhóm tùy chọn: Topping, Mức đường, Mức đá.");
+                            t.HasComment("Nhóm tùy chọn: Topping, Mức đường, Dùng nóng hay đá, Mức đá.");
                         });
                 });
 
@@ -714,6 +735,11 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cancelled_at");
 
+                    b.Property<int>("Channel")
+                        .HasColumnType("integer")
+                        .HasColumnName("channel")
+                        .HasComment("0=khách đặt online, 1=nhân viên bấm tại quầy.");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -763,9 +789,19 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("discount_total");
 
+                    b.Property<DateTime?>("EstimatedReadyAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("estimated_ready_at")
+                        .HasComment("Thời gian ĐÃ HỨA với khách. Không tính lại — dùng để đối chiếu hứa/thực.");
+
                     b.Property<int>("GrandTotal")
                         .HasColumnType("integer")
                         .HasColumnName("grand_total");
+
+                    b.Property<int>("NetAmount")
+                        .HasColumnType("integer")
+                        .HasColumnName("net_amount")
+                        .HasComment("Tiền hàng chưa thuế. Luôn thỏa net_amount + tax_amount = grand_total.");
 
                     b.Property<string>("Note")
                         .HasMaxLength(500)
@@ -776,9 +812,29 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("order_type");
 
+                    b.Property<int>("PaidAmount")
+                        .HasColumnType("integer")
+                        .HasColumnName("paid_amount")
+                        .HasComment("Số tiền thực nhận. Có thể lớn hơn grand_total khi khách chuyển dư.");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<long?>("PaymentGatewayId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("payment_gateway_id")
+                        .HasComment("Id giao dịch SePay. Có giá trị = tiền do ngân hàng xác nhận tự động, không phải nhân viên bấm tay.");
+
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer")
                         .HasColumnName("payment_method");
+
+                    b.Property<string>("PaymentRef")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("payment_ref")
+                        .HasComment("Nội dung chuyển khoản in trên mã QR, VD MCC7K2M9. Khóa đối soát của webhook SePay.");
 
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer")
@@ -814,6 +870,23 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("subtotal");
 
+                    b.Property<int>("TaxAmount")
+                        .HasColumnType("integer")
+                        .HasColumnName("tax_amount")
+                        .HasComment("Tiền thuế GTGT của đơn.");
+
+                    b.Property<int>("TaxMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("tax_mode")
+                        .HasComment("Chế độ thuế đã áp dụng cho đơn. Đơn có trước khi hệ thống tách thuế mang giá trị 0.");
+
+                    b.Property<int>("TaxRatePercent")
+                        .HasColumnType("integer")
+                        .HasColumnName("tax_rate_percent")
+                        .HasComment("Thuế suất % đã áp dụng cho đơn này.");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -829,15 +902,22 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CustomerPhone");
 
+                    b.HasIndex("PaymentRef")
+                        .IsUnique()
+                        .HasFilter("payment_ref IS NOT NULL");
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("StoreId", "PlacedAt");
+
+                    b.HasIndex("StoreId", "Status", "ConfirmedAt")
+                        .HasDatabaseName("ix_orders_hang_pha");
 
                     b.HasIndex("StoreId", "Status", "PlacedAt");
 
                     b.ToTable("orders", null, t =>
                         {
-                            t.HasComment("Đơn hàng. KHO ĐƯỢC TRỪ khi chuyển sang Confirmed(1) và HOÀN LẠI khi Cancelled(5). Không trạng thái nào khác động vào kho.");
+                            t.HasComment("Đơn hàng. KHO ĐƯỢC TRỪ khi chuyển sang Completed(4) — tức là lúc nhân viên bấm Hoàn tất sau khi pha xong — và HOÀN LẠI khi Cancelled(5). Không trạng thái nào khác động vào kho. Confirmed(1) và Preparing(2) chỉ đưa đơn vào hàng pha.");
                         });
                 });
 
@@ -913,6 +993,114 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.ToTable("order_items", null, t =>
                         {
                             t.HasComment("Dòng món trong đơn. Tên và giá là SNAPSHOT tại thời điểm đặt — đổi giá hay đổi tên món sau này không được làm sai đơn cũ.");
+                        });
+                });
+
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("account_number");
+
+                    b.Property<int>("Amount")
+                        .HasColumnType("integer")
+                        .HasColumnName("amount")
+                        .HasComment("Số tiền giao dịch, đơn vị đồng.");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("content")
+                        .HasComment("Nội dung chuyển khoản nguyên văn từ ngân hàng.");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DetectedRef")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("detected_ref")
+                        .HasComment("Mã tham chiếu của quán dò ra từ nội dung. null = giao dịch không phải trả đơn.");
+
+                    b.Property<string>("Gateway")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("gateway");
+
+                    b.Property<long>("GatewayId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("gateway_id")
+                        .HasComment("Id giao dịch do SePay cấp. Duy nhất — chống ghi nhận một lần chuyển tiền hai lần.");
+
+                    b.Property<int>("MatchStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("match_status");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("note")
+                        .HasComment("Diễn giải tiếng Việt kết quả đối soát — hiện thẳng cho chủ quán đọc.");
+
+                    b.Property<Guid?>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("raw_payload")
+                        .HasComment("Payload webhook nguyên văn. Dữ liệu tiền bạc do bên thứ ba gửi — luôn giữ bản gốc.");
+
+                    b.Property<string>("ReferenceCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference_code");
+
+                    b.Property<string>("SubAccount")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("sub_account");
+
+                    b.Property<DateTime>("TransactionDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("transaction_date");
+
+                    b.Property<string>("TransferType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("transfer_type")
+                        .HasComment("in = tiền vào, out = tiền ra. Chỉ 'in' mới được xét thanh toán đơn.");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GatewayId")
+                        .IsUnique();
+
+                    b.HasIndex("MatchStatus");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("TransactionDate");
+
+                    b.ToTable("payment_transactions", null, t =>
+                        {
+                            t.HasComment("Nhật ký biến động số dư ngân hàng do SePay gửi qua webhook. GIỮ CẢ giao dịch không khớp đơn nào — tiền đã vào tài khoản mà hệ thống im lặng bỏ qua là trường hợp tệ nhất khi đối soát cuối ngày.");
                         });
                 });
 
@@ -1090,6 +1278,144 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PrepRecipe", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("code")
+                        .HasComment("Mã công thức, duy nhất trong chi nhánh. VD: PREP-TEA-BLK");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("instructions")
+                        .HasComment("Hiện nguyên văn cho nhân viên. Nhiệt độ nước và thời gian ủ nằm ở đây.");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OutputIngredientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("output_ingredient_id");
+
+                    b.Property<double>("OutputQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("double precision")
+                        .HasColumnName("output_quantity")
+                        .HasComment("Sản lượng MỘT MẺ CHUẨN, SAU hao hụt — lượng thật sự rót vào bình, không phải lượng nước đổ vào nồi.");
+
+                    b.Property<int>("PrepMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("prep_minutes")
+                        .HasComment("Thời gian làm xong một mẻ, tính bằng phút.");
+
+                    b.Property<int>("ShelfLifeHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("shelf_life_hours")
+                        .HasComment("Hạn dùng của mẻ tính bằng GIỜ. Phải là giờ chứ không phải ngày: cốt trà hỏng sau 6 tiếng, ghi 1 ngày là cho phép bán trà ủ từ sáng vào lúc tối.");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("store_id");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OutputIngredientId");
+
+                    b.HasIndex("StoreId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("prep_recipes", null, t =>
+                        {
+                            t.HasComment("CÔNG THỨC MỘT MẺ SƠ CHẾ: 80g lá hồng trà → 2000ml cốt hồng trà, hạn 6 tiếng. Khác recipe_items ở chỗ recipe_items tính cho MỘT LY, bảng này tính cho MỘT MẺ. Chạy một mẻ sinh bút toán ProductionOut cho nguyên liệu thô và ProductionIn kèm một lô mới cho bán thành phẩm.");
+                        });
+                });
+
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PrepRecipeLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ingredient_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("PrepRecipeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("prep_recipe_id");
+
+                    b.Property<double>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("double precision")
+                        .HasColumnName("quantity")
+                        .HasComment("Lượng cho MỘT MẺ CHUẨN, theo đơn vị cơ sở của nguyên liệu thô.");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientId");
+
+                    b.HasIndex("PrepRecipeId", "IngredientId")
+                        .IsUnique();
+
+                    b.ToTable("prep_recipe_lines", null, t =>
+                        {
+                            t.HasComment("Nguyên liệu thô cần cho MỘT MẺ. Làm hai mẻ thì hệ thống nhân đôi, không sửa số này.");
+                        });
+                });
+
             modelBuilder.Entity("QlyCoffee.Domain.Entities.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1168,6 +1494,22 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("name");
+
+                    b.Property<string>("PairingNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("pairing_note")
+                        .HasComment("Gợi ý thưởng thức: dùng nóng/lạnh thế nào, ăn kèm món nào. Rỗng thì giao diện ẩn khối này.");
+
+                    b.Property<int>("PrepSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("prep_seconds")
+                        .HasComment("Giây để pha xong 1 ly. Là con số duy nhất quyết định thời gian báo khách.");
+
+                    b.Property<int>("ServeStyle")
+                        .HasColumnType("integer")
+                        .HasColumnName("serve_style")
+                        .HasComment("0=đồ uống đá · 1=đồ uống nóng · 2=đồ ăn. Quyết định món có size/mức đá không, và tỷ lệ giá vốn mục tiêu khi gợi ý giá.");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -1857,7 +2199,7 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("reference_type")
-                        .HasComment("Loại chứng từ nguồn: ORDER | PURCHASE | COUNT | WASTE | EXPIRY");
+                        .HasComment("Loại chứng từ nguồn: ORDER | PURCHASE | PREP | COUNT | WASTE | EXPIRY");
 
                     b.Property<Guid>("StoreId")
                         .HasColumnType("uuid")
@@ -1976,6 +2318,19 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(150)")
                         .HasColumnName("slug");
 
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tax_code")
+                        .HasComment("Mã số thuế in lên hóa đơn.");
+
+                    b.Property<int>("TaxMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("tax_mode")
+                        .HasComment("0=không tách thuế (hộ nộp trực tiếp) · 1=giá đã gồm thuế (Luật Giá 2023 Đ.29) · 2=giá chưa gồm thuế.");
+
                     b.Property<string>("TimeZone")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1986,6 +2341,13 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<int>("VatRatePercent")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(8)
+                        .HasColumnName("vat_rate_percent")
+                        .HasComment("Thuế suất GTGT %. 8% theo Nghị quyết 204/2025/QH15, hiệu lực tới 31/12/2026.");
 
                     b.HasKey("Id");
 
@@ -2200,11 +2562,18 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("QlyCoffee.Domain.Entities.PrepRecipe", "PrepRecipe")
+                        .WithMany()
+                        .HasForeignKey("PrepRecipeId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("QlyCoffee.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId");
 
                     b.Navigation("Ingredient");
+
+                    b.Navigation("PrepRecipe");
 
                     b.Navigation("Supplier");
                 });
@@ -2274,6 +2643,16 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.Navigation("Variant");
                 });
 
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.HasOne("QlyCoffee.Domain.Entities.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("QlyCoffee.Domain.Entities.PlanDecision", b =>
                 {
                     b.HasOne("QlyCoffee.Domain.Entities.User", "Actor")
@@ -2320,6 +2699,44 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.Navigation("Plan");
 
                     b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PrepRecipe", b =>
+                {
+                    b.HasOne("QlyCoffee.Domain.Entities.Ingredient", "OutputIngredient")
+                        .WithMany()
+                        .HasForeignKey("OutputIngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("QlyCoffee.Domain.Entities.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OutputIngredient");
+
+                    b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PrepRecipeLine", b =>
+                {
+                    b.HasOne("QlyCoffee.Domain.Entities.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("QlyCoffee.Domain.Entities.PrepRecipe", "PrepRecipe")
+                        .WithMany("Lines")
+                        .HasForeignKey("PrepRecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+
+                    b.Navigation("PrepRecipe");
                 });
 
             modelBuilder.Entity("QlyCoffee.Domain.Entities.Product", b =>
@@ -2544,6 +2961,11 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("QlyCoffee.Domain.Entities.PlanSuggestion", b =>
                 {
                     b.Navigation("Decisions");
+                });
+
+            modelBuilder.Entity("QlyCoffee.Domain.Entities.PrepRecipe", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("QlyCoffee.Domain.Entities.Product", b =>

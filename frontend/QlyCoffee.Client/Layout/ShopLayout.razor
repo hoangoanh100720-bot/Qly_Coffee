@@ -39,10 +39,10 @@
         <div class="container topnav-inner">
 
             <a href="/" class="brand" style="padding: 0; text-decoration: none; color: inherit;"
-               aria-label="Qly Coffee — về trang chủ">
+               aria-label="Một Chút Coffee — về trang chủ">
                 <LogoMark Size="38" />
                 <div class="stack" style="gap: 0;">
-                    <span class="brand-name">Qly Coffee</span>
+                    <span class="brand-name">Một Chút Coffee</span>
                     <span class="brand-sub">Cà phê &amp; Trà</span>
                 </div>
             </a>
@@ -89,7 +89,7 @@
                 <div class="stack stack-3">
                     <div class="row row-3">
                         <LogoMark Size="34" />
-                        <span class="brand-name" itemprop="name">Qly Coffee</span>
+                        <span class="brand-name" itemprop="name">Một Chút Coffee</span>
                     </div>
                     <p class="small text-2" style="max-width: 34ch;" itemprop="description">
                         Cà phê pha phin, trà trái cây và đá xay — làm tươi mỗi ly,
@@ -111,8 +111,8 @@
                     <span class="small">
                         Mở cửa
                         @* <time> cho phép bot đọc đúng khung giờ thay vì đoán từ chuỗi chữ *@
-                        <time itemprop="openingHours" datetime="Mo-Su 07:00-22:00">
-                            <span class="num">@OpenTime</span> – <span class="num">@CloseTime</span>
+                        <time itemprop="openingHours" datetime="@StoreHours.SchemaValue">
+                            <span class="num">@StoreHours.OpenLabel</span> – <span class="num">@StoreHours.CloseLabel</span>
                         </time>
                         mỗi ngày
                     </span>
@@ -133,7 +133,7 @@
             </div>
 
             <div class="footer-bottom">
-                <span class="xs muted">© @DateTime.Now.Year Qly Coffee</span>
+                <span class="xs muted">© @DateTime.Now.Year Một Chút Coffee</span>
                 <span class="xs muted">Giá đã bao gồm thuế</span>
             </div>
         </div>
@@ -162,9 +162,10 @@
     /// <summary>Số điện thoại cho thuộc tính href="tel:" — không được có khoảng trắng.</summary>
     private const string StorePhoneRaw = "0901234567";
 
-    private const string StoreEmail    = "xinchao@qlycoffee.vn";
-    private const string OpenTime      = "07:00";
-    private const string CloseTime     = "22:00";
+    private const string StoreEmail    = "xinchao@motchutcoffee.vn";
+    // Giờ mở cửa KHÔNG khai báo ở đây nữa — nó nằm trong Services/StoreHours.cs
+    // cùng với hàm kiểm tra "ngay lúc này quán còn mở không" mà chip trạng thái
+    // trên trang chủ dùng tới. Để hai bản sao thì sớm muộn cũng lệch nhau.
 
     protected override void OnInitialized()
     {

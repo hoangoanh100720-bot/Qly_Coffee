@@ -1,0 +1,99 @@
+@*
+    =============================================================================
+    KHỐI THUẾ GIÁ TRỊ GIA TĂNG
+    =============================================================================
+
+    Một component dùng ở HAI nơi — giỏ hàng (trước khi đặt) và trang tra cứu đơn
+    (sau khi đặt) — vì hai con số đó bắt buộc phải khớp nhau từng đồng. Viết hai
+    lần là sớm muộn lệch nhau, mà lệch số thuế thì khách mất niềm tin đúng vào
+    lúc họ sắp trả tiền.
+
+    Phép tính KHÔNG nằm ở đây. Nó nằm ở QlyCoffee.Shared/VatPolicy, dùng chung
+    với backend. Component này chỉ nhận số đã tính và trình bày.
+
+    VÌ SAO ĐẶT DƯỚI NÚT ĐẶT MÓN
+    Thứ khách cần để quyết định bấm hay không là TỔNG TIỀN. Chi tiết thuế là
+    thông tin để đối chiếu và lưu chứng từ, không phải thứ chen vào giữa lúc
+    quyết định. Đặt trên nút là đẩy nút xuống dưới màn hình trên điện thoại.
+
+    CĂN CỨ PHÁP LÝ: xem phần đầu shared/QlyCoffee.Shared/Tax.cs.
+    =============================================================================
+*@
+
+<section class="card vat-card" aria-labelledby="vat-heading">
+
+    <div class="vat-head">
+        <h2 class="card-title" id="vat-heading" style="margin: 0;">Thuế giá trị gia tăng</h2>
+        @if (Vat.HasTax)
+        {
+            <span class="badge badge-neutral">@Vat.RatePercent%</span>
+        }
+    </div>
+
+    @if (Vat.HasTax)
+    {
+        <div class="pl-table" style="background: transparent; border: none; padding: 0;">
+            <div class="pl-row">
+                <span class="pl-label">Tiền hàng chưa thuế</span>
+                <span class="pl-value num">@Money.Format(Vat.Net)</span>
+            </div>
+            <div class="pl-row">
+                <span class="pl-label">@VatPolicy.RateLabel(Vat.RatePercent)</span>
+                <span class="pl-value num">@Money.Format(Vat.Tax)</span>
+            </div>
+            <div class="pl-row pl-total">
+                <span class="pl-label">Tổng thanh toán</span>
+                <span class="pl-value num">@Money.Format(Vat.Gross)</span>
+            </div>
+        </div>
+    }
+
+    @*  Câu giải thích là phần QUAN TRỌNG NHẤT của khối này với chế độ "giá đã
+        gồm thuế": không có nó, khách nhìn thấy một dòng thuế và tưởng quán vừa
+        thu thêm 8% ngoài giá niêm yết.                                        *@
+    <p class="vat-note">@VatPolicy.Explanation(Vat.Mode)</p>
+
+    @if (!string.IsNullOrWhiteSpace(TaxCode) || !string.IsNullOrWhiteSpace(StoreName))
+    {
+        <dl class="vat-issuer">
+            @if (!string.IsNullOrWhiteSpace(StoreName))
+            {
+                <dt>Đơn vị bán hàng</dt>
+                <dd>@StoreName</dd>
+            }
+            @if (!string.IsNullOrWhiteSpace(TaxCode))
+            {
+                <dt>Mã số thuế</dt>
+                <dd class="num">@TaxCode</dd>
+            }
+        </dl>
+    }
+
+    @*  Nói thẳng rằng đây CHƯA phải hóa đơn. Nghị định 70/2025/NĐ-CP bắt hộ kinh
+        doanh ăn uống doanh thu từ 1 tỷ/năm phải xuất hóa đơn điện tử khởi tạo từ
+        máy tính tiền — hệ thống này chưa nối với nhà cung cấp hóa đơn điện tử,
+        nên để khách hiểu nhầm màn hình này là hóa đơn hợp lệ là sai.           *@
+    <p class="vat-note vat-note-quiet">
+        Đây là bảng kê tiền hàng, chưa phải hóa đơn điện tử.
+        Khách cần hóa đơn xin báo nhân viên trước khi thanh toán.
+    </p>
+</section>
+
+@code {
+    /// <summary>
+    /// Kết quả tách thuế đã tính sẵn bằng <c>VatPolicy.Compute</c>.
+    /// <para>
+    /// Nhận số ĐÃ TÍNH chứ không tự tính từ tổng tiền, vì trang tra cứu đơn phải
+    /// hiện đúng con số đã CHỤP LẠI vào đơn hôm khách đặt — tính lại theo thuế
+    /// suất hôm nay sẽ ra số khác khi nhà nước đổi thuế suất.
+    /// </para>
+    /// </summary>
+    [Parameter, EditorRequired]
+    public VatBreakdown Vat { get; set; }
+
+    /// <summary>Mã số thuế của quán. Rỗng thì bỏ dòng này.</summary>
+    [Parameter] public string? TaxCode { get; set; }
+
+    /// <summary>Tên đơn vị bán hàng in kèm mã số thuế.</summary>
+    [Parameter] public string? StoreName { get; set; }
+}

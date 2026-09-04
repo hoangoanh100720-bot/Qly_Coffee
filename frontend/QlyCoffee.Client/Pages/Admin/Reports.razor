@@ -15,7 +15,7 @@
 @attribute [Authorize(Roles = "Manager,Owner")]
 @inject ApiClient Api
 
-<PageTitle>Báo cáo — Qly Coffee</PageTitle>
+<PageTitle>Báo cáo — Một Chút Coffee</PageTitle>
 
 <div class="stack stack-6">
 
@@ -170,12 +170,14 @@
                             {
                                 var share = _topRevenue > 0 ? p.Revenue * 100.0 / _topRevenue : 0;
                                 <div class="top-product">
-                                    <DrinkGlass DrinkColor="@p.ColorPrimaryHex" FoamColor="#F5EDE0"
-                                                Size="30" AriaLabel="" />
+                                    <img class="top-product-photo"
+                                         src="@DrinkPhoto.PhotoFor(p.ImageUrl, null, p.Name)"
+                                         alt="" loading="lazy" decoding="async"
+                                         width="30" height="30" />
                                     <div class="stack stack-1 grow" style="min-width: 0;">
                                         <div class="row row-between">
                                             <span class="small truncate" style="font-weight: 600;">@p.Name</span>
-                                            <span class="xs num muted">@p.UnitsSold ly</span>
+                                            <span class="xs num muted">@p.UnitsSold phần</span>
                                         </div>
                                         <div class="meter">
                                             <div class="meter-fill"

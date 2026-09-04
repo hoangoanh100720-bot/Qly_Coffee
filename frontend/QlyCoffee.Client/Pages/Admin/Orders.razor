@@ -24,7 +24,7 @@
 @inject AlertService Alerts
 @implements IDisposable
 
-<PageTitle>Đơn hàng — Qly Coffee</PageTitle>
+<PageTitle>Đơn hàng — Một Chút Coffee</PageTitle>
 
 <div class="stack stack-6">
 
@@ -140,9 +140,10 @@
                         @foreach (var item in order.Items)
                         {
                             <div class="order-item-row">
-                                <DrinkGlass DrinkColor="@item.ColorPrimaryHex"
-                                            FoamColor="@item.ColorAccentHex"
-                                            Size="32" AriaLabel="" />
+                                <img class="order-item-photo"
+                                     src="@DrinkPhoto.PhotoFor(item.ImageUrl, null, item.ProductName)"
+                                     alt="" loading="lazy" decoding="async"
+                                     width="32" height="32" />
                                 <span class="num" style="font-weight: 700; min-width: 24px;">
                                     @item.Quantity×
                                 </span>

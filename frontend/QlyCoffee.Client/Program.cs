@@ -30,6 +30,15 @@ if (string.IsNullOrWhiteSpace(apiBaseUrl))
 // Ảnh món lưu ở backend nên cần biết địa chỉ backend để ghép đường dẫn
 QlyCoffee.Client.Services.Media.ApiBaseUrl = apiBaseUrl;
 
+// --- Tài khoản nhận chuyển khoản --------------------------------------------
+// Dùng cho mã QR ở màn hình bán hàng tại quầy. Cũng đi ra từ .env qua
+// scripts/gen-client-config.ps1, cùng đường với ApiBaseUrl ở trên.
+// Thiếu cấu hình không phải là lỗi: BankQr.IsConfigured sẽ false và màn hình
+// quầy chỉ nhắc nhân viên khai báo, chứ không hỏng.
+BankQr.BankCode      = builder.Configuration["Payment:BankCode"]      ?? "";
+BankQr.AccountNumber = builder.Configuration["Payment:AccountNumber"] ?? "";
+BankQr.AccountName   = builder.Configuration["Payment:AccountName"]   ?? "";
+
 builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(apiBaseUrl),

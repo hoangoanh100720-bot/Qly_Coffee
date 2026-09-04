@@ -47,9 +47,16 @@ public class AppDbContext : DbContext
     public DbSet<StockCount> StockCounts => Set<StockCount>();
     public DbSet<StockCountLine> StockCountLines => Set<StockCountLine>();
 
+    // --- Sơ chế (nguyên liệu thô → bán thành phẩm) -------------------------------
+    public DbSet<PrepRecipe> PrepRecipes => Set<PrepRecipe>();
+    public DbSet<PrepRecipeLine> PrepRecipeLines => Set<PrepRecipeLine>();
+
     // --- Đơn hàng ---------------------------------------------------------------
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
+    // --- Thanh toán ---------------------------------------------------------------
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     // --- Khuyến mãi & kế hoạch AI ----------------------------------------------
     public DbSet<Promotion> Promotions => Set<Promotion>();
@@ -115,6 +122,17 @@ public class AppDbContext : DbContext
                 .HasComment("Múi giờ IANA. Mọi phép tính theo ngày kinh doanh phải dùng giá trị này.");
             e.Property(x => x.BusinessDayEndHour)
                 .HasComment("Giờ chốt sổ (0-23). Job sinh kế hoạch chạy sau mốc này.");
+
+            // --- Thuế GTGT — căn cứ pháp lý xem QlyCoffee.Shared/Tax.cs -------
+            e.Property(x => x.TaxMode)
+                .HasDefaultValue(1)
+                .HasComment("0=không tách thuế (hộ nộp trực tiếp) · 1=giá đã gồm thuế (Luật Giá 2023 Đ.29) · 2=giá chưa gồm thuế.");
+            e.Property(x => x.VatRatePercent)
+                .HasDefaultValue(8)
+                .HasComment("Thuế suất GTGT %. 8% theo Nghị quyết 204/2025/QH15, hiệu lực tới 31/12/2026.");
+            e.Property(x => x.TaxCode).HasMaxLength(20)
+                .HasComment("Mã số thuế in lên hóa đơn.");
+
             e.HasQueryFilter(x => x.DeletedAt == null);
         });
 
@@ -150,6 +168,8 @@ public class AppDbContext : DbContext
             e.Property(x => x.Name).HasMaxLength(150).IsRequired();
             e.Property(x => x.Slug).HasMaxLength(150).IsRequired();
             e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.PairingNote).HasMaxLength(300)
+                .HasComment("Gợi ý thưởng thức: dùng nóng/lạnh thế nào, ăn kèm món nào. Rỗng thì giao diện ẩn khối này.");
 
             e.Property(x => x.ColorPrimaryHex).HasMaxLength(9)
                 .HasComment("Màu THẬT của ly nước, hex. Dùng dựng minh họa SVG khi chưa có ảnh chụp.");
@@ -165,6 +185,10 @@ public class AppDbContext : DbContext
             e.Property(x => x.UnavailableReason).HasMaxLength(200);
             e.Property(x => x.Tags).HasMaxLength(300)
                 .HasComment("Nhãn ngăn cách bởi dấu phẩy. VD: best-seller,mới");
+            e.Property(x => x.PrepSeconds)
+                .HasComment("Giây để pha xong 1 ly. Là con số duy nhất quyết định thời gian báo khách.");
+            e.Property(x => x.ServeStyle)
+                .HasComment("0=đồ uống đá · 1=đồ uống nóng · 2=đồ ăn. Quyết định món có size/mức đá không, và tỷ lệ giá vốn mục tiêu khi gợi ý giá.");
 
             e.Ignore(x => x.MarginPercent);   // thuộc tính tính toán, không lưu DB
 
@@ -211,8 +235,12 @@ public class AppDbContext : DbContext
 
         b.Entity<ModifierGroup>(e =>
         {
-            e.ToTable("modifier_groups", t => t.HasComment("Nhóm tùy chọn: Topping, Mức đường, Mức đá."));
+            e.ToTable("modifier_groups", t => t.HasComment(
+                "Nhóm tùy chọn: Topping, Mức đường, Dùng nóng hay đá, Mức đá."));
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Kind).HasMaxLength(24).HasDefaultValue("").HasComment(
+                "topping · sugar · ice · temperature · rỗng = nhóm thường. Giao diện đọc cột này "
+                + "để biết nhóm nào phải ẩn khi khách chọn dùng nóng — KHÔNG so theo tên nhóm.");
             e.HasQueryFilter(x => x.DeletedAt == null);
         });
 
@@ -283,6 +311,9 @@ public class AppDbContext : DbContext
                 .HasComment("Hao hụt chế biến. 0.03 = 3%. Trái cây gọt vỏ 0.10-0.15, bột/siro 0.01.");
             e.Property(x => x.AverageUnitCost)
                 .HasComment("Giá vốn bình quân gia quyền, ĐỒNG cho 1 đơn vị cơ sở. Tự cập nhật khi nhập kho.");
+            e.Property(x => x.IsPrepared)
+                .HasComment("true = BÁN THÀNH PHẨM do quán tự nấu/ủ (cốt trà, cà phê phin, nước đường). " +
+                            "Chỉ vào kho qua màn hình Sơ chế, không nhập từ nhà cung cấp.");
             e.Property(x => x.Note).HasMaxLength(500);
 
             e.HasQueryFilter(x => x.DeletedAt == null);
@@ -331,11 +362,16 @@ public class AppDbContext : DbContext
                 .HasComment("0=Active 1=Depleted 2=Expired 3=Disposed. Chỉ lô Active mới được FEFO lấy ra.");
             e.Property(x => x.Note).HasMaxLength(300);
 
+            e.Property(x => x.PrepRecipeId)
+                .HasComment("Công thức sơ chế đã tạo ra lô này. NULL = lô mua từ nhà cung cấp.");
+
             e.Ignore(x => x.DaysUntilExpiry);
             e.Ignore(x => x.RemainingValue);
 
             e.HasOne(x => x.Ingredient).WithMany(i => i.Lots)
                 .HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.PrepRecipe).WithMany()
+                .HasForeignKey(x => x.PrepRecipeId).OnDelete(DeleteBehavior.SetNull);
             e.HasQueryFilter(x => x.DeletedAt == null);
         });
 
@@ -362,7 +398,7 @@ public class AppDbContext : DbContext
                 .HasComment("0=PurchaseIn 1=SaleOut 2=Waste 3=ExpiredOut 4=AdjustIn 5=AdjustOut " +
                             "6=ReturnIn 7=ProductionOut 8=ProductionIn");
             e.Property(x => x.ReferenceType).HasMaxLength(30)
-                .HasComment("Loại chứng từ nguồn: ORDER | PURCHASE | COUNT | WASTE | EXPIRY");
+                .HasComment("Loại chứng từ nguồn: ORDER | PURCHASE | PREP | COUNT | WASTE | EXPIRY");
             e.Property(x => x.Reason).HasMaxLength(300)
                 .HasComment("BẮT BUỘC với bút toán hao hụt và điều chỉnh kiểm kê.");
             e.Property(x => x.IdempotencyKey).HasMaxLength(200)
@@ -428,18 +464,80 @@ public class AppDbContext : DbContext
         });
 
         // ======================================================================
+        //  SƠ CHẾ — NGUYÊN LIỆU THÔ THÀNH BÁN THÀNH PHẨM
+        // ======================================================================
+        b.Entity<PrepRecipe>(e =>
+        {
+            e.ToTable("prep_recipes", t => t.HasComment(
+                "CÔNG THỨC MỘT MẺ SƠ CHẾ: 80g lá hồng trà → 2000ml cốt hồng trà, hạn 6 tiếng. " +
+                "Khác recipe_items ở chỗ recipe_items tính cho MỘT LY, bảng này tính cho MỘT MẺ. " +
+                "Chạy một mẻ sinh bút toán ProductionOut cho nguyên liệu thô và ProductionIn " +
+                "kèm một lô mới cho bán thành phẩm."));
+
+            e.HasIndex(x => new { x.StoreId, x.Code }).IsUnique();
+            e.HasIndex(x => x.OutputIngredientId);
+
+            e.Property(x => x.Code).HasMaxLength(60).IsRequired()
+                .HasComment("Mã công thức, duy nhất trong chi nhánh. VD: PREP-TEA-BLK");
+            e.Property(x => x.Name).HasMaxLength(150).IsRequired();
+            e.Property(x => x.OutputQuantity).HasPrecision(18, 4)
+                .HasComment("Sản lượng MỘT MẺ CHUẨN, SAU hao hụt — lượng thật sự rót vào bình, " +
+                            "không phải lượng nước đổ vào nồi.");
+            e.Property(x => x.ShelfLifeHours)
+                .HasComment("Hạn dùng của mẻ tính bằng GIỜ. Phải là giờ chứ không phải ngày: " +
+                            "cốt trà hỏng sau 6 tiếng, ghi 1 ngày là cho phép bán trà ủ từ sáng vào lúc tối.");
+            e.Property(x => x.PrepMinutes)
+                .HasComment("Thời gian làm xong một mẻ, tính bằng phút.");
+            e.Property(x => x.Instructions).HasMaxLength(1000)
+                .HasComment("Hiện nguyên văn cho nhân viên. Nhiệt độ nước và thời gian ủ nằm ở đây.");
+
+            e.HasOne(x => x.OutputIngredient).WithMany()
+                .HasForeignKey(x => x.OutputIngredientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        b.Entity<PrepRecipeLine>(e =>
+        {
+            e.ToTable("prep_recipe_lines", t => t.HasComment(
+                "Nguyên liệu thô cần cho MỘT MẺ. Làm hai mẻ thì hệ thống nhân đôi, không sửa số này."));
+
+            e.HasIndex(x => new { x.PrepRecipeId, x.IngredientId }).IsUnique();
+
+            e.Property(x => x.Quantity).HasPrecision(18, 4)
+                .HasComment("Lượng cho MỘT MẺ CHUẨN, theo đơn vị cơ sở của nguyên liệu thô.");
+            e.Property(x => x.Note).HasMaxLength(300);
+
+            e.HasOne(x => x.PrepRecipe).WithMany(p => p.Lines)
+                .HasForeignKey(x => x.PrepRecipeId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Ingredient).WithMany()
+                .HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ======================================================================
         //  ĐƠN HÀNG
         // ======================================================================
         b.Entity<Order>(e =>
         {
             e.ToTable("orders", t => t.HasComment(
-                "Đơn hàng. KHO ĐƯỢC TRỪ khi chuyển sang Confirmed(1) và HOÀN LẠI khi Cancelled(5). " +
-                "Không trạng thái nào khác động vào kho."));
+                "Đơn hàng. KHO ĐƯỢC TRỪ khi chuyển sang Completed(4) — tức là lúc nhân viên bấm " +
+                "Hoàn tất sau khi pha xong — và HOÀN LẠI khi Cancelled(5). Không trạng thái nào " +
+                "khác động vào kho. Confirmed(1) và Preparing(2) chỉ đưa đơn vào hàng pha."));
 
             e.HasIndex(x => x.Code).IsUnique();
             e.HasIndex(x => new { x.StoreId, x.Status, x.PlacedAt });
             e.HasIndex(x => new { x.StoreId, x.PlacedAt });
             e.HasIndex(x => x.CustomerPhone);
+
+            // Màn hình pha chế đọc liên tục 15 giây một lần: lọc theo cửa hàng và
+            // trạng thái đang chờ, sắp theo thứ tự vào hàng. Không có index này thì
+            // mỗi lần làm mới là một lần quét toàn bảng orders.
+            e.HasIndex(x => new { x.StoreId, x.Status, x.ConfirmedAt })
+                .HasDatabaseName("ix_orders_hang_pha");
+
+            e.Property(x => x.Channel)
+                .HasComment("0=khách đặt online, 1=nhân viên bấm tại quầy.");
+            e.Property(x => x.EstimatedReadyAt)
+                .HasComment("Thời gian ĐÃ HỨA với khách. Không tính lại — dùng để đối chiếu hứa/thực.");
 
             e.Property(x => x.Code).HasMaxLength(30).IsRequired()
                 .HasComment("Mã đơn QC-YYMMDD-NNNN. Khách tra cứu đơn bằng mã này, không cần đăng nhập.");
@@ -451,10 +549,35 @@ public class AppDbContext : DbContext
 
             e.Property(x => x.CostTotal)
                 .HasComment("Giá vốn THỰC TẾ từ đúng những lô đã bị trừ, không phải giá vốn bình quân.");
+
+            // --- Thuế GTGT chụp lại lúc đặt ------------------------------------
+            // Chụp lại chứ không đọc từ bảng stores: thuế suất đổi theo nghị quyết,
+            // hóa đơn in lại sau một năm phải ra đúng số đã giao cho khách hôm đó.
+            e.Property(x => x.TaxMode)
+                .HasDefaultValue(0)
+                .HasComment("Chế độ thuế đã áp dụng cho đơn. Đơn có trước khi hệ thống tách thuế mang giá trị 0.");
+            e.Property(x => x.TaxRatePercent)
+                .HasComment("Thuế suất % đã áp dụng cho đơn này.");
+            e.Property(x => x.NetAmount)
+                .HasComment("Tiền hàng chưa thuế. Luôn thỏa net_amount + tax_amount = grand_total.");
+            e.Property(x => x.TaxAmount)
+                .HasComment("Tiền thuế GTGT của đơn.");
             e.Property(x => x.StockDeducted)
                 .HasComment("Cờ chống trừ kho hai lần khi client retry hoặc người dùng bấm nhanh.");
             e.Property(x => x.StockReturned)
                 .HasComment("Cờ chống hoàn kho hai lần khi hủy đơn.");
+
+            // Webhook SePay tìm ngược ra đơn bằng đúng cột này, mỗi lần tiền về
+            // là một lần tra. Duy nhất chứ không chỉ là index: hai đơn trùng mã
+            // tham chiếu thì tiền của khách này có thể được ghi cho đơn khách kia.
+            e.HasIndex(x => x.PaymentRef).IsUnique().HasFilter("payment_ref IS NOT NULL");
+
+            e.Property(x => x.PaymentRef).HasMaxLength(20)
+                .HasComment("Nội dung chuyển khoản in trên mã QR, VD MCC7K2M9. Khóa đối soát của webhook SePay.");
+            e.Property(x => x.PaidAmount)
+                .HasComment("Số tiền thực nhận. Có thể lớn hơn grand_total khi khách chuyển dư.");
+            e.Property(x => x.PaymentGatewayId)
+                .HasComment("Id giao dịch SePay. Có giá trị = tiền do ngân hàng xác nhận tự động, không phải nhân viên bấm tay.");
 
             e.Ignore(x => x.GrossProfit);
 
@@ -482,6 +605,48 @@ public class AppDbContext : DbContext
                 .HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Product).WithMany()
                 .HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<PaymentTransaction>(e =>
+        {
+            e.ToTable("payment_transactions", t => t.HasComment(
+                "Nhật ký biến động số dư ngân hàng do SePay gửi qua webhook. GIỮ CẢ giao dịch " +
+                "không khớp đơn nào — tiền đã vào tài khoản mà hệ thống im lặng bỏ qua là " +
+                "trường hợp tệ nhất khi đối soát cuối ngày."));
+
+            // Chỉ mục DUY NHẤT này LÀ toàn bộ cơ chế chống ghi nhận trùng.
+            // SePay gửi lại tối đa 7 lần khi server trả lỗi ngoài dải 200-299;
+            // nếu lần đầu đã ghi xong rồi mới lỗi ở bước sau, lần gửi lại sẽ
+            // đâm vào đây và bị chặn ở tầng cơ sở dữ liệu, không phụ thuộc vào
+            // việc mã ứng dụng có nhớ kiểm tra hay không.
+            e.HasIndex(x => x.GatewayId).IsUnique();
+            e.HasIndex(x => x.OrderId);
+            e.HasIndex(x => x.TransactionDate);
+            e.HasIndex(x => x.MatchStatus);
+
+            e.Property(x => x.GatewayId)
+                .HasComment("Id giao dịch do SePay cấp. Duy nhất — chống ghi nhận một lần chuyển tiền hai lần.");
+            e.Property(x => x.Gateway).HasMaxLength(60).IsRequired();
+            e.Property(x => x.AccountNumber).HasMaxLength(40).IsRequired();
+            e.Property(x => x.SubAccount).HasMaxLength(40);
+            e.Property(x => x.TransferType).HasMaxLength(10).IsRequired()
+                .HasComment("in = tiền vào, out = tiền ra. Chỉ 'in' mới được xét thanh toán đơn.");
+            e.Property(x => x.Amount)
+                .HasComment("Số tiền giao dịch, đơn vị đồng.");
+            e.Property(x => x.Content).HasMaxLength(500).IsRequired()
+                .HasComment("Nội dung chuyển khoản nguyên văn từ ngân hàng.");
+            e.Property(x => x.ReferenceCode).HasMaxLength(100);
+            e.Property(x => x.DetectedRef).HasMaxLength(20)
+                .HasComment("Mã tham chiếu của quán dò ra từ nội dung. null = giao dịch không phải trả đơn.");
+            e.Property(x => x.Note).HasMaxLength(300)
+                .HasComment("Diễn giải tiếng Việt kết quả đối soát — hiện thẳng cho chủ quán đọc.");
+            e.Property(x => x.RawPayload).HasColumnType("jsonb")
+                .HasComment("Payload webhook nguyên văn. Dữ liệu tiền bạc do bên thứ ba gửi — luôn giữ bản gốc.");
+
+            // SetNull chứ không Cascade: xóa đơn KHÔNG được phép xóa mất bằng
+            // chứng tiền đã về tài khoản.
+            e.HasOne(x => x.Order).WithMany()
+                .HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.SetNull);
         });
 
         // ======================================================================

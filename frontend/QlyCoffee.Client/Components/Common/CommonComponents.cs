@@ -24,7 +24,7 @@ public class LogoMark : ComponentBase
     {
         builder.AddMarkupContent(0, $"""
             <svg width="{Size}" height="{Size}" viewBox="0 0 48 48" fill="none"
-                 class="{CssClass}" role="img" aria-label="Qly Coffee"
+                 class="{CssClass}" role="img" aria-label="Một Chút Coffee"
                  xmlns="http://www.w3.org/2000/svg">
               <path d="M12 16h24l-3 22a4 4 0 0 1-4 3.5H19a4 4 0 0 1-4-3.5L12 16Z"
                     stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>

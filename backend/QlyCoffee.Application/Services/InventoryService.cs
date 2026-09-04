@@ -33,9 +33,18 @@ public interface IInventoryService
     Task ReturnStockForOrderAsync(AppDbContext tx, Guid orderId, Guid actorId, CancellationToken ct = default);
     Task<int> ExpireOverdueLotsAsync(Guid storeId, CancellationToken ct = default);
     Task RecordWasteAsync(WasteCommand cmd, CancellationToken ct = default);
+    Task RecalculateAverageCostAsync(Guid ingredientId, CancellationToken ct = default);
 }
 
-/// <summary>Yêu cầu tiêu thụ nguyên liệu từ kho.</summary>
+/// <summary>
+/// Yêu cầu tiêu thụ nguyên liệu từ kho.
+/// <para>
+/// <c>Type</c> là loại bút toán ghi vào sổ cái, mặc định <c>SaleOut</c> — bán một
+/// ly cho khách. Sơ chế PHẢI truyền <c>ProductionOut</c>: lá trà rời kho để thành
+/// cốt trà thì không phải doanh thu, và giá vốn hàng bán không được tính nó hai
+/// lần (một lần lúc ủ, một lần nữa lúc bán ly trà làm từ cốt đó).
+/// </para>
+/// </summary>
 public record ConsumeRequest(
     Guid StoreId,
     Guid IngredientId,
@@ -43,7 +52,8 @@ public record ConsumeRequest(
     string ReferenceType,
     Guid ReferenceId,
     string IdempotencyKey,
-    Guid? ActorUserId = null);
+    Guid? ActorUserId = null,
+    MovementType Type = MovementType.SaleOut);
 
 /// <summary>Kết quả tiêu thụ: tổng giá vốn thực tế và các lô đã bị trừ.</summary>
 public record ConsumeResult(int TotalCost, IReadOnlyList<(Guid LotId, double Quantity)> ConsumedLots);
@@ -209,7 +219,7 @@ public class InventoryService : IInventoryService
                 StoreId       = req.StoreId,
                 IngredientId  = req.IngredientId,
                 LotId         = lot.Id,
-                Type          = MovementType.SaleOut,
+                Type          = req.Type,
                 QuantityDelta = -take,               // ÂM vì là xuất kho
                 UnitCost      = lot.UnitCost,
                 TotalCost     = lineCost,
@@ -317,11 +327,28 @@ public class InventoryService : IInventoryService
                 ? DateTime.UtcNow.Date.AddDays(days)
                 : null);
 
+        // Mã lô là DUY NHẤT trong một cửa hàng — đó là điều kiện để truy ngược
+        // được "lô nào đã bị bán vào những đơn nào". Kiểm ở đây để nhân viên
+        // nhận được câu tiếng Việt rõ ràng, thay vì để ràng buộc unique của
+        // database bắn ra một DbUpdateException lộ nguyên stack trace lên màn hình.
+        var lotCode = cmd.LotCode?.Trim();
+        if (!string.IsNullOrEmpty(lotCode))
+        {
+            var taken = await _db.InventoryLots
+                .AnyAsync(l => l.StoreId == cmd.StoreId && l.LotCode == lotCode, ct);
+
+            if (taken)
+                throw new BusinessRuleException(
+                    $"Mã lô \"{lotCode}\" đã được dùng cho một lô khác. " +
+                    "Mỗi lô phải có mã riêng để truy ngược được nguyên liệu đã bán đi đâu. " +
+                    "Để trống ô mã lô thì hệ thống tự sinh mã.");
+        }
+
         var lot = new InventoryLot
         {
             StoreId          = cmd.StoreId,
             IngredientId     = cmd.IngredientId,
-            LotCode          = cmd.LotCode ?? GenerateLotCode(ingredient.Sku),
+            LotCode          = string.IsNullOrEmpty(lotCode) ? GenerateLotCode(ingredient.Sku) : lotCode,
             ReceivedQuantity = baseQuantity,
             RemainingQuantity = baseQuantity,
             UnitCost         = cmd.UnitCost,
@@ -371,7 +398,14 @@ public class InventoryService : IInventoryService
     /// Dùng bình quân gia quyền thay vì giá lô mới nhất để giá vốn món không
     /// nhảy vọt mỗi lần nhập hàng giá cao.
     /// </para>
+    /// <para>
+    /// Công khai vì sơ chế cũng làm đổi giá vốn: mẻ cốt trà mới đắt hơn mẻ cũ thì
+    /// giá vốn ly trà sữa phải đổi theo, y như khi nhập lá trà giá mới.
+    /// </para>
     /// </summary>
+    public Task RecalculateAverageCostAsync(Guid ingredientId, CancellationToken ct = default)
+        => UpdateWeightedAverageCostAsync(ingredientId, ct);
+
     private async Task UpdateWeightedAverageCostAsync(Guid ingredientId, CancellationToken ct)
     {
         var lots = await _db.InventoryLots
@@ -452,19 +486,53 @@ public class InventoryService : IInventoryService
 
     /// <summary>
     /// Đánh dấu các lô đã quá hạn và ghi bút toán tiêu hủy.
-    /// Job buổi sáng gọi hàm này trước khi quán mở cửa.
+    /// <para>
+    /// HAI LOẠI HẠN, HAI CÁCH TÍNH — đây là chỗ dễ hiểu nhầm nhất của hàm này:
+    /// </para>
+    /// <para>
+    /// · Lô MUA VỀ có hạn ghi theo NGÀY, giờ đúng 00:00. "Hạn 15/08" nghĩa là
+    ///   dùng được HẾT ngày 15/08, nên chỉ quá hạn từ 16/08.
+    /// </para>
+    /// <para>
+    /// · Lô SƠ CHẾ có hạn ghi theo GIỜ ("14:30 hôm nay"). Mẻ cốt trà ủ lúc 08:30
+    ///   hạn 6 tiếng thì 14:30 là hỏng, không phải hết ngày. Áp quy tắc theo ngày
+    ///   cho nó nghĩa là cho phép bán trà thiu suốt buổi chiều.
+    /// </para>
+    /// <para>
+    /// Job buổi sáng gọi hàm này trước khi quán mở cửa, và chu kỳ ngắn trong ngày
+    /// gọi lại để bắt kịp các mẻ sơ chế — xem <c>ScheduledJobsService</c>.
+    /// Hàm chạy lại bao nhiêu lần cũng vô hại: lô đã chuyển Expired không lọt vào
+    /// truy vấn nữa.
+    /// </para>
     /// </summary>
     public async Task<int> ExpireOverdueLotsAsync(Guid storeId, CancellationToken ct = default)
     {
-        var today = DateTime.UtcNow.Date;
+        var now = DateTime.UtcNow;
+        var today = now.Date;
 
-        var overdue = await _db.InventoryLots
+        // Lọc thô ở database bằng điều kiện RỘNG NHẤT (quá hạn theo giờ), rồi
+        // lọc tinh trong bộ nhớ. Tập lô còn hạn dùng của một quán chỉ vài chục
+        // dòng nên rẻ, mà tránh phải viết biểu thức ngày-giờ khó đọc trong SQL.
+        var candidates = await _db.InventoryLots
             .Where(l => l.StoreId == storeId
                      && l.Status == LotStatus.Active
                      && l.RemainingQuantity > 0
                      && l.ExpiryDate != null
-                     && l.ExpiryDate < today)
+                     && l.ExpiryDate < now)
             .ToListAsync(ct);
+
+        var overdue = candidates
+            .Where(l =>
+            {
+                var expiry = l.ExpiryDate!.Value;
+
+                // Có phần giờ phút = hạn của mẻ sơ chế → so tới từng phút.
+                // Đúng 00:00 = hạn theo ngày → còn dùng được hết ngày hôm đó.
+                return expiry.TimeOfDay != TimeSpan.Zero
+                    ? expiry < now
+                    : expiry.Date < today;
+            })
+            .ToList();
 
         if (overdue.Count == 0) return 0;
 
@@ -485,7 +553,9 @@ public class InventoryService : IInventoryService
                 TotalCost      = (int)Math.Round(qty * lot.UnitCost),
                 ReferenceType  = "EXPIRY",
                 ReferenceId    = lot.Id,
-                Reason         = $"Quá hạn sử dụng ngày {lot.ExpiryDate:dd/MM/yyyy}",
+                Reason         = lot.ExpiryDate!.Value.TimeOfDay != TimeSpan.Zero
+                                     ? $"Quá hạn lúc {lot.ExpiryDate:HH:mm dd/MM/yyyy}"
+                                     : $"Quá hạn sử dụng ngày {lot.ExpiryDate:dd/MM/yyyy}",
                 IdempotencyKey = $"EXPIRE:{lot.Id}",
                 OccurredAt     = DateTime.UtcNow
             });

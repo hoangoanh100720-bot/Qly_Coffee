@@ -32,4 +32,4 @@ Disallow: /_content/
 User-agent: Googlebot-Image
 Allow: /img/
 
-Sitemap: https://qlycoffee.vn/sitemap.xml
+Sitemap: https://motchutcoffee.vn/sitemap.xml

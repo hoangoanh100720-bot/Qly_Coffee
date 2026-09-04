@@ -216,7 +216,17 @@ public class RecipeService : IRecipeService
 
 public interface IAvailabilityService
 {
-    Task<(int MaxServings, string? BlockingIngredient)> ComputeMaxServingsAsync(
+    /// <summary>
+    /// <c>BlockingReason</c> là câu ĐÃ SẴN SÀNG HIỂN THỊ, không phải tên nguyên liệu trần.
+    /// <para>
+    /// Lý do: ba tình huống chặn bán cần ba câu khác nhau vì chúng dẫn nhân viên
+    /// tới ba hành động khác nhau — "Hết Sữa tươi" thì gọi nhà cung cấp,
+    /// "Chưa sơ chế Cốt hồng trà" thì đi ủ một bình, "Chưa có công thức" thì báo
+    /// quản lý. Ghép chuỗi ở từng nơi gọi thì sớm muộn cũng ra
+    /// "Hết Chưa có công thức định lượng".
+    /// </para>
+    /// </summary>
+    Task<(int MaxServings, string? BlockingReason)> ComputeMaxServingsAsync(
         Guid productId, Guid? variantId = null, CancellationToken ct = default);
     Task RecomputeForIngredientsAsync(IEnumerable<Guid> ingredientIds, CancellationToken ct = default);
     Task RecomputeAllAsync(Guid storeId, CancellationToken ct = default);
@@ -241,7 +251,7 @@ public class AvailabilityService : IAvailabilityService
     /// được ly không đá.
     /// </para>
     /// </summary>
-    public async Task<(int MaxServings, string? BlockingIngredient)> ComputeMaxServingsAsync(
+    public async Task<(int MaxServings, string? BlockingReason)> ComputeMaxServingsAsync(
         Guid productId, Guid? variantId = null, CancellationToken ct = default)
     {
         var recipe = await _db.RecipeItems
@@ -278,7 +288,13 @@ public class AvailabilityService : IAvailabilityService
             if (possible < min)
             {
                 min = possible;
-                blocking = item.Ingredient.Name;
+
+                // Bán thành phẩm hết thì việc phải làm là ĐI Ủ MỘT MẺ, không phải
+                // gọi nhà cung cấp. Câu chữ ở đây là thứ nhân viên đọc rồi hành
+                // động theo, nên nó phải nói đúng việc cần làm.
+                blocking = item.Ingredient.IsPrepared
+                    ? $"Chưa sơ chế {item.Ingredient.Name}"
+                    : $"Hết {item.Ingredient.Name}";
             }
         }
 
@@ -327,7 +343,9 @@ public class AvailabilityService : IAvailabilityService
             .ExecuteUpdateAsync(s => s
                 .SetProperty(p => p.MaxServings, maxServings)
                 .SetProperty(p => p.IsAvailable, maxServings > 0)
+                // blocking đã là câu hoàn chỉnh ("Hết Sữa tươi" / "Chưa sơ chế
+                // Cốt hồng trà"), không ghép thêm tiền tố ở đây.
                 .SetProperty(p => p.UnavailableReason,
-                    maxServings > 0 ? null : $"Hết {blocking}"), ct);
+                    maxServings > 0 ? null : blocking), ct);
     }
 }

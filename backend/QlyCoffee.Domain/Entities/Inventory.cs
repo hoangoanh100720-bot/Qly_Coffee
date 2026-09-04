@@ -114,6 +114,21 @@ public class Ingredient : StoreScopedEntity
     /// <summary>Đang sử dụng hay đã ngừng dùng.</summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// BÁN THÀNH PHẨM — không mua ngoài mà do quán tự nấu/ủ từ nguyên liệu thô.
+    /// VD: cốt hồng trà, cà phê phin cốt, nước đường, kem muối.
+    /// <para>
+    /// Nguyên liệu như vậy chỉ vào kho qua màn hình <c>Sơ chế</c>, và mỗi mẻ là
+    /// một lô riêng có hạn dùng tính bằng GIỜ (xem <see cref="PrepRecipe"/>).
+    /// </para>
+    /// <para>
+    /// Hết bán thành phẩm thì món dùng nó phải báo "chưa sơ chế" chứ không phải
+    /// "hết hàng" — hai câu đó dẫn nhân viên tới hai hành động khác hẳn nhau:
+    /// một bên là đi ủ mẻ mới, một bên là gọi nhà cung cấp.
+    /// </para>
+    /// </summary>
+    public bool IsPrepared { get; set; }
+
     /// <summary>Ghi chú vận hành. VD: "Bảo quản ngăn mát 2-6°C".</summary>
     public string? Note { get; set; }
 
@@ -207,6 +222,15 @@ public class InventoryLot : StoreScopedEntity
     public Guid? SupplierId { get; set; }
     public Guid? PurchaseOrderItemId { get; set; }
 
+    /// <summary>
+    /// Công thức sơ chế đã tạo ra lô này. <c>null</c> = lô mua từ nhà cung cấp.
+    /// <para>
+    /// Có cột này thì truy được ngược: mẻ cốt trà hôm nay đắng bất thường là do
+    /// công thức nào, ai làm, lúc mấy giờ, ăn hết bao nhiêu lá trà của lô nào.
+    /// </para>
+    /// </summary>
+    public Guid? PrepRecipeId { get; set; }
+
     /// <summary>Ghi chú riêng của lô. VD: "Hàng khuyến mãi, cận hạn".</summary>
     public string? Note { get; set; }
 
@@ -223,6 +247,7 @@ public class InventoryLot : StoreScopedEntity
 
     public Ingredient? Ingredient { get; set; }
     public Supplier? Supplier { get; set; }
+    public PrepRecipe? PrepRecipe { get; set; }
     public ICollection<StockMovement> Movements { get; set; } = new List<StockMovement>();
 }
 
@@ -262,7 +287,7 @@ public class StockMovement : BaseEntity
 
     // --- Truy vết nguồn gốc -----------------------------------------------------
 
-    /// <summary>Loại chứng từ nguồn: "ORDER" | "PURCHASE" | "COUNT" | "WASTE" | "EXPIRY".</summary>
+    /// <summary>Loại chứng từ nguồn: "ORDER" | "PURCHASE" | "PREP" | "COUNT" | "WASTE" | "EXPIRY".</summary>
     public string? ReferenceType { get; set; }
 
     /// <summary>Id của chứng từ nguồn (đơn hàng, phiếu nhập, phiếu kiểm kê...).</summary>

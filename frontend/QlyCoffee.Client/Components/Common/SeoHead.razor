@@ -49,7 +49,7 @@
 
     @* --- Open Graph: Facebook, Zalo, Messenger, LinkedIn ------------------ *@
     <meta property="og:type" content="@OgType" />
-    <meta property="og:site_name" content="Qly Coffee" />
+    <meta property="og:site_name" content="Một Chút Coffee" />
     <meta property="og:locale" content="vi_VN" />
     <meta property="og:title" content="@FullTitle" />
     <meta property="og:description" content="@Description" />
@@ -70,7 +70,7 @@
 
 @code {
     /// <summary>
-    /// Tiêu đề riêng của trang, KHÔNG kèm tên quán — component tự nối "— Qly Coffee".
+    /// Tiêu đề riêng của trang, KHÔNG kèm tên quán — component tự nối "— Một Chút Coffee".
     /// Để trống thì dùng tiêu đề mặc định của trang chủ.
     /// Độ dài nên dưới 60 ký tự, quá dài Google sẽ cắt bằng dấu ba chấm.
     /// </summary>
@@ -107,14 +107,14 @@
     /// </summary>
     [Parameter] public string OgType { get; set; } = "website";
 
-    private const string DefaultTitle = "Qly Coffee — Cà phê pha phin & trà trái cây";
+    private const string DefaultTitle = "Một Chút Coffee — Cà phê pha phin & trà trái cây";
     private const string DefaultDescription =
         "Cà phê pha phin, trà trái cây tươi và đá xay tại TP.HCM. Đặt món online, "
       + "biết trước món còn hay hết, tới lấy là có. Mở cửa 07:00 – 22:00 mỗi ngày.";
 
     /// <summary>Tiêu đề đầy đủ hiện trên tab trình duyệt và trên Google.</summary>
     private string FullTitle =>
-        string.IsNullOrWhiteSpace(Title) ? DefaultTitle : $"{Title} — Qly Coffee";
+        string.IsNullOrWhiteSpace(Title) ? DefaultTitle : $"{Title} — Một Chút Coffee";
 
     /// <summary>
     /// URL chuẩn tuyệt đối. Phải là tuyệt đối: thẻ canonical và og:url dùng
