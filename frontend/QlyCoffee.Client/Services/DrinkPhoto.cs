@@ -187,7 +187,13 @@ public static class DrinkPhoto
          || s.Contains("macchiato") || s.Contains("americano")
          || s.Contains("cold brew") || s.Contains("bạc xỉu"))
         {
-            return s.Contains("nóng") || s.Contains("hot") ? CaPheNong : CaPheDa;
+            // "kem trứng" nằm ở đây vì cà phê trứng LUÔN uống nóng — đó là cả
+            // điểm của món: lớp kem trứng đánh bông chỉ giữ được độ bông khi
+            // ly còn ấm. Tên món không có chữ "nóng" nên nếu không liệt kê
+            // riêng, nó sẽ nhận ảnh cà phê đá.
+            return s.Contains("nóng") || s.Contains("hot") || s.Contains("kem trứng")
+                ? CaPheNong
+                : CaPheDa;
         }
 
         // ---- 10. Trà thuần & thảo mộc: đứng trước trà trái cây ----------------

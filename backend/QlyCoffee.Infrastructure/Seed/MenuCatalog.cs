@@ -296,15 +296,15 @@ public static class MenuCatalog
         //  Hao hụt 2% là phần đọng lại trong bình và rớt ra ngoài lúc rót. Phần
         //  hao hụt của khâu ủ (lá trà ngậm nước) KHÔNG nằm ở đây — nó đã nằm sẵn
         //  trong sản lượng mỗi mẻ. Ghi cả hai chỗ là tính hao hụt hai lần.
-        new("PRE-TEA-BLK", "Cốt hồng trà (đã ủ)", IngredientCategory.Tea,
+        new("PRE-TEA-BLK", "Cốt hồng trà", IngredientCategory.Tea,
             BaseUnit.Milliliter, "#A64B1E", "syrup", 10, 1, 1, 0.02, 400, 800, Prepared: true),
-        new("PRE-TEA-OOL", "Cốt trà ô long (đã ủ)", IngredientCategory.Tea,
+        new("PRE-TEA-OOL", "Cốt trà ô long", IngredientCategory.Tea,
             BaseUnit.Milliliter, "#96944A", "syrup", 15, 1, 1, 0.02, 400, 800, Prepared: true),
-        new("PRE-TEA-JAS", "Cốt trà lài (đã ủ)", IngredientCategory.Tea,
+        new("PRE-TEA-JAS", "Cốt trà lài", IngredientCategory.Tea,
             BaseUnit.Milliliter, "#C2BE72", "syrup", 12, 1, 1, 0.02, 300, 600, Prepared: true),
-        new("PRE-TEA-GRN", "Cốt lục trà (đã ủ)", IngredientCategory.Tea,
+        new("PRE-TEA-GRN", "Cốt lục trà", IngredientCategory.Tea,
             BaseUnit.Milliliter, "#9BB35C", "syrup", 11, 1, 1, 0.02, 350, 700, Prepared: true),
-        new("PRE-TEA-CHA", "Cốt hoa cúc (đã hãm)", IngredientCategory.Tea,
+        new("PRE-TEA-CHA", "Cốt hoa cúc", IngredientCategory.Tea,
             BaseUnit.Milliliter, "#EBD681", "syrup", 9, 1, 1, 0.02, 220, 440, Prepared: true),
         new("PRE-COF-PHI", "Cà phê phin cốt", IngredientCategory.Coffee,
             BaseUnit.Milliliter, "#2E1B0F", "syrup", 90, 1, 1, 0.02, 80, 160, Prepared: true),
@@ -462,7 +462,7 @@ public static class MenuCatalog
     {
         // --- Cà phê -----------------------------------------------------------
         ["ca-phe-kem-trung"] =
-            "Uống nóng ngay khi kem còn bông; chấm bánh mì que pate vào lớp kem trứng đúng kiểu Hà Nội.",
+            "Uống nóng ngay khi kem còn bông; chấm bánh mì que hoặc quẩy vào lớp kem trứng đúng kiểu Hà Nội.",
         ["ca-phe-muoi"] =
             "Đừng khuấy vội — hớp ngụm đầu qua lớp kem muối, ăn kèm croissant bơ là chuẩn bài.",
         ["bac-xiu"] =
