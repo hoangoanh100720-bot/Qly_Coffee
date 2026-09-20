@@ -374,6 +374,20 @@ public static class MenuSync
                 // doanh (đồ ăn thì mãi mãi không có size L), nên đồng bộ luôn.
                 existing.ServeStyle = (int)spec.Serve;
 
+                // Món MỞ topping trong thực đơn nguồn mà chưa gắn nhóm Topping thì
+                // gắn thêm. CHỈ THÊM, không bao giờ gỡ: chủ quán tự tắt topping ở
+                // món nào thì đó là quyết định của quán, lần đồng bộ sau không
+                // được bật lại. Và chỉ chạy khi cố ý làm mới (MENU_SYNC_RECIPES),
+                // cùng lúc với công thức — hai thứ đi cùng nhau khi đổi thực đơn.
+                if (spec.AllowTopping && spec.Serve != ServeStyle.Food
+                    && !await db.ProductModifiers.AnyAsync(
+                        l => l.ProductId == existing.Id && l.ModifierGroupId == toppingGroup.Id, ct))
+                {
+                    db.ProductModifiers.Add(new ProductModifier
+                        { ProductId = existing.Id, ModifierGroupId = toppingGroup.Id, SortOrder = 1 });
+                    logger.LogInformation("Mở topping cho món {Name}", existing.Name);
+                }
+
                 existing.UpdatedAt = DateTime.UtcNow;
                 refreshedRecipes++;
                 continue;
@@ -669,12 +683,18 @@ public static class MenuSync
 
         var allProducts = await db.Products.Where(p => p.StoreId == storeId).ToListAsync(ct);
 
+        // In kèm TRẠNG THÁI CỜ chứ không chỉ số đếm. "0 công thức làm mới" một
+        // mình là câu vô nghĩa: nó vừa có thể là "cờ đang tắt", vừa có thể là
+        // "cờ bật nhưng chẳng có gì phải sửa". Hai tình huống đó cần hai hành
+        // động khác hẳn nhau, mà không phân biệt được thì phải đi đọc mã nguồn.
         logger.LogInformation(
             "Đồng bộ thực đơn: +{Ing} nguyên liệu, +{Cat} danh mục, +{Prod} món, "
-          + "{Recipe} công thức làm mới, +{Prep} công thức sơ chế, "
-          + "{PrepRefresh} công thức sơ chế làm mới, {Lot} lô khởi đầu",
+          + "{Recipe} công thức làm mới ({RecipeFlag}), +{Prep} công thức sơ chế, "
+          + "{PrepRefresh} công thức sơ chế làm mới, {Lot} lô khởi đầu ({StockFlag})",
             newIngredients.Count, newCategoryCount, newProducts.Count,
-            refreshedRecipes, newPrepCount, refreshedPrepCount, openingLots);
+            refreshedRecipes, refreshRecipes ? "MENU_SYNC_RECIPES=true" : "MENU_SYNC_RECIPES=false",
+            newPrepCount, refreshedPrepCount,
+            openingLots, openingStock ? "MENU_SYNC_OPENING_STOCK=true" : "MENU_SYNC_OPENING_STOCK=false");
 
         if (newPrepCount > 0)
             logger.LogInformation(

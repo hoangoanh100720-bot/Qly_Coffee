@@ -98,6 +98,26 @@ public class InventoryController : BaseApiController
         return Ok(result);
     }
 
+    /// <summary>
+    /// Danh sách nguyên liệu cần nhập của một ngày — hiện trên trang Kế hoạch và
+    /// trang Nhập kho. Đặt ở đây chứ không ở PlansController vì nhân viên kho
+    /// (vai trò Staff) cũng cần xem để đi nhập, mà trang Kế hoạch chỉ dành cho quản lý.
+    /// </summary>
+    /// <param name="date">"yyyy-MM-dd". Bỏ trống = hôm nay.</param>
+    [HttpGet("restock")]
+    public async Task<IActionResult> GetRestock(
+        [FromQuery] string? date,
+        [FromServices] IRestockService restock,
+        CancellationToken ct)
+    {
+        if (!string.IsNullOrEmpty(date) && !DateTime.TryParseExact(date, "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _))
+            return Fail<RestockListDto>(400, "VALIDATION", "Ngày phải có dạng yyyy-MM-dd.");
+
+        return Ok(await restock.GetRestockListAsync(CurrentStoreId, date, ct));
+    }
+
     /// <summary>Danh sách lô hàng, sắp theo FEFO (hết hạn sớm nhất lên đầu).</summary>
     [HttpGet("lots")]
     public async Task<IActionResult> GetLots(CancellationToken ct)
@@ -147,7 +167,10 @@ public class InventoryController : BaseApiController
 
     /// <summary>Nhập kho — tạo lô mới và cập nhật giá vốn bình quân.</summary>
     [HttpPost("receive")]
-    public async Task<IActionResult> Receive([FromBody] ReceiveStockRequest req, CancellationToken ct)
+    public async Task<IActionResult> Receive(
+        [FromBody] ReceiveStockRequest req,
+        [FromServices] IRestockService restock,
+        CancellationToken ct)
     {
         if (req.Quantity <= 0)
             return Fail<object>(400, "VALIDATION", "Số lượng nhập phải lớn hơn 0.");
@@ -164,6 +187,10 @@ public class InventoryController : BaseApiController
             // Nhập hàng làm đổi giá vốn nguyên liệu → giá vốn mọi món dùng nó cũng đổi
             await _recipe.RecomputeAllProductCostsAsync(CurrentStoreId, ct);
             await _availability.RecomputeForIngredientsAsync(new[] { req.IngredientId }, ct);
+
+            // Hàng đã về thì đóng việc "cần nhập" lại. Không làm bước này thì
+            // một lần chặn đơn lúc sáng còn kêu tới hết ngày dù kho đã đầy.
+            await restock.MarkRestockedAsync(CurrentStoreId, req.IngredientId, lot.ReceivedQuantity, ct);
 
             return Ok(new { lot.Id, lot.LotCode, lot.RemainingQuantity, lot.ExpiryDate });
         }
@@ -289,7 +316,147 @@ public class ProductsAdminController : BaseApiController
             .OrderBy(p => p.Category!.SortOrder).ThenBy(p => p.SortOrder)
             .ToListAsync(ct);
 
-        return Ok(products.Select(MapProduct).ToList());
+        // Số topping mỗi món nhận — để bảng món hiện "+11 topping" ngay trên dòng,
+        // khỏi phải mở từng món ra mới biết món nào cho gọi thêm.
+        var toppingCounts = await _db.ProductModifiers
+            .AsNoTracking()
+            .Where(pm => pm.Group!.Kind == ModifierGroupKinds.Topping)
+            .SelectMany(pm => pm.Group!.Modifiers
+                .Where(m => m.IsActive)
+                .Select(m => new { pm.ProductId, m.Id }))
+            .GroupBy(x => x.ProductId)
+            .Select(g => new { ProductId = g.Key, Count = g.Select(x => x.Id).Distinct().Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Count, ct);
+
+        return Ok(products
+            .Select(p => MapProduct(p, toppingCounts.GetValueOrDefault(p.Id)))
+            .ToList());
+    }
+
+    /// <summary>
+    /// Topping món này nhận được, mỗi cái kèm công thức trừ kho của nó.
+    /// Chỉ lấy nhóm loại <c>topping</c> — mức đường, mức đá không tốn nguyên liệu.
+    /// </summary>
+    private async Task<List<ProductToppingDto>> LoadToppingsAsync(Guid productId, CancellationToken ct)
+    {
+        var modifiers = await _db.Modifiers
+            .AsNoTracking()
+            .Where(m => m.Group!.Kind == ModifierGroupKinds.Topping
+                     && m.Group.ProductLinks.Any(pl => pl.ProductId == productId))
+            .Include(m => m.RecipeItems).ThenInclude(r => r.Ingredient)
+            .OrderBy(m => m.SortOrder)
+            .ToListAsync(ct);
+
+        return modifiers.Select(MapTopping).ToList();
+    }
+
+    /// <summary>
+    /// Một topping kèm công thức trừ kho của nó. Tách riêng vì cả màn hình soạn
+    /// một món lẫn bảng xem công thức cả thực đơn đều dựng đúng DTO này.
+    /// </summary>
+    private static ProductToppingDto MapTopping(Domain.Entities.Modifier m) => new(
+        m.Id, m.Name, m.PriceDelta, m.ColorHex, m.IsActive,
+        m.RecipeItems
+            .Where(r => r.Ingredient is not null)
+            .Select(r => new RecipeLineDto
+            {
+                Id = r.Id,
+                IngredientId = r.IngredientId,
+                IngredientName = r.Ingredient!.Name,
+                IngredientColorHex = r.Ingredient.ColorHex,
+                IngredientIconKey = r.Ingredient.IconKey,
+                UnitLabel = WasteRiskService.UnitLabel(r.Ingredient.BaseUnit),
+                Quantity = r.Quantity,
+                UnitCost = r.Ingredient.AverageUnitCost,
+                WastageRate = r.Ingredient.WastageRate
+            })
+            .ToList());
+
+    /// <summary>
+    /// Công thức của MỌI món trong MỘT lần gọi — dùng khi chủ quán bấm chip
+    /// "Đã có công thức" để xem định lượng cả thực đơn cùng lúc.
+    /// <para>
+    /// Không tái dùng <see cref="GetRecipe"/> cho việc này: endpoint đó phục vụ
+    /// màn hình SOẠN một món nên nạp kèm cả danh sách kho, và hỏi tồn kho từng
+    /// nguyên liệu một. Gọi nó 56 lần là vài nghìn truy vấn chỉ để mở một bảng.
+    /// Ở đây tồn kho được gom bằng MỘT truy vấn GROUP BY, topping bằng một truy vấn.
+    /// </para>
+    /// </summary>
+    [HttpGet("recipes")]
+    public async Task<IActionResult> GetAllRecipes(CancellationToken ct)
+    {
+        var items = await _db.RecipeItems
+            .AsNoTracking()
+            .Include(r => r.Ingredient)
+            .Where(r => r.Product!.StoreId == CurrentStoreId && r.Ingredient != null)
+            .OrderBy(r => r.SortOrder)
+            .ToListAsync(ct);
+
+        var ingredientIds = items.Select(r => r.IngredientId).Distinct().ToList();
+
+        var stock = await _db.InventoryLots
+            .AsNoTracking()
+            .Where(l => ingredientIds.Contains(l.IngredientId)
+                     && l.Status == LotStatus.Active
+                     && l.RemainingQuantity > 0)
+            .GroupBy(l => l.IngredientId)
+            .Select(g => new { IngredientId = g.Key, Total = g.Sum(l => l.RemainingQuantity) })
+            .ToDictionaryAsync(x => x.IngredientId, x => x.Total, ct);
+
+        var lines = items
+            .GroupBy(r => r.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(r => new RecipeLineDto
+                    {
+                        Id = r.Id,
+                        IngredientId = r.IngredientId,
+                        IngredientName = r.Ingredient!.Name,
+                        IngredientColorHex = r.Ingredient.ColorHex,
+                        IngredientIconKey = r.Ingredient.IconKey,
+                        UnitLabel = WasteRiskService.UnitLabel(r.Ingredient.BaseUnit),
+                        Quantity = r.Quantity,
+                        IsOptional = r.IsOptional,
+                        Note = r.Note,
+                        UnitCost = r.Ingredient.AverageUnitCost,
+                        WastageRate = r.Ingredient.WastageRate,
+                        CurrentStock = stock.GetValueOrDefault(r.IngredientId)
+                    })
+                    // Dòng bắt buộc lên trước, dòng tùy chọn (đá, đường) xuống cuối —
+                    // cùng thứ tự với khi mở từng món, để hai cách xem không lệch nhau.
+                    .OrderBy(l => l.IsOptional)
+                    .ToList());
+
+        // Topping: một món nhận những topping thuộc các NHÓM topping gắn với nó.
+        var links = await _db.ProductModifiers
+            .AsNoTracking()
+            .Where(pl => pl.Group!.Kind == ModifierGroupKinds.Topping
+                      && pl.Product!.StoreId == CurrentStoreId)
+            .Select(pl => new { pl.ProductId, pl.ModifierGroupId })
+            .ToListAsync(ct);
+
+        var groupIds = links.Select(l => l.ModifierGroupId).Distinct().ToList();
+
+        var modifiers = await _db.Modifiers
+            .AsNoTracking()
+            .Where(m => groupIds.Contains(m.ModifierGroupId))
+            .Include(m => m.RecipeItems).ThenInclude(r => r.Ingredient)
+            .OrderBy(m => m.SortOrder)
+            .ToListAsync(ct);
+
+        var toppingsByGroup = modifiers
+            .GroupBy(m => m.ModifierGroupId)
+            .ToDictionary(g => g.Key, g => g.Select(MapTopping).ToList());
+
+        var toppings = links
+            .GroupBy(l => l.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.SelectMany(l => toppingsByGroup.GetValueOrDefault(l.ModifierGroupId)
+                                       ?? new List<ProductToppingDto>())
+                      .ToList());
+
+        return Ok(new { Lines = lines, Toppings = toppings });
     }
 
     /// <summary>
@@ -299,7 +466,9 @@ public class ProductsAdminController : BaseApiController
     /// đúng những con số này — tách ra hai nơi là sớm muộn lệch nhau.
     /// </para>
     /// </summary>
-    private static ProductAdminDto MapProduct(Domain.Entities.Product p)
+    private static ProductAdminDto MapProduct(Domain.Entities.Product p) => MapProduct(p, 0);
+
+    private static ProductAdminDto MapProduct(Domain.Entities.Product p, int toppingCount)
     {
         var targetRatio = p.ServeStyle == 2
             ? Pricing.FoodCostRatioPercent
@@ -316,7 +485,8 @@ public class ProductsAdminController : BaseApiController
             targetRatio,
             Pricing.Suggest(p.ComputedCost, targetRatio),
             Pricing.CostRatioPercent(p.BasePrice, p.ComputedCost),
-            Pricing.Verdict(p.BasePrice, p.ComputedCost, targetRatio));
+            Pricing.Verdict(p.BasePrice, p.ComputedCost, targetRatio),
+            toppingCount);
     }
 
     /// <summary>
@@ -428,9 +598,10 @@ public class ProductsAdminController : BaseApiController
         // p nạp bằng AsNoTracking nên RecipeItems rỗng — gán lại để MapProduct
         // đếm đúng số dòng công thức thay vì báo 0.
         p.RecipeItems = recipeItems;
-        var dto = MapProduct(p);
+        var toppings = await LoadToppingsAsync(id, ct);
+        var dto = MapProduct(p, toppings.Count(t => t.IsActive));
 
-        return Ok(new { Product = dto, Lines = lines, Ingredients = ingredientDtos });
+        return Ok(new { Product = dto, Lines = lines, Ingredients = ingredientDtos, Toppings = toppings });
     }
 
     /// <summary>

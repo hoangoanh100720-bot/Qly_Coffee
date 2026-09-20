@@ -172,6 +172,30 @@ về **đúng những lô** đã bị trừ.
 
 ---
 
+## Hết nguyên liệu giữa ca thì làm gì
+
+Quán trà sữa hết trân châu lúc 4 giờ chiều là chuyện hằng ngày. Màn hình quầy
+không chỉ báo **"Hết"** — nó trả lời câu hỏi *tiếp theo làm gì*:
+
+| Nhãn trên ô món | Nghĩa | Nhân viên làm gì |
+|---|---|---|
+| **Nấu ~25′** (màu nhấn) | Nấu thêm nhanh hơn `POS_PREP_QUICK_MINUTES` | Bấm **+**, báo khách chờ 25 phút |
+| **Tạm ngưng** (đỏ) | Nấu lâu quá, hoặc phải nhập hàng | Xin lỗi khách. Vẫn bấm **+** được để nấu cho ca sau |
+| **Hết** | Hàng chờ pha đã chiếm hết chỗ | Chờ pha xong là bán tiếp |
+
+Nút **+** ngay trên ô món và cạnh topping trong khay chạy **một mẻ sơ chế thật**:
+trừ nguyên liệu thô, tạo lô bán thành phẩm mới kèm hạn dùng, ghi bút toán kho —
+cùng đường mà trang [Sơ chế](#) đi. Đặt nút ở quầy vì thiếu hàng chỉ lộ ra đúng
+lúc có khách đứng trước mặt; bỏ khách chạy sang trang khác là mất cả mạch bán hàng.
+
+Cần nửa mẻ hay ba mẻ thì vào `/admin/so-che` — ở quầy giữa lúc đông khách, thêm
+một ô nhập số là thêm một chỗ bấm nhầm.
+
+> **Trân châu và pudding là bán thành phẩm**, không phải hàng nhập: quán nấu từ
+> trân châu khô. Vì vậy chúng chỉ vào kho qua màn hình Sơ chế, hạn dùng tính bằng
+> **giờ** chứ không phải ngày — trân châu để qua đêm thì cứng, sáng hôm sau nhai
+> như hạt sạn.
+
 ## Giá bán, giá vốn và thuế GTGT
 
 **Giá vốn không nhập tay.** Nó là số dẫn xuất từ công thức định lượng:

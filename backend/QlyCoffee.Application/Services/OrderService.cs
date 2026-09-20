@@ -60,6 +60,7 @@ public class OrderService : IOrderService
     private readonly IInventoryService _inventory;
     private readonly IAvailabilityService _availability;
     private readonly IBarQueueService _queue;
+    private readonly IRestockService _restock;
     private readonly ILogger<OrderService> _logger;
 
     public OrderService(
@@ -68,6 +69,7 @@ public class OrderService : IOrderService
         IInventoryService inventory,
         IAvailabilityService availability,
         IBarQueueService queue,
+        IRestockService restock,
         ILogger<OrderService> logger)
     {
         _db = db;
@@ -75,6 +77,7 @@ public class OrderService : IOrderService
         _inventory = inventory;
         _availability = availability;
         _queue = queue;
+        _restock = restock;
         _logger = logger;
     }
 
@@ -110,8 +113,32 @@ public class OrderService : IOrderService
             }
         }
 
-        if (shortages.Count > 0)
-            throw new StockShortageException(shortages);
+        // Kiểm tra theo CẢ BILL, gộp nguyên liệu của mọi món. Kiểm từng món
+        // riêng lẻ thì hai món cùng dùng sữa đều "đủ" dù cộng lại là thiếu, và
+        // mỗi món chỉ nêu được một nguyên liệu chặn nó. Bản gộp này liệt kê ĐỦ
+        // mọi nguyên liệu thiếu trong một lần — nhân viên không phải bấm lại
+        // nhiều lần để lần lượt phát hiện từng thứ.
+        var requirements = await _recipe.AggregateOrderAsync(
+            req.Items.Select(i => new ExplodeRequest(
+                i.ProductId, i.VariantId, i.ModifierIds, i.Quantity)), ct);
+
+        var missing = await _restock.FindShortagesAsync(storeId, null, requirements, ct: ct);
+
+        if (shortages.Count > 0 || missing.Count > 0)
+        {
+            if (missing.Count > 0)
+            {
+                var names = await _db.Products.AsNoTracking()
+                    .Where(p => req.Items.Select(i => i.ProductId).Contains(p.Id))
+                    .Select(p => p.Name)
+                    .ToListAsync(ct);
+
+                // Ghi lại để trang Kế hoạch gom vào danh sách cần nhập hôm nay
+                await _restock.RecordShortagesAsync(storeId, missing, names, ct);
+            }
+
+            throw new StockShortageException(shortages, missing);
+        }
 
         // ---- Dựng đơn -------------------------------------------------------
         var order = new Order
@@ -363,6 +390,16 @@ public class OrderService : IOrderService
 
             var requirements = await _recipe.AggregateOrderAsync(requests, ct);
 
+            // ---- Kiểm đủ TẤT CẢ trước khi trừ bất cứ thứ gì ------------------
+            // ConsumeFefoAsync tự chặn khi thiếu, nhưng chặn ở nguyên liệu ĐẦU
+            // TIÊN thiếu rồi dừng. Kiểm gộp trước để người pha thấy một lần đủ
+            // cả danh sách. Không trừ phần hàng chờ: ly này đã pha xong rồi.
+            var missing = await _restock.FindShortagesAsync(
+                order.StoreId, order.Id, requirements, countQueued: false, ct: ct);
+
+            if (missing.Count > 0)
+                throw new IngredientShortageException(missing);
+
             // ---- Trừ kho theo FEFO ------------------------------------------
             var costTotal = 0;
             foreach (var req in requirements)
@@ -408,6 +445,32 @@ public class OrderService : IOrderService
 
             return order;
         }
+        catch (IngredientShortageException ex)
+        {
+            await transaction.RollbackAsync(ct);
+
+            // Ghi SAU khi hoàn tác — ghi bên trong transaction thì cũng bị cuốn
+            // ngược theo, và danh sách cần nhập sẽ không bao giờ biết chuyện này.
+            // Chưa có thay đổi nào trên đơn trước chỗ ném lỗi, xóa bộ theo dõi là an toàn.
+            _db.ChangeTracker.Clear();
+
+            // Hỏng ở bước ghi nhật ký thì bỏ qua, KHÔNG để nó đè mất lỗi thiếu
+            // nguyên liệu mà người pha cần thấy.
+            try
+            {
+                var info = await _db.Orders.AsNoTracking().IgnoreQueryFilters()
+                    .Where(o => o.Id == orderId)
+                    .Select(o => new { o.StoreId, Names = o.Items.Select(i => i.ProductName).ToList() })
+                    .FirstAsync(ct);
+
+                await _restock.RecordShortagesAsync(info.StoreId, ex.Shortages, info.Names, ct);
+            }
+            catch (Exception logEx)
+            {
+                _logger.LogWarning(logEx, "Không ghi được nhật ký thiếu nguyên liệu cho đơn {OrderId}", orderId);
+            }
+            throw;
+        }
         catch
         {
             await transaction.RollbackAsync(ct);
@@ -430,58 +493,17 @@ public class OrderService : IOrderService
                 i.ProductId, i.VariantId, ParseModifierIds(i.ModifiersJson), i.Quantity)), ct);
 
         // Phần nguyên liệu đã bị các đơn trong hàng pha "xí" trước
-        var reserved = await GetReservedIngredientsAsync(order.StoreId, order.Id, ct);
+        // Tồn kho trừ phần các đơn khác trong hàng pha đã giữ (bỏ qua chính đơn
+        // này để nó không tự trừ phần của mình hai lần). Trả về ĐỦ mọi nguyên
+        // liệu thiếu — bản cũ dừng ở cái đầu tiên, nhân viên phải bấm lại nhiều
+        // lần mới biết hết.
+        var missing = await _restock.FindShortagesAsync(order.StoreId, order.Id, requirements, ct: ct);
+        if (missing.Count == 0) return;
 
-        foreach (var req in requirements)
-        {
-            var onHand = await _db.InventoryLots
-                .Where(l => l.StoreId == order.StoreId
-                         && l.IngredientId == req.IngredientId
-                         && l.Status == LotStatus.Active
-                         && l.RemainingQuantity > 0)
-                .SumAsync(l => (double)l.RemainingQuantity, ct);
+        await _restock.RecordShortagesAsync(
+            order.StoreId, missing, order.Items.Select(i => i.ProductName), ct);
 
-            var taken = reserved.TryGetValue(req.IngredientId, out var r) ? r : 0;
-            var usable = onHand - taken;
-
-            if (usable < req.Quantity)
-            {
-                var name = await _db.Ingredients
-                    .Where(i => i.Id == req.IngredientId)
-                    .Select(i => i.Name)
-                    .FirstOrDefaultAsync(ct) ?? "nguyên liệu";
-
-                throw new InsufficientStockException(
-                    req.IngredientId, name, (double)req.Quantity, (double)Math.Max(0, usable));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Lượng nguyên liệu mà các đơn ĐANG TRONG HÀNG PHA sẽ tiêu thụ khi hoàn tất.
-    /// Bỏ qua chính đơn đang xét để nó không tự trừ phần của mình hai lần.
-    /// </summary>
-    private async Task<Dictionary<Guid, double>> GetReservedIngredientsAsync(
-        Guid storeId, Guid excludeOrderId, CancellationToken ct)
-    {
-        var queued = await _db.OrderItems
-            .AsNoTracking()
-            .Where(i => i.Order!.StoreId == storeId
-                     && i.OrderId != excludeOrderId
-                     && !i.Order.StockDeducted
-                     && (i.Order.Status == OrderStatus.Confirmed
-                      || i.Order.Status == OrderStatus.Preparing
-                      || i.Order.Status == OrderStatus.Ready))
-            .Select(i => new { i.ProductId, i.VariantId, i.ModifiersJson, i.Quantity })
-            .ToListAsync(ct);
-
-        if (queued.Count == 0) return new Dictionary<Guid, double>();
-
-        var reqs = await _recipe.AggregateOrderAsync(
-            queued.Select(q => new ExplodeRequest(
-                q.ProductId, q.VariantId, ParseModifierIds(q.ModifiersJson), q.Quantity)), ct);
-
-        return reqs.ToDictionary(r => r.IngredientId, r => r.Quantity);
+        throw new IngredientShortageException(missing);
     }
 
     // ==========================================================================
@@ -699,7 +721,7 @@ public class OrderService : IOrderService
         return digits;
     }
 
-    private static List<Guid> ParseModifierIds(string json)
+    internal static List<Guid> ParseModifierIds(string json)
     {
         try
         {
@@ -737,9 +759,19 @@ public class StockShortageException : Exception
 {
     public IReadOnlyList<StockShortageDto> Shortages { get; }
 
-    public StockShortageException(IReadOnlyList<StockShortageDto> shortages)
-        : base("Một số món đã hết nguyên liệu")
-        => Shortages = shortages;
+    /// <summary>Mọi nguyên liệu thiếu của cả bill, đã gộp — không chỉ cái đầu tiên.</summary>
+    public IReadOnlyList<IngredientShortageDto> Ingredients { get; }
+
+    public StockShortageException(
+        IReadOnlyList<StockShortageDto> shortages,
+        IReadOnlyList<IngredientShortageDto>? ingredients = null)
+        : base(ingredients is { Count: > 0 }
+            ? IngredientShortageException.BuildMessage(ingredients)
+            : "Một số món đã hết nguyên liệu")
+    {
+        Shortages = shortages;
+        Ingredients = ingredients ?? Array.Empty<IngredientShortageDto>();
+    }
 }
 
 /// <summary>

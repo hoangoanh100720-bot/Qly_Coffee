@@ -125,7 +125,10 @@ public class PrepController : BaseApiController
     /// Chạy một mẻ: trừ nguyên liệu thô theo FEFO và tạo lô bán thành phẩm mới.
     /// </summary>
     [HttpPost("produce")]
-    public async Task<IActionResult> Produce([FromBody] ProduceBatchRequest req, CancellationToken ct)
+    public async Task<IActionResult> Produce(
+        [FromBody] ProduceBatchRequest req,
+        [FromServices] IRestockService restock,
+        CancellationToken ct)
     {
         if (req.BatchCount <= 0)
             return Fail<object>(400, "VALIDATION", "Số mẻ phải lớn hơn 0.");
@@ -141,6 +144,12 @@ public class PrepController : BaseApiController
             // không phải chờ job 15 phút — nhân viên vừa ủ xong là có khách gọi.
             await _recipe.RecomputeAllProductCostsAsync(CurrentStoreId, ct);
             await _availability.RecomputeAllAsync(CurrentStoreId, ct);
+
+            // Bán thành phẩm cũng chặn đơn được, và cách "nhập" nó là ủ một mẻ.
+            // Ủ xong thì đóng việc lại y như nhập kho, nếu không bảng cần nhập
+            // vẫn đòi cốt trà trong khi bình mới đã nằm sẵn trên quầy.
+            await restock.MarkRestockedAsync(
+                CurrentStoreId, batch.OutputIngredientId, batch.OutputQuantity, ct);
 
             return Ok(new PrepBatchResultDto(
                 LotId:          batch.LotId,

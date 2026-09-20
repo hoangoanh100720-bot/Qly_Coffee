@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using QlyCoffee.Api.Ai;
 using QlyCoffee.Api.Controllers;
+using QlyCoffee.Api.LiveScore;
 using QlyCoffee.Application.Services;
 using QlyCoffee.Infrastructure.Persistence;
 using QlyCoffee.Infrastructure.Seed;
@@ -97,6 +98,7 @@ builder.Services.Configure<PlanningOptions>(o =>
     o.MaxSuggestionsPerPlan  = EnvInt("MAX_SUGGESTIONS_PER_PLAN", 6);
     o.ForecastLookbackDays   = EnvInt("FORECAST_LOOKBACK_DAYS", 28);
     o.ForecastEwmaAlpha      = EnvDouble("FORECAST_EWMA_ALPHA", 0.25);
+    o.RestockCoverDays       = EnvInt("RESTOCK_COVER_DAYS", 3);
 });
 
 builder.Services.Configure<BarOptions>(o =>
@@ -125,6 +127,7 @@ builder.Services.AddScoped<IPrepService, PrepService>();
 builder.Services.AddScoped<IRecipeService, RecipeService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IBarQueueService, BarQueueService>();
+builder.Services.AddScoped<IRestockService, RestockService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWasteRiskService, WasteRiskService>();
 builder.Services.AddScoped<IPromotionPlanner, PromotionPlanner>();
@@ -186,6 +189,24 @@ builder.Services.AddSwaggerGen(c =>
 // ---- Job nền ----------------------------------------------------------------
 builder.Services.AddHostedService<ScheduledJobsService>();
 
+// ---- Bóng đá trực tiếp ------------------------------------------------------
+// Chỉ MÁY CHỦ hỏi nguồn tỉ số rồi đẩy xuống mọi màn hình qua SignalR: mười màn
+// hình mở cùng lúc vẫn chỉ tốn một lượt gọi, và khóa API không ra tới trình
+// duyệt. Chưa đặt FOOTBALL_API_KEY thì job tự tắt, không gọi ra ngoài lần nào.
+builder.Services.Configure<LiveScoreOptions>(o =>
+{
+    o.ApiKey          = Cfg("FOOTBALL_API_KEY", "");
+    o.Competitions    = Cfg("FOOTBALL_COMPETITIONS", "");
+    o.LivePollSeconds = EnvInt("FOOTBALL_LIVE_POLL_SECONDS", 30);
+    o.IdlePollMinutes = EnvInt("FOOTBALL_IDLE_POLL_MINUTES", 10);
+});
+builder.Services.AddSignalR();
+builder.Services.AddHttpClient(FootballDataClient.HttpClientName,
+    c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddSingleton<FootballDataClient>();
+builder.Services.AddSingleton<LiveScoreStore>();
+builder.Services.AddHostedService<LiveScorePoller>();
+
 var app = builder.Build();
 
 // ==============================================================================
@@ -203,6 +224,7 @@ app.UseCors("QlyClient");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<LiveScoreHub>("/" + QlyCoffee.Shared.LiveScoreChannel.HubPath);
 
 // Phục vụ ảnh người dùng tải lên
 app.UseStaticFiles();

@@ -338,3 +338,53 @@ public class DailySales : BaseEntity
 
     public Product? Product { get; set; }
 }
+
+/// <summary>
+/// Nhật ký "thiếu nguyên liệu khi nhận đơn", gộp theo NGÀY và theo NGUYÊN LIỆU.
+/// <para>
+/// Vì sao cần: tồn kho lúc 22:00 chỉ cho biết cái gì đang ít, không cho biết
+/// trong ngày đã có bao nhiêu đơn phải từ chối vì thiếu thứ gì. Một nguyên liệu
+/// còn 150 ml vẫn "trên mức tối thiểu" nhưng đã chặn năm ly sữa tươi trân châu
+/// — đó mới là thứ phải nhập đầu tiên. Bảng này giữ lại dấu vết đó để trang Kế
+/// hoạch gom thành danh sách cần nhập theo từng ngày.
+/// </para>
+/// <para>
+/// MỘT DÒNG cho mỗi (chi nhánh, ngày, nguyên liệu), cập nhật dồn chứ không thêm
+/// dòng mới mỗi lần: nhân viên bấm "Nhận đơn" năm lần liền cho cùng một giỏ thì
+/// bảng không được phình ra năm dòng. Vì cùng lý do đó, lượng thiếu lưu là mức
+/// LỚN NHẤT của một lần bị chặn, không phải tổng — cộng dồn năm lần bấm lại sẽ
+/// thổi phồng số cần nhập lên gấp năm.
+/// </para>
+/// </summary>
+public class StockShortageLog : BaseEntity
+{
+    public Guid StoreId { get; set; }
+    public Guid IngredientId { get; set; }
+
+    /// <summary>Ngày kinh doanh "yyyy-MM-dd" theo giờ Việt Nam.</summary>
+    public string BusinessDate { get; set; } = string.Empty;
+
+    /// <summary>Lượng thiếu lớn nhất trong một lần bị chặn, theo đơn vị cơ sở.</summary>
+    public double MaxMissingQuantity { get; set; }
+
+    /// <summary>Số lần bấm nhận đơn bị chặn vì nguyên liệu này.</summary>
+    public int BlockedCount { get; set; }
+
+    /// <summary>Tên các món bị ảnh hưởng, cách nhau bởi dấu phẩy, không trùng.</summary>
+    public string AffectedProducts { get; set; } = string.Empty;
+
+    /// <summary>Lần bị chặn gần nhất (UTC).</summary>
+    public DateTime LastBlockedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Lúc đã nhập bù đủ (UTC). null = việc còn treo, dòng này vẫn nằm trong
+    /// danh sách "Cần nhập hàng". Có giá trị = xong việc, danh sách thôi báo.
+    /// Bị chặn lại lần nữa thì xóa về null — nhập bù rõ ràng chưa đủ.
+    /// </summary>
+    public DateTime? ResolvedAt { get; set; }
+
+    /// <summary>Tổng lượng đã nhập bù kể từ lần chặn đầu trong ngày, theo đơn vị cơ sở.</summary>
+    public double RestockedQuantity { get; set; }
+
+    public Ingredient? Ingredient { get; set; }
+}

@@ -368,6 +368,12 @@ public class OrdersController : BaseApiController
 
             return Ok(MapOrder(full));
         }
+        catch (IngredientShortageException ex)
+        {
+            _logger.LogWarning("Xác nhận đơn thất bại, thiếu {Count} nguyên liệu", ex.Shortages.Count);
+            return Fail<OrderDto>(409, "INSUFFICIENT_STOCK", ex.Message,
+                new StockShortageDetailsDto(Array.Empty<StockShortageDto>(), ex.Shortages));
+        }
         catch (InsufficientStockException ex)
         {
             _logger.LogWarning("Xác nhận đơn thất bại do thiếu {Name}", ex.IngredientName);

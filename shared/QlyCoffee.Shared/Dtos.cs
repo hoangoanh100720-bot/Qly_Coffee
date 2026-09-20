@@ -290,6 +290,104 @@ public record StockShortageDto(
     int MaxServings,
     string Reason);
 
+/// <summary>
+/// Một nguyên liệu không đủ cho đơn đang nhận — trả kèm lỗi INSUFFICIENT_STOCK.
+/// <para>
+/// Luôn trả CẢ DANH SÁCH, không dừng ở nguyên liệu đầu tiên: nhân viên cần biết
+/// một lần là phải nhập sữa, trân châu VÀ đường, chứ không phải bấm lại ba lần
+/// để lần lượt phát hiện từng thứ.
+/// </para>
+/// </summary>
+/// <param name="Required">Lượng đơn này cần, theo đơn vị cơ sở.</param>
+/// <param name="Available">Lượng dùng được = tồn kho − phần các đơn trong hàng pha đã giữ.</param>
+/// <param name="Missing">Còn thiếu = Required − Available.</param>
+/// <param name="IsPrepared">Bán thành phẩm (cốt trà, nước đường…): phải sơ chế, không phải đi mua.</param>
+public record IngredientShortageDto(
+    Guid IngredientId,
+    string IngredientName,
+    string UnitLabel,
+    bool IsPrepared,
+    double Required,
+    double Available,
+    double Missing);
+
+/// <summary>Chi tiết lỗi thiếu nguyên liệu của máy quầy và màn hình xác nhận đơn.</summary>
+public record StockShortageDetailsDto(
+    IReadOnlyList<StockShortageDto> Products,
+    IReadOnlyList<IngredientShortageDto> Ingredients);
+
+// ------------------------------------------------------------------------------
+//  DANH SÁCH CẦN NHẬP HÀNG — hiện trên trang Kế hoạch và trang Nhập kho
+// ------------------------------------------------------------------------------
+
+/// <summary>Danh sách nguyên liệu cần nhập của một ngày.</summary>
+/// <param name="IsToday">
+/// true = số tồn kho là số của lúc này. Xem ngày cũ thì cột tồn kho vẫn là số
+/// hiện tại (để biết đã nhập bù chưa), chỉ phần "bị chặn" là của ngày đó.
+/// </param>
+/// <param name="PrepItems">Bán thành phẩm đang thiếu — việc của bếp, không phải của người đi chợ.</param>
+/// <param name="DoneItems">
+/// Đã báo thiếu rồi đã nhập bù đủ — việc đã xong, không nằm trong Items nữa.
+/// Giữ lại để màn hình nói được "hoàn tất" thay vì im lặng bỏ dòng đi.
+/// </param>
+public record RestockListDto(
+    string BusinessDate,
+    bool IsToday,
+    DateTime ComputedAt,
+    int CoverDays,
+    IReadOnlyList<RestockItemDto> Items,
+    IReadOnlyList<RestockItemDto> PrepItems,
+    int TotalEstimatedCost,
+    int BlockedIngredientCount,
+    IReadOnlyList<RestockItemDto> DoneItems);
+
+/// <summary>
+/// Một dòng trong danh sách cần nhập.
+/// </summary>
+/// <param name="Status">
+/// Mức độ, số nhỏ là gấp hơn: 0 hết hàng · 1 đã chặn đơn · 2 dưới mức tối thiểu ·
+/// 3 không đủ bán ngày mai · 4 dưới điểm đặt hàng lại · 9 đã nhập bù xong.
+/// </param>
+/// <param name="OnHand">Tổng tồn các lô đang dùng.</param>
+/// <param name="Reserved">Phần các đơn trong hàng pha sẽ dùng khi pha xong.</param>
+/// <param name="Available">OnHand − Reserved, không âm.</param>
+/// <param name="DaysOfCover">Đủ dùng bao nhiêu ngày theo tốc độ hiện tại; null nếu chưa có lịch sử tiêu thụ.</param>
+/// <param name="SuggestedQuantity">Lượng nên nhập theo đơn vị cơ sở, đã làm tròn theo quy cách mua.</param>
+/// <param name="SuggestedPurchaseText">VD "3 × Thùng 12 hộp 1L" hoặc "2 kg" — câu đọc được ngay khi gọi nhà cung cấp.</param>
+/// <param name="EstimatedCost">Ước tính theo giá vốn bình quân, 0 nếu nguyên liệu chưa từng nhập.</param>
+/// <param name="IsDone">Đã báo thiếu và đã nhập bù đủ — dòng chỉ để ghi nhận việc đã xong.</param>
+/// <param name="ResolvedAt">Lúc đánh dấu xong; null khi việc còn treo.</param>
+/// <param name="RestockedQuantity">Lượng đã nhập bù kể từ lần chặn đầu trong ngày.</param>
+public record RestockItemDto(
+    Guid IngredientId,
+    string Name,
+    string Sku,
+    string CategoryLabel,
+    string ColorHex,
+    string IconKey,
+    int BaseUnit,
+    string UnitLabel,
+    bool IsPrepared,
+    int Status,
+    string StatusLabel,
+    double OnHand,
+    double Reserved,
+    double Available,
+    double AvgDailyUsage,
+    double? DaysOfCover,
+    double MinStockLevel,
+    double ReorderPoint,
+    double SuggestedQuantity,
+    string SuggestedPurchaseText,
+    int AverageUnitCost,
+    int EstimatedCost,
+    int BlockedCount,
+    double MaxMissingQuantity,
+    string AffectedProducts,
+    bool IsDone,
+    DateTime? ResolvedAt,
+    double RestockedQuantity);
+
 // ------------------------------------------------------------------------------
 //  ĐƠN HÀNG
 // ------------------------------------------------------------------------------
@@ -582,7 +680,10 @@ public record ProductAdminDto(
     int CostRatioPercent,
 
     /// <summary>-1 đang bán lỗ · 0 biên mỏng · 1 lành mạnh · 2 cao hơn mặt bằng.</summary>
-    int PriceVerdict)
+    int PriceVerdict,
+
+    /// <summary>Số topping đang bán mà món này nhận. 0 = món không cho gọi thêm topping.</summary>
+    int ToppingCount = 0)
 {
     /// <summary>Món này là đồ ăn — trang quản lý tách riêng khu vực chỉnh giá cho nhóm này.</summary>
     public bool IsFood => ServeStyle == 2;
@@ -613,6 +714,25 @@ public class RecipeLineDto
 
     /// <summary>Tồn kho hiện tại của nguyên liệu — cảnh báo ngay khi soạn công thức.</summary>
     public double CurrentStock { get; set; }
+}
+
+/// <summary>
+/// Một topping khách gọi thêm được cho món, kèm định lượng nó trừ kho.
+/// <para>
+/// Hiện ở trang quản lý món để chủ quán thấy món nào nhận topping gì và mỗi phần
+/// topping tốn bao nhiêu — topping không nhân hệ số size nên định lượng là cố định.
+/// </para>
+/// </summary>
+public record ProductToppingDto(
+    Guid Id,
+    string Name,
+    int PriceDelta,
+    string ColorHex,
+    bool IsActive,
+    List<RecipeLineDto> Lines)
+{
+    /// <summary>Giá vốn một phần topping.</summary>
+    public int Cost => Lines.Sum(l => l.LineCost);
 }
 
 // ------------------------------------------------------------------------------
@@ -898,6 +1018,35 @@ public record PosCategoryDto(Guid Id, string Name, string Slug, string ColorHex)
 public record PosVariantDto(Guid Id, string Name, int PriceDelta, bool IsDefault);
 
 /// <summary>
+/// Một topping khách có thể gọi thêm ở quầy.
+/// <para>
+/// CHỈ gồm các nhóm tùy chọn KHÔNG bắt buộc. Mức đường và mức đá là nhóm bắt
+/// buộc, giá bằng 0 và ở quầy đã có nút bấm nhanh ("Ít đá", "Không ngọt") —
+/// đưa chúng vào đây nữa là bắt nhân viên chọn hai lần cho cùng một thứ.
+/// </para>
+/// <para>
+/// Topping thì khác: nó CÓ tiền và CÓ trừ kho, nên bắt buộc phải ghi vào đơn
+/// chứ không thể để trong ghi chú — ghi chú không cộng tiền và không trừ kho.
+/// </para>
+/// </summary>
+/// <param name="IsAvailable">
+/// Còn đủ nguyên liệu để làm hay không. Hết thì giao diện quầy vẫn HIỆN nhưng
+/// khóa nút — nhân viên cần thấy để nói với khách "hôm nay hết trân châu", chứ
+/// topping tự biến mất thì họ tưởng mình bấm nhầm chỗ.
+/// </param>
+/// <param name="PrepRecipeId">
+/// Công thức sơ chế làm ra nguyên liệu đang thiếu, nếu có. Quầy dùng id này để
+/// bấm nấu thêm ngay tại chỗ, không phải bỏ khách chạy sang trang Sơ chế.
+/// </param>
+/// <param name="PrepMinutes">
+/// Nấu một mẻ mất bao nhiêu phút. Chính là con số nhân viên nói với khách —
+/// "trân châu hết rồi, chờ em 15 phút nhé".
+/// </param>
+public record PosToppingDto(
+    Guid Id, string Name, int PriceDelta, string ColorHex, bool IsAvailable,
+    Guid? PrepRecipeId = null, string? PrepName = null, int PrepMinutes = 0);
+
+/// <summary>
 /// Một món trên lưới bấm đơn.
 /// <para>
 /// <c>MaxServings</c> ở đây ĐÃ TRỪ phần đang nằm trong hàng pha — khác với
@@ -917,9 +1066,48 @@ public record PosProductDto(
     int QuantityInQueue,
     bool IsAvailable,
     int PrepSeconds,
-    List<PosVariantDto> Variants);
+    List<PosVariantDto> Variants,
 
-public record PosMenuDto(List<PosCategoryDto> Categories, List<PosProductDto> Products);
+    /// <summary>
+    /// Id của những topping áp dụng được cho MÓN NÀY. Tra tên và giá trong
+    /// <c>PosMenuDto.Toppings</c>.
+    /// <para>
+    /// Trả về danh sách id thay vì lặp lại cả tên và giá ở từng món: 56 món ×
+    /// 7 topping là 392 bản sao của cùng bảy dòng dữ liệu. Rỗng nghĩa là món
+    /// không nhận topping — bánh và đồ ăn nằm nhóm này.
+    /// </para>
+    /// </summary>
+    List<Guid> ToppingIds,
+
+    // --- Món hết hàng: nấu thêm được hay phải ngưng bán? ----------------------
+    //
+    //  "Hết" là câu trả lời cụt. Nhân viên đứng trước khách cần biết TIẾP THEO
+    //  LÀM GÌ: nấu thêm mẻ trân châu 15 phút rồi bán tiếp, hay xin lỗi khách vì
+    //  hôm nay hết hẳn. Ba trường dưới đây trả lời đúng câu đó.
+
+    /// <summary>
+    /// Số phút chờ nếu nấu thêm ngay bây giờ. 0 = không cần sơ chế gì.
+    /// Đây là con số nói với khách.
+    /// </summary>
+    int PrepWaitMinutes = 0,
+
+    /// <summary>Công thức sơ chế cần chạy để bán lại được món này.</summary>
+    Guid? PrepRecipeId = null,
+
+    /// <summary>
+    /// Hết hàng và KHÔNG nấu nhanh được — phải nhập thêm hoặc ủ mẻ dài.
+    /// Giao diện hiện "Tạm ngưng" thay vì "Hết", vì hai chuyện khác nhau:
+    /// một cái chờ 15 phút là có, một cái hôm nay đừng bán nữa.
+    /// </summary>
+    bool IsSuspended = false);
+
+/// <param name="Toppings">
+/// Bảng topping dùng chung cho cả thực đơn, đã khử trùng lặp.
+/// </param>
+public record PosMenuDto(
+    List<PosCategoryDto> Categories,
+    List<PosProductDto> Products,
+    List<PosToppingDto> Toppings);
 
 public record EstimateItem(Guid ProductId, int Quantity);
 public record EstimateRequest(List<EstimateItem> Items);
@@ -943,6 +1131,32 @@ public record PosOrderResultDto(
     int EtaMinutes,
     DateTime? EstimatedReadyAt,
     int TotalCups);
+
+/// <summary>
+/// Phiếu pha của MỘT món trong đơn: định lượng cho MỘT ly, đã nhân hệ số size
+/// và đã áp mức đá / mức đường khách chọn. Hiện trên thẻ ở màn hình Pha chế.
+/// </summary>
+/// <param name="Quantity">Số ly của dòng đơn này — định lượng trong Lines là cho một ly.</param>
+public record BarRecipeDto(
+    Guid OrderItemId,
+    string ProductName,
+    string? VariantName,
+    int Quantity,
+    string Choices,
+    IReadOnlyList<BarRecipeLineDto> Lines);
+
+/// <param name="Quantity">Lượng cho một ly, theo đơn vị cơ sở. 0 khi dòng bị bỏ.</param>
+/// <param name="IsTopping">Dòng đến từ topping khách chọn, không phải công thức gốc.</param>
+/// <param name="SkipReason">Có giá trị = KHÔNG cho thứ này vào ly (VD "Khách chọn không đá").</param>
+public record BarRecipeLineDto(
+    string IngredientName,
+    string ColorHex,
+    double Quantity,
+    string UnitLabel,
+    bool IsOptional,
+    bool IsTopping,
+    string? Note,
+    string? SkipReason);
 
 public record BarQueueLineDto(
     Guid OrderId,
@@ -1138,3 +1352,88 @@ public record SePayWebhookResult(
 
     /// <summary>true nếu giao dịch này đã được xử lý ở lần gửi trước.</summary>
     bool Duplicate);
+
+// ------------------------------------------------------------------------------
+//  BÓNG ĐÁ TRỰC TIẾP
+// ------------------------------------------------------------------------------
+
+/// <summary>
+/// Địa chỉ hub và tên sự kiện SignalR. Để ở thư viện dùng chung vì hai phía
+/// phải khớp TỪNG CHỮ — lệch một ký tự là client vẫn nối được nhưng không bao
+/// giờ nhận được gì, và cũng không có lỗi nào báo ra.
+/// </summary>
+public static class LiveScoreChannel
+{
+    public const string HubPath = "hubs/live-score";
+    public const string BoardUpdated = "BoardUpdated";
+}
+
+/// <summary>
+/// Giai đoạn của một trận, đã quy về năm nhóm mà giao diện cần phân biệt.
+/// <para>
+/// Nguồn dữ liệu có hơn chục trạng thái (TIMED, IN_PLAY, PAUSED, EXTRA_TIME…).
+/// Giao diện không cần biết từng cái — nó chỉ cần biết xếp trận vào nhóm nào.
+/// Nhãn chi tiết ("Hiệp phụ", "Hoãn") đi riêng trong <c>StatusLabel</c>.
+/// </para>
+/// </summary>
+public static class MatchPhase
+{
+    public const string Upcoming = "upcoming";
+    public const string Live     = "live";
+    /// <summary>Nghỉ giữa hiệp — vẫn tính là đang diễn ra.</summary>
+    public const string Break    = "break";
+    public const string Finished = "finished";
+    /// <summary>Hoãn, hủy, tạm dừng.</summary>
+    public const string Off      = "off";
+}
+
+/// <summary>Một trận trên bảng tỉ số.</summary>
+public record LiveMatchDto(
+    long Id,
+    string Competition,
+    string? CompetitionEmblem,
+    string HomeTeam,
+    string? HomeCrest,
+    string AwayTeam,
+    string? AwayCrest,
+
+    /// <summary>Null khi trận chưa đá.</summary>
+    int? HomeScore,
+    int? AwayScore,
+
+    /// <summary>Giá trị của <see cref="MatchPhase"/>.</summary>
+    string Phase,
+
+    /// <summary>Nhãn tiếng Việt: "Đang đá", "Nghỉ giữa hiệp", "Hoãn"…</summary>
+    string StatusLabel,
+
+    /// <summary>
+    /// Phút đang đá. Null khi nguồn không cung cấp — gói miễn phí có thể không
+    /// có. Giao diện khi đó hiện "Đang đá" chứ không bịa ra một con số.
+    /// </summary>
+    int? Minute,
+    int? InjuryTime,
+
+    DateTime KickoffUtc);
+
+/// <summary>
+/// Toàn bộ bảng tỉ số — máy chủ đẩy NGUYÊN KHỐI mỗi lần có thay đổi.
+/// <para>
+/// Gửi cả bảng thay vì từng trận vừa đổi vì bảng chỉ vài KB, mà client khỏi
+/// phải tự ghép: lỡ mất một gói lúc mạng chập chờn thì gói sau tự sửa lại hết.
+/// </para>
+/// </summary>
+public record LiveScoreBoardDto(
+    /// <summary>Đã khai báo FOOTBALL_API_KEY chưa. false thì giao diện chỉ hiện hướng dẫn.</summary>
+    bool Enabled,
+
+    /// <summary>
+    /// Lần cuối DỮ LIỆU THAY ĐỔI (không phải lần cuối hỏi nguồn), giờ UTC.
+    /// Null nghĩa là máy chủ chưa lấy được lần nào.
+    /// </summary>
+    DateTime? UpdatedAtUtc,
+
+    IReadOnlyList<LiveMatchDto> Matches,
+
+    /// <summary>Lời nhắn khi nguồn lỗi. Tỉ số cũ vẫn giữ nguyên bên dưới.</summary>
+    string? Notice = null);

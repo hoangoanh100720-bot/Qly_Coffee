@@ -192,20 +192,60 @@ public static class MenuCatalog
         new("POW-CRE-01", "Bột kem béo (creamer)", IngredientCategory.Powder,
             BaseUnit.Gram, "#F3EADC", "milk", 95, 365, 30, 0.03, 500, 1500),
 
+        // Bột hương vị cho nhóm trà sữa: một muỗng bột cho ra đúng màu và vị
+        // của món, không phụ thuộc trái cây theo mùa. Mua theo bịch 1kg.
+        new("POW-TAR-01", "Bột khoai môn", IngredientCategory.Powder,
+            BaseUnit.Gram, "#B4A0C4", "powder", 180, 365, 30, 0.03, 300, 800),
+        new("POW-STR-01", "Bột dâu", IngredientCategory.Powder,
+            BaseUnit.Gram, "#E8A0B0", "powder", 200, 365, 30, 0.03, 300, 800),
+        new("POW-THG-01", "Bột trà thái xanh", IngredientCategory.Powder,
+            BaseUnit.Gram, "#8DBE6A", "matcha", 320, 365, 30, 0.03, 250, 600),
+
         // --- Topping ----------------------------------------------------------
-        // Trân châu chỉ để được 3 ngày sau khi nấu — nhóm bị bỏ đi nhiều nhất.
+        //
+        //  Trân châu và pudding là BÁN THÀNH PHẨM: quán nấu tại chỗ từ nguyên liệu
+        //  khô, không mua sẵn. Đó cũng là lý do chúng chỉ để được vài giờ và là
+        //  nhóm hết hàng giữa ca thường xuyên nhất — nấu thêm một mẻ ngay tại quầy
+        //  là thao tác hằng ngày, xem PrepRecipes §5.
+        //
+        //  Thạch dừa và nha đam thì mua theo hũ, để được lâu, nên vẫn là hàng nhập.
+        new("TOP-BOB-RAW", "Trân châu đen khô", IngredientCategory.Topping,
+            BaseUnit.Gram, "#3A2C22", "boba", 70, 365, 30, 0.02, 2000, 5000),
+        new("TOP-BOW-RAW", "Trân châu trắng khô", IngredientCategory.Topping,
+            BaseUnit.Gram, "#DCD3C4", "boba", 95, 365, 30, 0.02, 1200, 3000),
+        new("TOP-PUD-RAW", "Bột pudding trứng", IngredientCategory.Topping,
+            BaseUnit.Gram, "#E8D9A8", "pudding", 180, 365, 30, 0.02, 400, 1000),
+
         new("TOP-BOB-01", "Trân châu đen", IngredientCategory.Topping,
-            BaseUnit.Gram, "#2A1F1A", "boba", 45, 3, 1, 0.08, 500, 1500),
+            BaseUnit.Gram, "#2A1F1A", "boba", 45, 1, 1, 0.08, 500, 1500, Prepared: true),
         new("TOP-BOW-01", "Trân châu trắng", IngredientCategory.Topping,
-            BaseUnit.Gram, "#EDE4D6", "boba", 60, 3, 1, 0.08, 300, 900),
+            BaseUnit.Gram, "#EDE4D6", "boba", 60, 1, 1, 0.08, 300, 900, Prepared: true),
         new("TOP-JEL-01", "Thạch dừa", IngredientCategory.Topping,
             BaseUnit.Gram, "#F2EDE3", "jelly", 40, 14, 5, 0.05, 400, 1000),
         new("TOP-PUD-01", "Pudding trứng", IngredientCategory.Topping,
-            BaseUnit.Gram, "#F3D68A", "pudding", 70, 3, 1, 0.06, 300, 800),
+            BaseUnit.Gram, "#F3D68A", "pudding", 70, 1, 1, 0.06, 300, 800, Prepared: true),
         new("TOP-ALO-01", "Thạch nha đam", IngredientCategory.Topping,
             BaseUnit.Gram, "#EAF0DC", "jelly", 55, 10, 4, 0.06, 300, 800),
         new("TOP-OREO-01", "Bánh quy socola nghiền", IngredientCategory.Topping,
             BaseUnit.Gram, "#3A3335", "cacao", 220, 180, 20, 0.03, 200, 500),
+
+        //  Hạt nổ và củ năng mua đóng hũ/lon, sương sáo mua theo khối — không nấu.
+        //  Hạt nổ hao 5% vì hạt vỡ khi múc; múc bằng muôi thủng, đừng dùng thìa ép.
+        new("TOP-POP-01", "Hạt nổ", IngredientCategory.Topping,
+            BaseUnit.Gram, "#F4A259", "popping", 85, 30, 7, 0.05, 400, 1000),
+        new("TOP-WCH-01", "Củ năng cắt hạt lựu", IngredientCategory.Topping,
+            BaseUnit.Gram, "#F4F1E6", "chestnut", 90, 180, 30, 0.04, 300, 800),
+        new("TOP-GRJ-01", "Sương sáo", IngredientCategory.Topping,
+            BaseUnit.Gram, "#2B2A24", "jelly", 30, 7, 2, 0.05, 400, 1000),
+        //  Thạch trái cây mua theo hũ ngâm siro — topping thứ hai của nhóm trà sữa.
+        new("TOP-FJL-01", "Thạch trái cây", IngredientCategory.Topping,
+            BaseUnit.Gram, "#F2A65A", "jelly", 45, 30, 7, 0.05, 400, 1000),
+
+        //  Thạch cà phê là BÁN THÀNH PHẨM: nấu từ cà phê phin cốt và bột rau câu.
+        new("TOP-AGA-RAW", "Bột rau câu dẻo", IngredientCategory.Topping,
+            BaseUnit.Gram, "#EFE9DA", "sugar", 600, 365, 30, 0.02, 60, 150),
+        new("TOP-COF-01", "Thạch cà phê", IngredientCategory.Topping,
+            BaseUnit.Gram, "#4A2E1C", "jelly", 30, 1, 1, 0.05, 300, 800, Prepared: true),
 
         // --- Trái cây ---------------------------------------------------------
         new("FRU-PEA-01", "Đào ngâm", IngredientCategory.Fruit,
@@ -260,6 +300,16 @@ public static class MenuCatalog
             BaseUnit.Milliliter, "#4A2E1E", "syrup", 95, 365, 30, 0.02, 400, 1000),
         new("SYR-CAR-01", "Sốt caramel", IngredientCategory.Syrup,
             BaseUnit.Milliliter, "#B5772E", "syrup", 100, 365, 30, 0.02, 400, 1000),
+        // Siro trái cây mua chai cho nhóm soda và trà trái cây: giữ vị ổn định
+        // giữa các ly khi trái cây tươi lúc ngọt lúc chua.
+        new("SYR-MIN-01", "Siro bạc hà", IngredientCategory.Syrup,
+            BaseUnit.Milliliter, "#7FCB9A", "syrup", 85, 365, 30, 0.01, 400, 1000),
+        new("SYR-BLU-01", "Siro việt quất", IngredientCategory.Syrup,
+            BaseUnit.Milliliter, "#5A4E96", "syrup", 95, 365, 30, 0.01, 400, 1000),
+        new("SYR-PIN-01", "Siro dứa", IngredientCategory.Syrup,
+            BaseUnit.Milliliter, "#F2C744", "syrup", 80, 365, 30, 0.01, 400, 1000),
+        new("SYR-GUA-01", "Siro ổi hồng", IngredientCategory.Syrup,
+            BaseUnit.Milliliter, "#E68A8A", "syrup", 85, 365, 30, 0.01, 400, 1000),
         new("SYR-HON-01", "Mật ong", IngredientCategory.Syrup,
             BaseUnit.Milliliter, "#D89A2B", "syrup", 180, 730, 60, 0.01, 300, 800),
         new("SYR-COC-01", "Nước cốt dừa", IngredientCategory.Syrup,
@@ -296,14 +346,15 @@ public static class MenuCatalog
         //  Hao hụt 2% là phần đọng lại trong bình và rớt ra ngoài lúc rót. Phần
         //  hao hụt của khâu ủ (lá trà ngậm nước) KHÔNG nằm ở đây — nó đã nằm sẵn
         //  trong sản lượng mỗi mẻ. Ghi cả hai chỗ là tính hao hụt hai lần.
+        //  Đơn giá cốt trà = giá lá × 0,06 (6g lá cho 100ml cốt, xem §5).
         new("PRE-TEA-BLK", "Cốt hồng trà", IngredientCategory.Tea,
-            BaseUnit.Milliliter, "#A64B1E", "syrup", 10, 1, 1, 0.02, 400, 800, Prepared: true),
+            BaseUnit.Milliliter, "#A64B1E", "syrup", 15, 1, 1, 0.02, 400, 800, Prepared: true),
         new("PRE-TEA-OOL", "Cốt trà ô long", IngredientCategory.Tea,
-            BaseUnit.Milliliter, "#96944A", "syrup", 15, 1, 1, 0.02, 400, 800, Prepared: true),
+            BaseUnit.Milliliter, "#96944A", "syrup", 23, 1, 1, 0.02, 400, 800, Prepared: true),
         new("PRE-TEA-JAS", "Cốt trà lài", IngredientCategory.Tea,
-            BaseUnit.Milliliter, "#C2BE72", "syrup", 12, 1, 1, 0.02, 300, 600, Prepared: true),
+            BaseUnit.Milliliter, "#C2BE72", "syrup", 18, 1, 1, 0.02, 300, 600, Prepared: true),
         new("PRE-TEA-GRN", "Cốt lục trà", IngredientCategory.Tea,
-            BaseUnit.Milliliter, "#9BB35C", "syrup", 11, 1, 1, 0.02, 350, 700, Prepared: true),
+            BaseUnit.Milliliter, "#9BB35C", "syrup", 17, 1, 1, 0.02, 350, 700, Prepared: true),
         new("PRE-TEA-CHA", "Cốt hoa cúc", IngredientCategory.Tea,
             BaseUnit.Milliliter, "#EBD681", "syrup", 9, 1, 1, 0.02, 220, 440, Prepared: true),
         new("PRE-COF-PHI", "Cà phê phin cốt", IngredientCategory.Coffee,
@@ -410,7 +461,12 @@ public static class MenuCatalog
         new("Thạch nha đam",   8000,  "#EAF0DC", "TOP-ALO-01",  45, 4),
         new("Pudding trứng",   10000, "#F3D68A", "TOP-PUD-01",  45, 5),
         new("Kem cheese",      12000, "#FAF0DC", "DAI-CHE-01",  35, 6),
-        new("Bánh quy nghiền", 9000,  "#3A3335", "TOP-OREO-01", 20, 7)
+        new("Bánh quy nghiền", 9000,  "#3A3335", "TOP-OREO-01", 20, 7),
+        new("Hạt nổ",          9000,  "#F4A259", "TOP-POP-01",  40, 8),
+        new("Củ năng",         8000,  "#F4F1E6", "TOP-WCH-01",  40, 9),
+        new("Sương sáo",       7000,  "#2B2A24", "TOP-GRJ-01",  50, 10),
+        new("Thạch cà phê",    8000,  "#4A2E1C", "TOP-COF-01",  45, 11),
+        new("Thạch trái cây",  8000,  "#F2A65A", "TOP-FJL-01",  40, 12)
     };
 
     /// <summary>
@@ -597,11 +653,32 @@ public static class MenuCatalog
     //  §4  MÓN & CÔNG THỨC ĐỊNH LƯỢNG
     //
     //  ColorPrimary = màu thân nước, ColorAccent = màu lớp kem hoặc lớp foam.
+    //
+    //  CHUẨN ĐỊNH LƯỢNG CỦA QUÁN (size M — size L tự nhân 1,4)
+    //    · Một ly ≈ 500ml tính cả đá.
+    //    · Cốt trà 150ml (ủ 6g lá / 100ml, xem §5). Trà uống thuần rót 180–200ml.
+    //    · Sữa tươi 120–150ml. Sữa đặc 15–25ml.
+    //    · Siro trái cây 20–30ml (mức 20–40ml tùy độ ngọt, quán chọn giữa).
+    //    · Đá viên 150–180g cho đồ uống đá, 180–200g cho đồ đá xay.
+    //    · Nước đường luôn là dòng TÙY CHỌN: kho trừ theo mức đường khách chọn
+    //      (70% đường → trừ 70%, không đường → không trừ). Đá cũng vậy: "Ít đá",
+    //      "Không đá", "Dùng nóng" đều được trừ đúng — xem RecipeService.
+    //    · Trang trí (lát chanh, lá bạc hà, bột rắc mặt, hoa cúc khô) GHI VÀO
+    //      CÔNG THỨC như mọi nguyên liệu khác, đánh dấu Optional để hết thì vẫn
+    //      bán được. Không ghi thì cuối tháng kho hụt mà không ai biết vì sao.
+    //    · Một nguyên liệu chỉ được xuất hiện MỘT dòng trong mỗi công thức
+    //      (database có chỉ mục duy nhất). Vừa pha vừa rắc mặt thì cộng dồn
+    //      vào cùng một dòng và ghi rõ trong Note.
     // ==========================================================================
     public static readonly ProductSpec[] Products =
     {
         // ======================================================================
         //  CÀ PHÊ
+        //
+        //  Espresso nền (Arabica, 18g = 2 shot) cho nhóm máy: americano, latte,
+        //  cappuccino, caramel macchiato. Nhóm Việt (cà phê sữa đá, đen đá, bạc
+        //  xỉu, muối, cốt dừa, kem trứng) giữ cốt PHIN Robusta — đó là thứ làm
+        //  nên chữ "cà phê pha phin" trên bảng hiệu, espresso không thay được.
         // ======================================================================
         new("coffee", "Cà phê muối", "ca-phe-muoi",
             "Cà phê phin đậm, phủ lớp kem muối béo mặn đặc trưng xứ Huế.",
@@ -609,11 +686,11 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-COF-PHI", 40, Note: "Rót từ bình cốt phin đã ủ — tương đương một phin 20g"),
-                new("DAI-CON-01", 20),
-                new("SYR-SLT-01", 45, Note: "Đánh bông rồi rót lên mặt, KHÔNG khuấy"),
+                new("DAI-CON-01",  20),
+                new("SYR-SLT-01",  45, Note: "Đánh bông rồi rót lên mặt, KHÔNG khuấy"),
                 new("OTH-ICE-01", 180, Optional: true),
-                new("PKG-CUP-M",   1),
-                new("PKG-STR-01",  1)
+                new("PKG-CUP-M",    1),
+                new("PKG-STR-01",   1)
             },
             Featured: true, SortOrder: 1, PrepSeconds: 140),   // đánh lớp kem muối riêng
 
@@ -626,6 +703,7 @@ public static class MenuCatalog
                 new("OTH-EGG-01",   1, Note: "Chỉ lấy lòng đỏ, bỏ lòng trắng"),
                 new("DAI-CON-01",  25),
                 new("DAI-WHIP-01", 20, Note: "Đánh cùng lòng đỏ tới khi bông cứng"),
+                new("POW-CAC-01",   1, Optional: true, Note: "Trang trí: rắc một lớp mỏng lên mặt kem"),
                 new("OTH-ICE-01", 150, Optional: true, Note: "CHỈ khi khách chọn dùng đá"),
                 new("PKG-CUP-H",    1)
             },
@@ -638,8 +716,8 @@ public static class MenuCatalog
             {
                 new("PRE-COF-PHI", 24, Note: "Ít cà phê hơn hẳn cà phê sữa đá"),
                 new("DAI-CON-01",   30),
-                new("DAI-MILK-01", 120),
-                new("OTH-ICE-01",  180, Optional: true),
+                new("DAI-MILK-01", 130, Note: "Đánh foam nếu khách dùng nóng"),
+                new("OTH-ICE-01",  170, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
             },
@@ -650,7 +728,7 @@ public static class MenuCatalog
             30000, "#4A2C17", "#C89968", "best-seller", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-COF-PHI", 40),
+                new("PRE-COF-PHI", 40, Note: "Cốt cà phê nền"),
                 new("DAI-CON-01",  25),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-M",    1),
@@ -664,7 +742,7 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-COF-PHI", 44),
-                new("SYR-SUG-01",  15, Optional: true, Note: "Khách gọi không đường thì bỏ dòng này"),
+                new("SYR-SUG-01",  15, Optional: true, Note: "Trừ theo mức đường khách chọn"),
                 new("OTH-ICE-01", 200, Optional: true),
                 new("PKG-CUP-M",    1),
                 new("PKG-STR-01",   1)
@@ -677,9 +755,10 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-COF-CLD", 196, Note: "Rót từ mẻ cold brew đã ủ, không pha loãng thêm"),
-                new("OTH-ICE-01", 200, Optional: true),
-                new("PKG-CUP-L",    1),
-                new("PKG-STR-01",   1)
+                new("SYR-SUG-01",   10, Optional: true),
+                new("OTH-ICE-01",  200, Optional: true),
+                new("PKG-CUP-L",     1),
+                new("PKG-STR-01",    1)
             },
             SortOrder: 6, PrepSeconds: 45),    // đã ủ sẵn, tại quầy chỉ rót
 
@@ -688,7 +767,8 @@ public static class MenuCatalog
             38000, "#4A3020", "#7A5A42", "", ServeStyle.HotOrIced,
             new RecipeLine[]
             {
-                new("COF-ARA-01",  18, Note: "2 shot espresso"),
+                new("COF-ARA-01",  18, Note: "2 shot espresso, thêm 200ml nước nóng (nước lọc nếu dùng đá)"),
+                new("SYR-SUG-01",  10, Optional: true),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-M",    1),
                 new("PKG-STR-01",   1)
@@ -700,7 +780,7 @@ public static class MenuCatalog
             30000, "#31200F", "#A6784E", "", ServeStyle.Hot,
             new RecipeLine[]
             {
-                new("COF-ARA-01", 18, Note: "2 shot, chiết trong 25–30 giây"),
+                new("COF-ARA-01", 18, Note: "2 shot, chiết 36ml trong 25–30 giây"),
                 new("PKG-CUP-H",   1)
             },
             SortOrder: 8, PrepSeconds: 60),
@@ -710,11 +790,12 @@ public static class MenuCatalog
             45000, "#B99A78", "#F5EDE0", "", ServeStyle.HotOrIced,
             new RecipeLine[]
             {
-                new("COF-ARA-01",   18),
-                new("DAI-MILK-01", 200),
+                new("COF-ARA-01",   18, Note: "2 shot espresso nền"),
+                new("DAI-MILK-01", 150, Note: "Đánh foam mịn tới 60°C nếu dùng nóng"),
                 new("SYR-SUG-01",   15, Optional: true),
-                new("OTH-ICE-01",  120, Optional: true),
-                new("PKG-CUP-M",     1)
+                new("OTH-ICE-01",  150, Optional: true),
+                new("PKG-CUP-M",     1),
+                new("PKG-STR-01",    1)
             },
             SortOrder: 9),
 
@@ -725,6 +806,8 @@ public static class MenuCatalog
             {
                 new("COF-ARA-01",   18),
                 new("DAI-MILK-01", 150, Note: "Đánh bọt tới 60–65°C, bọt dày 1cm"),
+                new("SYR-SUG-01",   10, Optional: true),
+                new("POW-CAC-01",    1, Optional: true, Note: "Trang trí: rắc bột cacao lên foam"),
                 new("OTH-ICE-01",  120, Optional: true, Note: "CHỈ khi khách chọn dùng đá"),
                 new("PKG-CUP-H",     1)
             },
@@ -749,10 +832,10 @@ public static class MenuCatalog
             52000, "#9E7648", "#E8C89A", "new", ServeStyle.HotOrIced,
             new RecipeLine[]
             {
-                new("COF-ARA-01",   18),
-                new("DAI-MILK-01", 180),
-                new("SYR-CAR-01",   20, Note: "10ml trộn dưới, 10ml vẽ mặt"),
-                new("OTH-ICE-01",  120, Optional: true),
+                new("COF-ARA-01",   18, Note: "Rót nổi lên trên lớp sữa, không khuấy"),
+                new("DAI-MILK-01", 150),
+                new("SYR-CAR-01",   25, Note: "15ml trộn dưới đáy, 10ml vẽ caramel drizzle trên mặt"),
+                new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-L",     1),
                 new("PKG-STR-01",    1)
             },
@@ -760,16 +843,22 @@ public static class MenuCatalog
 
         // ======================================================================
         //  TRÀ SỮA
+        //
+        //  Khung chung: 150ml cốt trà + 130ml sữa tươi + 20ml sữa đặc + phần
+        //  hương vị + 150g đá ≈ 500ml. Topping (trân châu đen, thạch trái cây…)
+        //  khách chọn thêm ở nhóm Topping, có công thức riêng.
         // ======================================================================
         new("milktea", "Trà sữa trân châu đường đen", "tra-sua-tran-chau-duong-den",
             "Trân châu nấu đường đen, ủ nóng liên tục để luôn dẻo.",
             45000, "#8E6647", "#EFE3D2", "best-seller,signature", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-BLK", 200, Note: "Rót từ bình cốt hồng trà — kiểm giờ ủ ghi trên bình"),
-                new("DAI-MILK-01", 200),
-                new("SYR-BRW-01",   30),
-                new("TOP-BOB-01",   60, Note: "Khoảng 2 muỗng canh đầy"),
+                new("PRE-TEA-BLK", 150, Note: "Rót từ bình cốt hồng trà — kiểm giờ ủ ghi trên bình"),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   20),
+                new("POW-CRE-01",   10, Note: "Kem béo: hòa với 20ml nước nóng trước khi pha"),
+                new("SYR-BRW-01",   20, Note: "Vẽ vằn đường nâu quanh thành ly trước khi cho đá"),
+                new("TOP-BOB-01",   60, Note: "Trân châu đen đường nâu, khoảng 2 muỗng canh đầy"),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -777,17 +866,17 @@ public static class MenuCatalog
             Featured: true, SortOrder: 1, AllowTopping: true),
 
         new("milktea", "Trà sữa truyền thống", "tra-sua-truyen-thong",
-            "Công thức xe đẩy quen thuộc: hồng trà đậm, bột kem béo, sữa đặc.",
+            "Hồng trà ủ đậm, sữa tươi và sữa đặc — vị trà sữa quen thuộc.",
             35000, "#B59570", "#F0E4D2", "best-seller", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-BLK", 200),
-                new("POW-CRE-01",  25, Note: "Hòa với 60ml nước nóng trước khi pha"),
-                new("DAI-CON-01",  20),
-                new("SYR-SUG-01",  20),
-                new("OTH-ICE-01", 150, Optional: true),
-                new("PKG-CUP-M",    1),
-                new("PKG-STR-01",   1)
+                new("PRE-TEA-BLK", 150),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   25),
+                new("SYR-SUG-01",   20, Optional: true),
+                new("OTH-ICE-01",  150, Optional: true),
+                new("PKG-CUP-M",     1),
+                new("PKG-STR-01",    1)
             },
             SortOrder: 2, AllowTopping: true),
 
@@ -796,9 +885,10 @@ public static class MenuCatalog
             42000, "#A98B62", "#F0E6D6", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-OOL", 200),
-                new("DAI-MILK-01", 200),
-                new("SYR-SUG-01",   25),
+                new("PRE-TEA-OOL", 150),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   20),
+                new("SYR-SUG-01",   15, Optional: true),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -806,13 +896,15 @@ public static class MenuCatalog
             SortOrder: 3, AllowTopping: true),
 
         new("milktea", "Trà sữa matcha", "tra-sua-matcha",
-            "Matcha Uji nguyên chất, không dùng bột pha sẵn.",
+            "Matcha Uji nguyên chất trên nền ô long nhẹ.",
             50000, "#8FAE6B", "#EFF3E4", "new", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("POW-MAT-01",    5, Note: "Rây bột rồi đánh chasen với 40ml nước 80°C"),
-                new("DAI-MILK-01", 210),
-                new("SYR-SUG-01",   22),
+                new("PRE-TEA-OOL",  80, Note: "Nền trà nhẹ — nhiều hơn sẽ lấn vị matcha"),
+                new("POW-MAT-01",    4, Note: "Rây bột rồi đánh chasen với 40ml nước 80°C"),
+                new("DAI-MILK-01", 140),
+                new("DAI-CON-01",   20),
+                new("SYR-SUG-01",   10, Optional: true),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -824,10 +916,11 @@ public static class MenuCatalog
             52000, "#B58358", "#FAF0DC", "best-seller", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-BLK", 200),
-                new("DAI-MILK-01", 180),
+                new("PRE-TEA-BLK", 150),
+                new("DAI-MILK-01", 120),
+                new("DAI-CON-01",   15),
                 new("DAI-CHE-01",   40, Note: "Đánh bông, rót lên mặt, không khuấy"),
-                new("SYR-SUG-01",   22),
+                new("SYR-SUG-01",   15, Optional: true),
                 new("OTH-ICE-01",  140, Optional: true),
                 new("PKG-CUP-L",     1)
             },
@@ -838,10 +931,10 @@ public static class MenuCatalog
             46000, "#B4A0C4", "#EDE6F2", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-JAS", 175),
-                new("DAI-MILK-01", 200),
-                new("SYR-SUG-01",   28),
-                new("TOP-BOW-01",   40, Optional: true),
+                new("PRE-TEA-BLK", 150),
+                new("POW-TAR-01",   20, Note: "≈ 2 muỗng cà phê đầy, hòa tan trong cốt trà ấm"),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   20),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -849,13 +942,14 @@ public static class MenuCatalog
             SortOrder: 6, AllowTopping: true),
 
         new("milktea", "Trà sữa dâu", "tra-sua-dau",
-            "Trà lài ủ nhạt cho dậy mùi dâu, màu hồng phấn.",
+            "Nền ô long nhẹ cho dậy mùi dâu, màu hồng phấn.",
             46000, "#E0A8B4", "#F8DDE2", "new", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-JAS", 175),
-                new("DAI-MILK-01", 190),
-                new("SYR-STR-01",   30),
+                new("PRE-TEA-OOL", 150),
+                new("POW-STR-01",   20, Note: "≈ 2 muỗng cà phê đầy, hòa tan trong cốt trà ấm"),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   20),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -863,13 +957,15 @@ public static class MenuCatalog
             SortOrder: 7, AllowTopping: true),
 
         new("milktea", "Trà sữa socola", "tra-sua-socola",
-            "Hồng trà nhẹ nền, sốt socola đắng dịu phủ thành ly.",
+            "Hồng trà nhẹ nền, bột cacao đậm và sốt socola phủ thành ly.",
             45000, "#5B3B2A", "#C79C74", "", ServeStyle.Iced,
             new RecipeLine[]
             {
                 new("PRE-TEA-BLK", 150),
-                new("DAI-MILK-01", 190),
-                new("SYR-CHO-01",   30, Note: "Vẽ 10ml quanh thành ly trước khi rót"),
+                new("POW-CAC-01",   12, Note: "Hòa bột cacao với cốt trà nóng cho tan hết"),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   20),
+                new("SYR-CHO-01",   10, Note: "Vẽ quanh thành ly trước khi rót"),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -877,21 +973,25 @@ public static class MenuCatalog
             SortOrder: 8, AllowTopping: true),
 
         new("milktea", "Trà sữa thái xanh", "tra-sua-thai-xanh",
-            "Lục trà ủ đậm pha bột kem béo, vị Thái quen thuộc.",
+            "Bột trà thái xanh trên nền ô long, vị Thái quen thuộc.",
             42000, "#9FBE7A", "#EDF3E2", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-GRN", 200),
-                new("POW-CRE-01",  22),
-                new("DAI-CON-01",  20),
-                new("OTH-ICE-01", 150, Optional: true),
-                new("PKG-CUP-M",    1),
-                new("PKG-STR-01",   1)
+                new("PRE-TEA-OOL", 150),
+                new("POW-THG-01",   15, Note: "Hòa tan trong cốt trà nóng rồi lọc qua rây"),
+                new("DAI-MILK-01", 130),
+                new("DAI-CON-01",   25),
+                new("OTH-ICE-01",  150, Optional: true),
+                new("PKG-CUP-M",     1),
+                new("PKG-STR-01",    1)
             },
             SortOrder: 9, AllowTopping: true),
 
         // ======================================================================
-        //  TRÀ TRÁI CÂY
+        //  TRÀ TRÁI CÂY & SODA
+        //
+        //  Khung chung: 150ml cốt trà (hoặc 200ml soda) + 20–30ml siro trái cây
+        //  + nước cốt chanh/cam + 180g đá. Trang trí trái cây tươi và lá bạc hà.
         // ======================================================================
         new("fruit", "Trà đào cam sả", "tra-dao-cam-sa",
             "Đào ngâm, cam vàng và sả tươi đập dập, ủ cùng trà lài.",
@@ -899,17 +999,18 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-TEA-JAS", 150, Note: "Rót từ bình cốt trà lài đã ủ"),
-                new("SYR-PEA-01",  25, Note: "Siro trong hũ đào ngâm, không dùng siro pha sẵn"),
-                new("FRU-PEA-01",  60, Note: "2 miếng đào ngâm, mỗi miếng ≈ 30g, thái lát"),
-                new("FRU-ORA-01", 0.2, Note: "2 lát cam vàng cả vỏ, mỗi lát ≈ 15g"),
+                new("SYR-PEA-01",  25, Note: "Siro trong hũ đào ngâm"),
+                new("FRU-PEA-01",  60, Note: "Trang trí: 2 miếng đào, mỗi miếng ≈ 30g, thái lát"),
+                new("FRU-ORA-01", 0.2, Note: "2 lát cam vàng: 1 lát vắt nước, 1 lát trang trí"),
                 new("FRU-LGR-01",  12, Note: "1 cây sả cắt khúc, đập dập cho ra tinh dầu"),
-                new("FRU-LEM-01", 0.3, Note: "Vắt lấy nước, bỏ hạt"),
-                new("SYR-SUG-01",  15, Optional: true, Note: "Chỉnh theo mức đường khách chọn"),
+                new("FRU-LEM-01", 0.2, Note: "Vắt lấy nước cốt, bỏ hạt"),
+                new("SYR-SUG-01",  10, Optional: true, Note: "Trừ theo mức đường khách chọn"),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            Featured: true, SortOrder: 1, PrepSeconds: 150),
+            Featured: true, SortOrder: 1, PrepSeconds: 150, AllowTopping: true),
 
         new("fruit", "Trà vải", "tra-vai",
             "Vải ngâm nguyên trái, trà lài ướp hương.",
@@ -917,15 +1018,16 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-TEA-JAS", 150),
-                new("FRU-LYC-01",  70, Note: "5 trái vải ngâm, mỗi trái ≈ 14g"),
                 new("SYR-LYC-01",  25, Note: "Nước ngâm trong hũ vải"),
-                new("FRU-LEM-01", 0.3),
+                new("FRU-LYC-01",  56, Note: "Trang trí: 4 trái vải ngâm, mỗi trái ≈ 14g"),
+                new("FRU-LEM-01", 0.2),
                 new("SYR-SUG-01",  10, Optional: true),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 2),
+            SortOrder: 2, AllowTopping: true),
 
         new("fruit", "Trà chanh giã tay", "tra-chanh-gia-tay",
             "Chanh tươi giã cùng đá, chua mát, giải nhiệt.",
@@ -934,12 +1036,12 @@ public static class MenuCatalog
             {
                 new("PRE-TEA-BLK", 150),
                 new("FRU-LEM-01", 1.5, Note: "1 quả vắt lấy nước, nửa quả thái lát giã cùng đá"),
-                new("SYR-SUG-01",  28),
+                new("SYR-SUG-01",  28, Optional: true),
                 new("OTH-ICE-01", 200, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 3),
+            SortOrder: 3, AllowTopping: true),
 
         new("fruit", "Trà tắc mật ong", "tra-tac-mat-ong",
             "Tắc vắt tươi, mật ong rừng, hồng trà ủ nhạt.",
@@ -947,14 +1049,15 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-TEA-BLK", 150),
-                new("FRU-KUM-01",   3, Note: "3 quả tắc: 2 vắt nước, 1 thái lát bỏ vào ly"),
-                new("SYR-HON-01",  20),
+                new("FRU-KUM-01",   3, Note: "3 quả tắc: 2 vắt nước cốt, 1 bổ đôi trang trí"),
+                new("SYR-HON-01",  25),
                 new("SYR-SUG-01",  10, Optional: true),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 4),
+            SortOrder: 4, AllowTopping: true),
 
         new("fruit", "Trà ổi hồng", "tra-oi-hong",
             "Ổi ruột hồng ép lấy nước, dằm cùng trà lài.",
@@ -962,14 +1065,16 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-TEA-JAS", 150),
-                new("FRU-GUA-01",  80, Note: "Nửa quả ổi hồng, bỏ ruột hạt rồi ép"),
-                new("SYR-SUG-01",  25),
-                new("FRU-LEM-01", 0.3),
+                new("SYR-GUA-01",  20),
+                new("FRU-GUA-01",  60, Note: "50g ép lấy nước, 10g cắt miếng trang trí"),
+                new("FRU-LEM-01", 0.2),
+                new("SYR-SUG-01",  10, Optional: true),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 5),
+            SortOrder: 5, AllowTopping: true),
 
         new("fruit", "Trà dứa nhiệt đới", "tra-dua-nhiet-doi",
             "Dứa tươi cắt hạt lựu, hồng trà và một chút chanh.",
@@ -977,127 +1082,144 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("PRE-TEA-BLK", 150),
-                new("FRU-PIN-01",  90, Note: "≈ 1/8 quả dứa đã gọt, cắt hạt lựu"),
-                new("SYR-SUG-01",  25),
-                new("FRU-LEM-01", 0.3),
+                new("SYR-PIN-01",  20),
+                new("FRU-PIN-01",  70, Note: "≈ 1/10 quả dứa đã gọt: 60g hạt lựu, 10g miếng trang trí"),
+                new("FRU-LEM-01", 0.2),
+                new("SYR-SUG-01",  10, Optional: true),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 6),
+            SortOrder: 6, AllowTopping: true),
 
         new("fruit", "Soda dâu tây", "soda-dau-tay",
             "Dâu tây tươi dằm, soda mát lạnh.",
             48000, "#D63B3B", "#F5B8B8", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("FRU-STR-01",  50, Note: "4 quả dâu, bỏ cuống, dằm nhuyễn dưới đáy ly"),
-                new("SYR-STR-01",  15, Note: "Bù màu và độ ngọt cho phần dâu tươi đã giảm"),
+                new("SYR-STR-01",  30),
+                new("FRU-STR-01",  30, Note: "2 quả dằm dưới đáy ly + 1 quả bổ đôi trang trí"),
+                new("FRU-LEM-01", 0.2, Note: "Vắt lấy nước cốt"),
                 new("OTH-SOD-01", 200, Note: "Rót nghiêng ly để giữ ga"),
-                new("SYR-SUG-01",  18),
-                new("FRU-LEM-01", 0.3),
+                new("SYR-SUG-01",  10, Optional: true),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 150, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 7),
+            SortOrder: 7, AllowTopping: true),
 
         new("fruit", "Soda việt quất", "soda-viet-quat",
             "Việt quất dằm tím sẫm, soda và vỏ chanh bào.",
             50000, "#4A4A8C", "#B9B9DC", "new", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("FRU-BLU-01",  30, Note: "Rã đông trước 10 phút rồi dằm cả nước tiết ra"),
+                new("SYR-BLU-01",  30),
+                new("FRU-BLU-01",  20, Note: "Rã đông trước 10 phút; dằm 15g, 5g thả mặt trang trí"),
+                new("FRU-LEM-01", 0.2, Note: "Vắt nước cốt, bào ít vỏ lên mặt"),
                 new("OTH-SOD-01", 200),
-                new("SYR-SUG-01",  25),
-                new("FRU-LEM-01", 0.3),
+                new("SYR-SUG-01",   5, Optional: true),
+                new("FRU-MIN-01", 0.5, Optional: true, Note: "Trang trí: 1 ngọn bạc hà"),
                 new("OTH-ICE-01", 150, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 8),
+            SortOrder: 8, AllowTopping: true),
 
         new("fruit", "Soda chanh bạc hà", "soda-chanh-bac-ha",
             "Chanh và lá bạc hà giã nhẹ, soda đầy ga.",
             42000, "#8FC98F", "#DCEFD9", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("FRU-LEM-01",   1, Note: "Nửa quả vắt, nửa quả thái lát"),
+                new("SYR-MIN-01",  25),
+                new("FRU-LEM-01", 0.6, Note: "Nửa quả vắt nước cốt, 1 lát trang trí"),
                 new("FRU-MIN-01",   5, Note: "≈ 10 lá, vỗ nhẹ cho dậy mùi, KHÔNG giã nát"),
                 new("OTH-SOD-01", 200),
-                new("SYR-SUG-01",  30),
+                new("SYR-SUG-01",  10, Optional: true),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 9),
+            SortOrder: 9, AllowTopping: true),
 
         // ======================================================================
         //  TRÀ & THẢO MỘC
+        //
+        //  Khung chung: cốt trà xanh / ô long + nước cốt chanh hoặc gừng + mật
+        //  ong + đá. Trang trí lát chanh, lát gừng, hoa cúc khô.
         // ======================================================================
         new("tea", "Trà ô long nướng", "tra-o-long-nuong",
             "Ô long rang lửa nhỏ, uống không đường vẫn ngọt hậu.",
             35000, "#9A7B4F", "#D9C4A0", "", ServeStyle.HotOrIced,
             new RecipeLine[]
             {
-                new("PRE-TEA-OOL", 200, Note: "Rót từ bình cốt ô long — món này uống thuần nên rót đậm"),
-                new("SYR-SUG-01",  15, Optional: true),
+                new("PRE-TEA-OOL", 180, Note: "Trà ô long hãm — món uống thuần nên rót nhiều hơn trà sữa"),
+                new("SYR-SUG-01",  20, Optional: true),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 1),
+            SortOrder: 1, AllowTopping: true),
 
         new("tea", "Lục trà chanh", "luc-tra-chanh",
-            "Lục trà ủ lạnh, vắt chanh tươi, không sữa.",
+            "Lục trà ủ lạnh, vắt chanh tươi, mật ong, không sữa.",
             32000, "#B7CE6E", "#E6EFC6", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("PRE-TEA-GRN", 175),
-                new("FRU-LEM-01",   1),
-                new("SYR-SUG-01",  25),
+                new("PRE-TEA-GRN", 180),
+                new("FRU-LEM-01", 0.6, Note: "Nửa quả vắt nước cốt, 1 lát trang trí"),
+                new("SYR-HON-01",  20),
+                new("SYR-SUG-01",  10, Optional: true),
                 new("OTH-ICE-01", 180, Optional: true),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
-            SortOrder: 2),
+            SortOrder: 2, AllowTopping: true),
 
         new("tea", "Trà hoa cúc mật ong", "tra-hoa-cuc-mat-ong",
-            "Hoa cúc khô hãm nóng, thêm mật ong — uống buổi tối không mất ngủ.",
+            "Hoa cúc khô hãm cùng lục trà, thêm mật ong — uống buổi tối không mất ngủ.",
             38000, "#E4C558", "#F7EAC0", "new", ServeStyle.HotOrIced,
             new RecipeLine[]
             {
-                new("PRE-TEA-CHA", 220, Note: "Rót từ bình cốt hoa cúc, hâm lại tới 70°C"),
+                new("PRE-TEA-CHA", 120, Note: "Rót từ bình cốt hoa cúc, hâm lại tới 70°C"),
+                new("PRE-TEA-GRN",  80, Note: "Nền trà xanh"),
                 new("SYR-HON-01",  25, Note: "Chờ trà nguội dưới 60°C mới cho mật ong"),
+                new("TEA-CHA-01",   1, Optional: true, Note: "Trang trí: 3–4 bông hoa cúc khô thả mặt"),
                 new("OTH-ICE-01", 150, Optional: true, Note: "CHỈ khi khách chọn dùng đá"),
                 new("PKG-CUP-H",    1)
             },
-            SortOrder: 3, PrepSeconds: 120),
+            SortOrder: 3, PrepSeconds: 120, AllowTopping: true),
 
         new("tea", "Trà gừng mật ong", "tra-gung-mat-ong",
-            "Gừng tươi giã, mật ong và chanh — ấm bụng ngày mưa.",
+            "Gừng tươi đập dập hãm cùng lục trà, mật ong và chanh — ấm bụng ngày mưa.",
             38000, "#E0C892", "#F5E7C8", "", ServeStyle.Hot,
             new RecipeLine[]
             {
-                new("FRU-GIN-01",  12, Note: "≈ 3 lát dày, đập dập rồi hãm 5 phút"),
+                new("PRE-TEA-GRN", 150, Note: "Nền trà xanh, hâm nóng"),
+                new("FRU-GIN-01",  14, Note: "3 lát dày đập dập hãm 5 phút + 1 lát mỏng trang trí"),
                 new("SYR-HON-01",  25),
-                new("FRU-LEM-01", 0.3),
+                new("FRU-LEM-01", 0.2, Note: "Vắt nước cốt"),
                 new("PKG-CUP-H",    1)
             },
-            SortOrder: 4, PrepSeconds: 130),
+            SortOrder: 4, PrepSeconds: 130, AllowTopping: true),
 
         // ======================================================================
         //  ĐÁ XAY & SINH TỐ
+        //
+        //  Khung chung: 120–150ml sữa tươi + 180–200g đá xay + siro hoặc trái
+        //  cây tươi + kem béo. Trang trí kem tươi và trái cây tươi.
         // ======================================================================
         new("blended", "Sinh tố xoài", "sinh-to-xoai",
             "Xoài cát tươi xay cùng sữa, không dùng siro.",
             50000, "#F2B33D", "#FCEBC4", "best-seller", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("FRU-MAN-01", 180, Note: "≈ 1 quả xoài cát vừa, đã gọt và lóc hạt"),
-                new("DAI-MILK-01", 80),
-                new("SYR-SUG-01",  25),
-                new("OTH-ICE-01", 200),
+                new("FRU-MAN-01", 160, Note: "≈ 1 quả xoài cát nhỏ: 140g xay, 20g hạt lựu trang trí"),
+                new("DAI-MILK-01", 120),
+                new("DAI-WHIP-01", 20, Note: "Kem béo xay cùng cho sánh"),
+                new("SYR-SUG-01",  15, Optional: true),
+                new("OTH-ICE-01", 180),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
@@ -1109,14 +1231,14 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 // 90g chứ không phải 150g: dâu tây 180đ/g là nguyên liệu đắt nhất
-                // nhóm trái cây, 150g một ly đẩy giá vốn lên 36.000đ — bán 55.000đ
-                // là tỷ lệ giá vốn 66%, tức bán càng nhiều càng lỗ. 90g dâu tươi
-                // cộng 15ml siro dâu cho màu và độ ngọt tương đương.
-                new("FRU-STR-01",  90, Note: "≈ 7 quả dâu cỡ vừa, bỏ cuống"),
+                // nhóm trái cây. 90g dâu tươi cộng 15ml siro dâu cho màu và độ
+                // ngọt tương đương mà giá vốn không vượt mức.
+                new("FRU-STR-01",  90, Note: "≈ 7 quả: 6 quả xay, 1 quả bổ đôi trang trí"),
                 new("SYR-STR-01",  15),
-                new("DAI-MILK-01", 90),
-                new("SYR-SUG-01",  20),
-                new("OTH-ICE-01", 200),
+                new("DAI-MILK-01", 120),
+                new("DAI-WHIP-01", 10, Note: "Kem béo ít thôi — trái cây đã đắt, 10ml đủ sánh"),
+                new("SYR-SUG-01",  15, Optional: true),
+                new("OTH-ICE-01", 180),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
             },
@@ -1128,8 +1250,9 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("FRU-AVO-01", 150, Note: "≈ 1 quả bơ sáp vừa, bỏ vỏ và hạt"),
-                new("DAI-CON-01",  30),
-                new("DAI-MILK-01", 80),
+                new("DAI-CON-01",  25),
+                new("DAI-MILK-01", 120),
+                new("DAI-WHIP-01", 15),
                 new("OTH-ICE-01", 180),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
@@ -1141,12 +1264,14 @@ public static class MenuCatalog
             60000, "#4A4A8C", "#C4C4E0", "new", ServeStyle.Iced,
             new RecipeLine[]
             {
-                // 55g: việt quất đông lạnh 320đ/g là nguyên liệu đắt thứ nhì cả kho,
-                // chỉ sau bột matcha. 90g một ly ăn hết 29.000đ giá vốn.
-                new("FRU-BLU-01",  55, Note: "Rã đông trước 10 phút, giữ lại nước tiết ra"),
-                new("DAI-YOG-01",  60),
-                new("DAI-MILK-01", 80),
-                new("SYR-SUG-01",  25),
+                // 50g: việt quất đông lạnh 320đ/g là nguyên liệu đắt thứ nhì cả
+                // kho, chỉ sau bột matcha. Siro việt quất bù phần màu và vị.
+                new("FRU-BLU-01",  45, Note: "40g xay, 5g thả mặt trang trí"),
+                new("SYR-BLU-01",  15),
+                new("DAI-YOG-01",  50),
+                new("DAI-MILK-01", 100),
+                new("DAI-WHIP-01", 10, Note: "Kem béo ít thôi — trái cây đã đắt, 10ml đủ sánh"),
+                new("SYR-SUG-01",  10, Optional: true),
                 new("OTH-ICE-01", 180),
                 new("PKG-CUP-L",    1),
                 new("PKG-STR-01",   1)
@@ -1158,10 +1283,10 @@ public static class MenuCatalog
             52000, "#4E3225", "#FBF6EC", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("POW-CAC-01",  18),
+                new("POW-CAC-01",  19, Note: "18g xay cùng, 1g rắc lên kem"),
                 new("DAI-MILK-01", 150),
-                new("SYR-SUG-01",   25),
-                new("DAI-WHIP-01",  30, Note: "Đánh bông, bóp lên mặt sau khi xay"),
+                new("SYR-SUG-01",   25, Optional: true),
+                new("DAI-WHIP-01",  30, Note: "Kem béo đánh bông, bóp lên mặt sau khi xay"),
                 new("OTH-ICE-01",  200),
                 new("PKG-CUP-L",     1)
             },
@@ -1172,9 +1297,9 @@ public static class MenuCatalog
             58000, "#8FAE6B", "#FAF0DC", "new", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("POW-MAT-01",    7),
+                new("POW-MAT-01",    6, Note: "5,5g xay cùng, 0,5g rắc lên lớp kem"),
                 new("DAI-MILK-01", 150),
-                new("SYR-SUG-01",   25),
+                new("SYR-SUG-01",   25, Optional: true),
                 new("DAI-CHE-01",   35),
                 new("OTH-ICE-01",  200),
                 new("PKG-CUP-L",     1)
@@ -1188,8 +1313,8 @@ public static class MenuCatalog
             {
                 new("TOP-OREO-01",  35, Note: "25g xay cùng, 10g rắc lên mặt"),
                 new("DAI-MILK-01", 150),
-                new("DAI-WHIP-01",  30),
-                new("SYR-SUG-01",   20),
+                new("DAI-WHIP-01",  30, Note: "Kem tươi phủ mặt"),
+                new("SYR-SUG-01",   20, Optional: true),
                 new("OTH-ICE-01",  200),
                 new("PKG-CUP-L",     1)
             },
@@ -1202,8 +1327,9 @@ public static class MenuCatalog
             {
                 new("COF-ARA-01",   15),
                 new("DAI-MILK-01", 150),
-                new("SYR-CAR-01",   25),
-                new("DAI-WHIP-01",  25),
+                new("SYR-CAR-01",   30, Note: "25ml xay cùng, 5ml vẽ drizzle trên kem"),
+                new("DAI-WHIP-01",  25, Note: "Kem tươi phủ mặt"),
+                new("SYR-SUG-01",   10, Optional: true),
                 new("OTH-ICE-01",  200),
                 new("PKG-CUP-L",     1)
             },
@@ -1211,14 +1337,17 @@ public static class MenuCatalog
 
         // ======================================================================
         //  MATCHA & CACAO
+        //
+        //  Khung chung: bột matcha / cacao + 150ml sữa tươi + nước đường + kem
+        //  béo hoặc kem cheese. Trang trí kem tươi, rắc bột matcha / cacao.
         // ======================================================================
         new("matcha", "Matcha latte", "matcha-latte",
             "Matcha Uji đánh tay, sữa tươi nguyên kem.",
             48000, "#7CA24A", "#EFF3E4", "best-seller", ServeStyle.HotOrIced,
             new RecipeLine[]
             {
-                new("POW-MAT-01",    6, Note: "Rây rồi đánh chasen với 40ml nước 80°C"),
-                new("DAI-MILK-01", 220),
+                new("POW-MAT-01",  5.5, Note: "5g rây rồi đánh chasen với 40ml nước 80°C, 0,5g rắc mặt"),
+                new("DAI-MILK-01", 150),
                 new("SYR-SUG-01",   20, Optional: true),
                 new("OTH-ICE-01",  150, Optional: true),
                 new("PKG-CUP-M",     1),
@@ -1231,35 +1360,37 @@ public static class MenuCatalog
             55000, "#7CA24A", "#FAF0DC", "new", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("POW-MAT-01",    6),
-                new("DAI-MILK-01", 180),
+                new("POW-MAT-01",  5.5, Note: "5g đánh chasen, 0,5g rắc lên lớp kem cheese"),
+                new("DAI-MILK-01", 150),
                 new("DAI-CHE-01",   40),
-                new("SYR-SUG-01",   20),
+                new("SYR-SUG-01",   20, Optional: true),
                 new("OTH-ICE-01",  140, Optional: true),
                 new("PKG-CUP-L",     1)
             },
             SortOrder: 2),
 
         new("matcha", "Cacao nóng", "cacao-nong",
-            "Cacao nguyên chất đánh cùng sữa nóng.",
+            "Cacao nguyên chất đánh cùng sữa nóng, phủ kem tươi.",
             42000, "#5C3A21", "#C9A57B", "", ServeStyle.Hot,
             new RecipeLine[]
             {
-                new("POW-CAC-01",   16),
-                new("DAI-MILK-01", 200, Note: "Hâm tới 65°C, không đun sôi kẻo sữa tách"),
-                new("SYR-SUG-01",   22),
+                new("POW-CAC-01",   17, Note: "16g đánh tan với 30ml nước sôi, 1g rắc lên kem"),
+                new("DAI-MILK-01", 150, Note: "Hâm tới 65°C, không đun sôi kẻo sữa tách"),
+                new("SYR-SUG-01",   20, Optional: true),
+                new("DAI-WHIP-01",  15, Note: "Kem tươi phủ mặt"),
                 new("PKG-CUP-H",     1)
             },
             SortOrder: 3),
 
         new("matcha", "Cacao đá", "cacao-da",
-            "Cacao pha đậm, sữa đặc và đá — bản lạnh của cacao nóng.",
+            "Cacao pha đậm, sữa tươi, kem béo và đá — bản lạnh của cacao nóng.",
             42000, "#4E3225", "#B8916A", "", ServeStyle.Iced,
             new RecipeLine[]
             {
-                new("POW-CAC-01",   18),
-                new("DAI-MILK-01", 180),
-                new("DAI-CON-01",   20),
+                new("POW-CAC-01",   16, Note: "Đánh tan với 30ml nước sôi trước khi cho đá"),
+                new("DAI-MILK-01", 150),
+                new("SYR-SUG-01",   25, Optional: true),
+                new("DAI-WHIP-01",  15, Note: "Kem béo khuấy cùng cho sánh"),
                 new("OTH-ICE-01",  160, Optional: true),
                 new("PKG-CUP-M",     1),
                 new("PKG-STR-01",    1)
@@ -1267,19 +1398,24 @@ public static class MenuCatalog
             SortOrder: 4),
 
         new("matcha", "Socola nóng", "socola-nong",
-            "Sốt socola đen đánh cùng sữa nóng, rắc bột cacao.",
+            "Sốt socola đen đánh cùng sữa nóng, phủ kem tươi, rắc bột cacao.",
             45000, "#3E2418", "#B08050", "new", ServeStyle.Hot,
             new RecipeLine[]
             {
-                new("SYR-CHO-01",   40),
-                new("DAI-MILK-01", 200),
-                new("POW-CAC-01",    5, Note: "Rắc mặt trước khi đậy nắp"),
+                new("SYR-CHO-01",   30),
+                new("POW-CAC-01",   10, Note: "8g đánh cùng sữa, 2g rắc mặt trước khi đậy nắp"),
+                new("DAI-MILK-01", 150),
+                new("SYR-SUG-01",   10, Optional: true),
+                new("DAI-WHIP-01",  20, Note: "Kem tươi phủ mặt"),
                 new("PKG-CUP-H",     1)
             },
             SortOrder: 5),
 
         // ======================================================================
         //  SỮA CHUA
+        //
+        //  Khung chung: 130g sữa chua + siro trái cây / đường + đá xay.
+        //  Trang trí nha đam, trái cây tươi.
         // ======================================================================
         new("yogurt", "Sữa chua đánh đá", "sua-chua-danh-da",
             "Sữa chua nhà làm đánh cùng đá bào, chua mát.",
@@ -1288,7 +1424,8 @@ public static class MenuCatalog
             {
                 new("DAI-YOG-01", 130, Note: "≈ 1 hũ rưỡi sữa chua"),
                 new("DAI-CON-01",  20),
-                new("OTH-ICE-01", 180),
+                new("SYR-SUG-01",  10, Optional: true),
+                new("OTH-ICE-01", 180, Note: "Đá xay"),
                 new("PKG-CUP-M",    1),
                 new("PKG-STR-01",   1)
             },
@@ -1300,9 +1437,10 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("DAI-YOG-01", 130),
-                new("FRU-BLU-01",  30),
-                new("SYR-SUG-01",  20),
-                new("OTH-ICE-01", 160),
+                new("SYR-BLU-01",  25),
+                new("FRU-BLU-01",  20, Note: "Trang trí: dằm sơ, phủ mặt"),
+                new("SYR-SUG-01",  10, Optional: true),
+                new("OTH-ICE-01", 160, Note: "Đá xay"),
                 new("PKG-CUP-M",    1),
                 new("PKG-STR-01",   1)
             },
@@ -1314,9 +1452,9 @@ public static class MenuCatalog
             new RecipeLine[]
             {
                 new("DAI-YOG-01", 130),
-                new("TOP-ALO-01",  50, Note: "Rửa lại bằng nước lạnh cho hết nhớt"),
-                new("SYR-SUG-01",  20),
-                new("OTH-ICE-01", 160),
+                new("TOP-ALO-01",  50, Note: "40g trộn cùng, 10g trang trí mặt — rửa nước lạnh cho hết nhớt"),
+                new("SYR-SUG-01",  20, Optional: true),
+                new("OTH-ICE-01", 160, Note: "Đá xay"),
                 new("PKG-CUP-M",    1),
                 new("PKG-STR-01",   1)
             },
@@ -1412,10 +1550,9 @@ public static class MenuCatalog
     //  QUY TẮC ĐẶT SỐ — SAI LÀ LỆCH GIÁ VỐN TOÀN BỘ THỰC ĐƠN
     //
     //  1. TỶ LỆ QUY ĐỔI PHẢI KHỚP GIỮA MẺ VÀ LY.
-    //     Hồng trà: 80g cho 2000ml, tức 1g ↔ 25ml. Công thức ly trước đây ghi 8g
-    //     thì bây giờ phải ghi đúng 8 × 25 = 200ml. Giữ đúng tỷ lệ này thì giá
-    //     vốn mỗi ly KHÔNG ĐỔI so với trước khi tách bước — điều bắt buộc, vì
-    //     giá bán của quán đang được đặt dựa trên giá vốn cũ.
+    //     Hồng trà: 120g cho 2000ml, tức 6g ↔ 100ml. Một ly trà sữa rót 150ml
+    //     cốt là đã dùng 9g lá. Đổi tỷ lệ ủ thì phải đổi luôn đơn giá ước tính
+    //     của cốt trà ở §1 (giá lá × 0,06), không thì giá vốn gợi ý bị lệch.
     //
     //  2. SẢN LƯỢNG LÀ LƯỢNG SAU CÙNG RÓT VÀO BÌNH, không phải lượng nước đổ vào
     //     nồi. Lá trà ngậm nước, bã giữ lại vài trăm ml. Ghi lượng nước đổ vào
@@ -1451,31 +1588,35 @@ public static class MenuCatalog
     public static readonly PrepSpec[] PrepRecipes =
     {
         // ---- TRÀ ------------------------------------------------------------
-        // Tỷ lệ chung 1g lá ↔ 25ml cốt. Ủ đậm hơn mức uống trực tiếp vì còn phải
-        // pha thêm sữa và đá; uống thuần thì rót lượng nhiều hơn.
+        // Tỷ lệ chuẩn của quán: 6g lá trà cho 100ml cốt (khoảng giữa của mức
+        // 5–7g / 100ml nước sôi). Ủ đậm vì cốt còn được pha thêm sữa, siro và
+        // đá — pha loãng từ đầu thì tới ly đã nhạt thếch.
+        //
+        // Lá trà ngậm nước khoảng 2,5 lần khối lượng của nó, nên lượng nước đổ
+        // vào nồi phải nhiều hơn sản lượng mẻ đúng chừng đó.
         new("PREP-TEA-BLK", "Ủ hồng trà", "PRE-TEA-BLK", 2000, 6, 12,
-            "Tráng ấm bằng nước sôi. Ủ 80g hồng trà trong 2,2 lít nước 95°C đúng 6 phút "
+            "Tráng ấm bằng nước sôi. Ủ 120g hồng trà trong 2,3 lít nước 95°C đúng 6 phút "
           + "rồi LỌC BỎ BÃ NGAY — để bã trong bình thêm 5 phút là cả mẻ chát, không cứu được. "
-          + "Bã ngậm khoảng 200ml nên rót ra còn 2 lít. Ghi giờ ủ lên bình.",
-            new PrepLine[] { new("TEA-BLK-01", 80, "Cân bằng cân, đừng ước lượng bằng muỗng") },
+          + "Bã ngậm khoảng 300ml nên rót ra còn 2 lít. Ghi giờ ủ lên bình.",
+            new PrepLine[] { new("TEA-BLK-01", 120, "6g / 100ml — cân bằng cân, đừng ước lượng bằng muỗng") },
             SortOrder: 1),
 
         new("PREP-TEA-OOL", "Ủ trà ô long", "PRE-TEA-OOL", 1500, 6, 12,
-            "Ủ 60g ô long trong 1,7 lít nước 95°C, 5 phút. Ô long chịu nhiệt cao hơn hồng trà "
+            "Ủ 90g ô long trong 1,75 lít nước 95°C, 5 phút. Ô long chịu nhiệt cao hơn hồng trà "
           + "nhưng ủ quá 6 phút thì mất hậu ngọt. Lọc bã ngay.",
-            new PrepLine[] { new("TEA-OOL-01", 60) },
+            new PrepLine[] { new("TEA-OOL-01", 90, "6g / 100ml") },
             SortOrder: 2),
 
         new("PREP-TEA-JAS", "Ủ trà lài", "PRE-TEA-JAS", 1500, 6, 12,
-            "Ủ 60g trà lài trong 1,7 lít nước 90°C, 5 phút. Nước sôi 100°C làm bay hết hương lài — "
+            "Ủ 90g trà lài trong 1,75 lít nước 90°C, 5 phút. Nước sôi 100°C làm bay hết hương lài — "
           + "chờ nước nguội bớt rồi mới rót.",
-            new PrepLine[] { new("TEA-JAS-01", 60) },
+            new PrepLine[] { new("TEA-JAS-01", 90, "6g / 100ml") },
             SortOrder: 3),
 
         new("PREP-TEA-GRN", "Ủ lục trà", "PRE-TEA-GRN", 1500, 5, 12,
-            "Ủ 60g lục trà trong 1,7 lít nước 80°C, 4 phút. Lục trà là loại dễ chát nhất: "
+            "Ủ 90g lục trà trong 1,75 lít nước 80°C, 4 phút. Lục trà là loại dễ chát nhất: "
           + "nóng quá hoặc lâu quá đều hỏng. Hạn ngắn hơn các loại khác nên ủ vừa đủ dùng.",
-            new PrepLine[] { new("TEA-GRN-01", 60) },
+            new PrepLine[] { new("TEA-GRN-01", 90, "6g / 100ml") },
             SortOrder: 4),
 
         new("PREP-TEA-CHA", "Hãm hoa cúc", "PRE-TEA-CHA", 1100, 8, 10,
@@ -1497,6 +1638,63 @@ public static class MenuCatalog
           + "Mẻ này để được 7 ngày — làm một lần cho cả tuần.",
             new PrepLine[] { new("COF-ARA-01", 200, "Xay thô như đường cát, xay mịn sẽ lọc không hết") },
             SortOrder: 7),
+
+        // ---- TOPPING NẤU TẠI QUÁN ---------------------------------------------
+        //
+        //  Ba mẻ này là thứ hết giữa ca nhiều nhất trong một quán trà sữa, và cũng
+        //  là thứ nấu lại nhanh nhất. Vì vậy chúng phải bấm được ngay từ màn hình
+        //  quầy: hết trân châu lúc 4 giờ chiều mà bắt nhân viên bỏ khách chạy sang
+        //  trang Sơ chế thì mất cả mạch bán hàng.
+        //
+        //  Hạn dùng tính bằng GIỜ chứ không phải ngày: trân châu để qua đêm bị
+        //  cứng lại, sáng hôm sau nhai như hạt sạn. 8 tiếng là đúng một ca.
+        new("PREP-TOP-BOB", "Nấu trân châu đen", "TOP-BOB-01", 1000, 8, 25,
+            "Đun 3 lít nước SÔI MẠNH rồi mới thả 400g trân châu khô — thả vào nước chưa sôi thì "
+          + "hạt tan ra thành hồ. Luộc 20 phút, tắt bếp ủ thêm 15 phút cho chín tới lõi. "
+          + "Xả nước lạnh cho hạt săn lại, rồi ngâm đường đen. "
+          + "Ủ ẤM liên tục trong bình giữ nhiệt, đừng để tủ mát — lạnh là cứng.",
+            new PrepLine[]
+            {
+                new("TOP-BOB-RAW", 400, "Cân trước khi luộc, hạt nở gấp 2,5 lần"),
+                new("SYR-BRW-01",  100, "Ngâm sau khi xả nước lạnh, đảo đều cho ngấm")
+            },
+            SortOrder: 10),
+
+        new("PREP-TOP-BOW", "Nấu trân châu trắng", "TOP-BOW-01", 800, 8, 20,
+            "Thả 320g trân châu trắng vào 2,5 lít nước sôi, luộc 15 phút rồi ủ 10 phút. "
+          + "Trân châu trắng chín nhanh hơn loại đen và dễ nát — canh giờ, đừng luộc theo cảm tính. "
+          + "Xả lạnh rồi ngâm nước đường.",
+            new PrepLine[]
+            {
+                new("TOP-BOW-RAW", 320),
+                new("SYR-SUG-01",   80)
+            },
+            SortOrder: 11),
+
+        new("PREP-TOP-PUD", "Làm pudding trứng", "TOP-PUD-01", 1000, 24, 30,
+            "Đánh tan 120g bột pudding với 800ml sữa tươi và 4 quả trứng, LỌC QUA RÂY để bỏ lợn cợn — "
+          + "bỏ bước rây là pudding rỗ mặt. Hấp lửa nhỏ 20 phút, để nguội rồi mới cho vào ngăn mát. "
+          + "Cắt miếng ngay trước khi bán, cắt sẵn thì chảy nước.",
+            new PrepLine[]
+            {
+                new("TOP-PUD-RAW", 120),
+                new("DAI-MILK-01", 800),
+                new("OTH-EGG-01",    4)
+            },
+            SortOrder: 12),
+
+        new("PREP-TOP-COF", "Nấu thạch cà phê", "TOP-COF-01", 1000, 24, 20,
+            "Hòa 15g bột rau câu dẻo với 700ml nước nguội, khuấy đều rồi mới bắc lên bếp — "
+          + "đổ bột vào nước nóng là vón cục. Đun sôi, hạ lửa, thêm 150ml nước đường và 150ml "
+          + "cà phê phin cốt, khuấy 1 phút rồi tắt bếp. Đổ khay, để nguội hẳn rồi cho ngăn mát "
+          + "ít nhất 2 tiếng mới cắt hạt lựu. Nấu từ đầu ca, đừng đợi hết mới nấu.",
+            new PrepLine[]
+            {
+                new("TOP-AGA-RAW",  15, "Cân chính xác — dư 3g là thạch cứng như cao su"),
+                new("PRE-COF-PHI", 150),
+                new("SYR-SUG-01",  150)
+            },
+            SortOrder: 13),
 
         // ---- SIRO & KEM NHÀ LÀM -----------------------------------------------
         new("PREP-SYR-SUG", "Nấu nước đường", "SYR-SUG-01", 1500, 720, 25,

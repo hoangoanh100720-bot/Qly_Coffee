@@ -53,6 +53,12 @@ public class PlanningOptions
 
     /// <summary>Hệ số EWMA. Càng lớn càng ưu tiên dữ liệu gần đây.</summary>
     public double ForecastEwmaAlpha { get; set; } = 0.25;
+
+    /// <summary>
+    /// Danh sách cần nhập gợi ý lượng đủ dùng bao nhiêu ngày (ngoài ngưỡng tồn
+    /// tối thiểu). 3 ngày hợp với nhà cung cấp giao hằng ngày hoặc cách ngày.
+    /// </summary>
+    public int RestockCoverDays { get; set; } = 3;
 }
 
 public class WasteRiskService : IWasteRiskService

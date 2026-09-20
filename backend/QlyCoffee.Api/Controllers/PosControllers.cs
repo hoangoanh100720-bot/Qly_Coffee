@@ -30,12 +30,33 @@ public class PosController : BaseApiController
     private readonly AppDbContext _db;
     private readonly IOrderService _orders;
     private readonly IBarQueueService _queue;
+    private readonly IInventoryService _inventory;
+    private readonly IPrepService _prep;
 
-    public PosController(AppDbContext db, IOrderService orders, IBarQueueService queue)
+    /// <summary>
+    /// Ngưỡng "nấu nhanh được", tính bằng phút.
+    /// <para>
+    /// Dưới ngưỡng thì quầy báo khách chờ và cho bấm nấu ngay. Trên ngưỡng thì
+    /// món chuyển sang "Tạm ngưng" — bắt khách đứng chờ 90 phút ủ một mẻ cốt trà
+    /// không phải là phục vụ, đó là làm mất khách.
+    /// </para>
+    /// <para>
+    /// 20 phút là mức khách Việt còn chấp nhận đứng chờ một ly nước. Chỉnh bằng
+    /// biến POS_PREP_QUICK_MINUTES trong .env nếu quán thấy khác.
+    /// </para>
+    /// </summary>
+    private static int QuickPrepMinutes =>
+        int.TryParse(Environment.GetEnvironmentVariable("POS_PREP_QUICK_MINUTES"), out var v) ? v : 20;
+
+    public PosController(
+        AppDbContext db, IOrderService orders, IBarQueueService queue,
+        IInventoryService inventory, IPrepService prep)
     {
         _db = db;
         _orders = orders;
         _queue = queue;
+        _inventory = inventory;
+        _prep = prep;
     }
 
     /// <summary>
@@ -69,9 +90,150 @@ public class PosController : BaseApiController
                     .Where(v => v.IsActive)
                     .OrderBy(v => v.SortOrder)
                     .Select(v => new PosVariantDto(v.Id, v.Name, v.PriceDelta, v.IsDefault))
+                    .ToList(),
+
+                // CHỈ nhóm tùy chọn KHÔNG bắt buộc, tức là topping.
+                //
+                // Mức đường và mức đá cũng là nhóm tùy chọn nhưng IsRequired = true,
+                // giá bằng 0, và ở quầy đã có nút bấm nhanh ("Ít đá", "Không ngọt")
+                // xử lý rồi. Kéo chúng vào đây nữa thì nhân viên phải chọn hai lần
+                // cho cùng một thứ, mà quầy là nơi mỗi cú chạm thừa đều làm khách chờ.
+                ToppingIds = p.ModifierLinks
+                    .Where(l => l.Group != null && !l.Group.IsRequired)
+                    .OrderBy(l => l.SortOrder)
+                    .SelectMany(l => l.Group!.Modifiers
+                        .Where(m => m.IsActive)
+                        .OrderBy(m => m.SortOrder)
+                        .Select(m => m.Id))
                     .ToList()
             })
             .ToListAsync(ct);
+
+        // ---- Bảng topping dùng chung ----------------------------------------
+        // Nạp một lần rồi để frontend tra theo id. Xem chú thích ở PosProductDto
+        // để biết vì sao không nhúng thẳng vào từng món.
+        var toppingIds = products.SelectMany(p => p.ToppingIds).Distinct().ToList();
+
+        var toppingRows = await _db.Modifiers
+            .AsNoTracking()
+            .Where(m => toppingIds.Contains(m.Id))
+            .OrderBy(m => m.SortOrder)
+            .Select(m => new
+            {
+                m.Id, m.Name, m.PriceDelta, m.ColorHex,
+                Recipe = m.RecipeItems.Select(r => new { r.IngredientId, r.Quantity }).ToList()
+            })
+            .ToListAsync(ct);
+
+        // ---- Topping nào còn nguyên liệu ------------------------------------
+        //
+        //  BẮT BUỘC phải kiểm, không được để mặc định "còn": trân châu đen nấu
+        //  xong chỉ để được 3 ngày nên hết hàng giữa buổi là chuyện thường. Nếu
+        //  vẫn cho bấm, đơn nhận được nhưng tới lúc bấm HOÀN TẤT mới báo thiếu
+        //  nguyên liệu — tức là báo sau khi khách đã trả tiền và đứng chờ.
+        //
+        //  Tồn kho tra một lần cho mỗi nguyên liệu rồi dùng lại: bảy topping
+        //  thường chỉ đụng bảy nguyên liệu, nhưng kem cheese vừa là topping vừa
+        //  nằm trong công thức vài món nên vẫn có trùng.
+        var stockCache = new Dictionary<Guid, double>();
+
+        async Task<double> StockOf(Guid ingredientId)
+        {
+            if (stockCache.TryGetValue(ingredientId, out var cached)) return cached;
+            var s = await _inventory.GetAvailableStockAsync(ingredientId, ct);
+            stockCache[ingredientId] = s;
+            return s;
+        }
+
+        // ---- Nguyên liệu nào NẤU THÊM ĐƯỢC ngay bây giờ ---------------------
+        //
+        //  Tra một lần cho cả màn hình. Mỗi công thức sơ chế làm ra đúng một
+        //  bán thành phẩm, nên tra ngược theo OutputIngredientId là đủ.
+        //
+        //  MaxBatches < 1 nghĩa là hết cả nguyên liệu THÔ — nấu cũng không nấu
+        //  được, đó là lúc phải nhập hàng chứ không phải lúc bảo khách chờ.
+        var prepStatuses = await _prep.GetStatusAsync(CurrentStoreId, ct);
+
+        var prepByOutput = prepStatuses
+            .Where(s => s.MaxBatches >= 1)
+            .GroupBy(s => s.Recipe.OutputIngredientId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Recipe.PrepMinutes).First());
+
+        var toppings = new List<PosToppingDto>();
+
+        foreach (var m in toppingRows)
+        {
+            // Topping không có công thức thì không trừ kho được — coi như luôn còn.
+            // Chặn ở đây là chặn nhầm: lỗi nằm ở chỗ thiếu công thức, không phải hết hàng.
+            var available = true;
+            Guid? thieuId = null;
+
+            foreach (var line in m.Recipe)
+            {
+                if (await StockOf(line.IngredientId) < line.Quantity)
+                {
+                    available = false;
+                    thieuId = line.IngredientId;
+                    break;
+                }
+            }
+
+            // Hết thì tra xem có nấu thêm được không, và mất bao lâu.
+            PrepStatus? cachNau = null;
+            if (!available && thieuId is Guid tid) prepByOutput.TryGetValue(tid, out cachNau);
+
+            toppings.Add(new PosToppingDto(
+                m.Id, m.Name, m.PriceDelta, m.ColorHex, available,
+                PrepRecipeId: cachNau?.Recipe.Id,
+                PrepName:     cachNau?.Recipe.Name,
+                PrepMinutes:  cachNau?.Recipe.PrepMinutes ?? 0));
+        }
+
+        // ---- Món hết hàng: nấu thêm được hay phải ngưng bán? ------------------
+        //
+        //  Chỉ tính cho món ĐANG HẾT — món còn bán được thì không cần tra gì.
+        //  Dòng công thức TÙY CHỌN (đá, đường) không tính: hết đá không phải lý
+        //  do ngưng bán cà phê.
+        var hetHang = products.Where(p => !p.IsAvailable).Select(p => p.Id).ToList();
+
+        var congThucMonHet = await _db.RecipeItems.AsNoTracking()
+            .Where(r => hetHang.Contains(r.ProductId) && !r.IsOptional)
+            .Select(r => new { r.ProductId, r.IngredientId, r.Quantity })
+            .ToListAsync(ct);
+
+        var prepTheoMon = new Dictionary<Guid, (int Phut, Guid? RecipeId, bool Ngung)>();
+
+        foreach (var nhom in congThucMonHet.GroupBy(x => x.ProductId))
+        {
+            var thieu = new List<Guid>();
+            foreach (var dong in nhom)
+                if (await StockOf(dong.IngredientId) < dong.Quantity) thieu.Add(dong.IngredientId);
+
+            // Không thiếu nguyên liệu nào → món hết vì hàng chờ đã chiếm hết chỗ,
+            // chờ pha xong là bán tiếp. Không phải chuyện của sơ chế.
+            if (thieu.Count == 0) continue;
+
+            var cachNau = thieu.Select(i => prepByOutput.TryGetValue(i, out var s) ? s : null).ToList();
+
+            // Chỉ báo "chờ N phút" khi MỌI thứ đang thiếu đều nấu được. Thiếu một
+            // thứ phải đi mua thì nấu mấy mẻ cũng không bán được món này.
+            if (cachNau.Any(s => s is null))
+            {
+                prepTheoMon[nhom.Key] = (0, null, true);
+                continue;
+            }
+
+            var phut = cachNau.Max(s => s!.Recipe.PrepMinutes);
+            var lauNhat = cachNau.OrderByDescending(s => s!.Recipe.PrepMinutes).First()!.Recipe.Id;
+
+            // Nấu được thì LUÔN trả về công thức, kể cả khi quá lâu: nút "+" ở quầy
+            // vẫn phải bấm được. Chỉ có LỜI HỨA VỚI KHÁCH là khác nhau — dưới ngưỡng
+            // thì báo "chờ N phút", trên ngưỡng thì "tạm ngưng" và nhân viên tự
+            // quyết định có nấu để bán ca sau hay không.
+            prepTheoMon[nhom.Key] = phut <= QuickPrepMinutes
+                ? (phut, lauNhat, false)
+                : (phut, lauNhat, true);
+        }
 
         // Trừ phần đã bị các đơn trong hàng pha chiếm chỗ. Không làm bước này thì
         // giờ cao điểm nhân viên vẫn bấm được món mà nguyên liệu thực tế đã hết.
@@ -96,10 +258,14 @@ public class PosController : BaseApiController
                 QuantityInQueue: inQueue,
                 IsAvailable:     p.IsAvailable && remaining > 0,
                 PrepSeconds:     p.PrepSeconds,
-                Variants:        p.Variants);
+                Variants:        p.Variants,
+                ToppingIds:      p.ToppingIds,
+                PrepWaitMinutes: prepTheoMon.TryGetValue(p.Id, out var pr) && !pr.Ngung ? pr.Phut : 0,
+                PrepRecipeId:    prepTheoMon.TryGetValue(p.Id, out var pr2) ? pr2.RecipeId : null,
+                IsSuspended:     prepTheoMon.TryGetValue(p.Id, out var pr3) && pr3.Ngung);
         }).ToList();
 
-        return Ok(new PosMenuDto(categories, result));
+        return Ok(new PosMenuDto(categories, result, toppings));
     }
 
     /// <summary>
@@ -148,8 +314,9 @@ public class PosController : BaseApiController
         }
         catch (StockShortageException ex)
         {
-            return Fail<object>(409, "INSUFFICIENT_STOCK",
-                "Không đủ nguyên liệu cho đơn này.", ex.Shortages);
+            // Trả ĐỦ danh sách nguyên liệu thiếu để máy quầy hiện một lần
+            return Fail<object>(409, "INSUFFICIENT_STOCK", ex.Message,
+                new StockShortageDetailsDto(ex.Shortages, ex.Ingredients));
         }
         catch (InsufficientStockException ex)
         {
@@ -177,11 +344,27 @@ public class BarController : BaseApiController
 {
     private readonly IBarQueueService _queue;
     private readonly IOrderService _orders;
+    private readonly IRecipeService _recipe;
 
-    public BarController(IBarQueueService queue, IOrderService orders)
+    public BarController(IBarQueueService queue, IOrderService orders, IRecipeService recipe)
     {
         _queue = queue;
         _orders = orders;
+        _recipe = recipe;
+    }
+
+    /// <summary>
+    /// Phiếu pha của một món trong đơn: định lượng cho một ly theo đúng size,
+    /// mức đá, mức đường và topping khách chọn. Người pha bấm "Công thức" trên
+    /// thẻ món là thấy, khỏi phải nhớ hay mở trang quản lý món.
+    /// </summary>
+    [HttpGet("items/{orderItemId:guid}/recipe")]
+    public async Task<IActionResult> GetItemRecipe(Guid orderItemId, CancellationToken ct)
+    {
+        var card = await _recipe.GetBrewCardAsync(orderItemId, ct);
+        return card is null
+            ? Fail<BarRecipeDto>(404, "NOT_FOUND", "Không tìm thấy món này trong đơn.")
+            : Ok(card);
     }
 
     /// <summary>Hàng pha + thống kê đã bán trong ngày. Màn hình gọi lại mỗi 15 giây.</summary>
@@ -245,6 +428,11 @@ public class BarController : BaseApiController
                 order.Id, order.Code, (int)order.Status,
                 order.CostTotal, order.GrandTotal - order.CostTotal,
                 promisedVsActual));
+        }
+        catch (IngredientShortageException ex)
+        {
+            return Fail<object>(409, "INSUFFICIENT_STOCK", ex.Message,
+                new StockShortageDetailsDto(Array.Empty<StockShortageDto>(), ex.Shortages));
         }
         catch (InsufficientStockException ex)
         {

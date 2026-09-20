@@ -65,6 +65,7 @@ public class AppDbContext : DbContext
     public DbSet<PlanDecision> PlanDecisions => Set<PlanDecision>();
     public DbSet<DailyConsumption> DailyConsumptions => Set<DailyConsumption>();
     public DbSet<DailySales> DailySales => Set<DailySales>();
+    public DbSet<StockShortageLog> StockShortageLogs => Set<StockShortageLog>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -740,6 +741,39 @@ public class AppDbContext : DbContext
                 "Doanh số theo món theo ngày. Dùng tính số ly bán TB/ngày khi sinh phương án khuyến mãi."));
             e.HasIndex(x => new { x.StoreId, x.ProductId, x.BusinessDate }).IsUnique();
             e.Property(x => x.BusinessDate).HasMaxLength(10).IsRequired();
+        });
+
+        b.Entity<StockShortageLog>(e =>
+        {
+            e.ToTable("stock_shortage_logs", t => t.HasComment(
+                "Nguyên liệu đã chặn việc nhận đơn, gộp theo ngày. Nguồn của danh sách " +
+                "'Cần nhập hàng' trên trang Kế hoạch — tồn kho cuối ngày không cho biết " +
+                "trong ngày đã phải từ chối bao nhiêu đơn vì thiếu thứ gì."));
+
+            // Duy nhất: mỗi lần bị chặn là CẬP NHẬT dòng của ngày đó, không thêm
+            // dòng mới. Hai máy quầy cùng ghi một lúc thì một bên đâm vào chỉ mục
+            // và chuyển sang cập nhật (xem RestockService.RecordShortagesAsync).
+            e.HasIndex(x => new { x.StoreId, x.BusinessDate, x.IngredientId }).IsUnique();
+
+            e.Property(x => x.BusinessDate).HasMaxLength(10).IsRequired();
+            e.Property(x => x.MaxMissingQuantity).HasPrecision(18, 4)
+                .HasComment("Lượng thiếu LỚN NHẤT của một lần bị chặn, không phải tổng — bấm lại nhiều lần không được thổi phồng số cần nhập.");
+            e.Property(x => x.BlockedCount)
+                .HasComment("Số lần bấm nhận đơn bị chặn vì nguyên liệu này trong ngày.");
+            e.Property(x => x.AffectedProducts).HasMaxLength(500);
+
+            e.Property(x => x.ResolvedAt)
+                .HasComment("Lúc đã nhập bù đủ. NULL = còn treo, danh sách \"Cần nhập hàng\" vẫn báo.");
+            e.Property(x => x.RestockedQuantity).HasPrecision(18, 4)
+                .HasComment("Tổng lượng đã nhập bù kể từ lần chặn đầu trong ngày.");
+
+            // Truy vấn nóng: "hôm nay còn việc nhập nào chưa xong?" — lọc thẳng
+            // trên các dòng chưa nhập bù thay vì quét cả bảng nhật ký.
+            e.HasIndex(x => new { x.StoreId, x.BusinessDate })
+                .HasFilter("resolved_at IS NULL");
+
+            e.HasOne(x => x.Ingredient).WithMany()
+                .HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // ======================================================================

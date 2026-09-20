@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using QlyCoffee.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using QlyCoffee.Infrastructure.Persistence;
 namespace QlyCoffee.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260917110816_NhatKyThieuNguyenLieu")]
+    partial class NhatKyThieuNguyenLieu
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2290,17 +2293,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnName("max_missing_quantity")
                         .HasComment("Lượng thiếu LỚN NHẤT của một lần bị chặn, không phải tổng — bấm lại nhiều lần không được thổi phồng số cần nhập.");
 
-                    b.Property<DateTime?>("ResolvedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("resolved_at")
-                        .HasComment("Lúc đã nhập bù đủ. NULL = còn treo, danh sách \"Cần nhập hàng\" vẫn báo.");
-
-                    b.Property<double>("RestockedQuantity")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("double precision")
-                        .HasColumnName("restocked_quantity")
-                        .HasComment("Tổng lượng đã nhập bù kể từ lần chặn đầu trong ngày.");
-
                     b.Property<Guid>("StoreId")
                         .HasColumnType("uuid")
                         .HasColumnName("store_id");
@@ -2312,9 +2304,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("IngredientId");
-
-                    b.HasIndex("StoreId", "BusinessDate")
-                        .HasFilter("resolved_at IS NULL");
 
                     b.HasIndex("StoreId", "BusinessDate", "IngredientId")
                         .IsUnique();

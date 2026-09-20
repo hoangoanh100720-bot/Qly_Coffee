@@ -64,6 +64,7 @@ public record ProduceBatchCommand(
 public record PrepBatchResult(
     Guid LotId,
     string LotCode,
+    Guid OutputIngredientId,
     string OutputIngredientName,
     double OutputQuantity,
     string UnitLabel,
@@ -247,6 +248,7 @@ public class PrepService : IPrepService
         return new PrepBatchResult(
             LotId:                lot.Id,
             LotCode:              lot.LotCode,
+            OutputIngredientId:   output.Id,
             OutputIngredientName: output.Name,
             OutputQuantity:       outputQuantity,
             UnitLabel:            WasteRiskService.UnitLabel(output.BaseUnit),

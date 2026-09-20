@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using QlyCoffee.Domain.Entities;
 using QlyCoffee.Infrastructure.Persistence;
+using QlyCoffee.Shared;
 
 namespace QlyCoffee.Application.Services;
 
@@ -34,6 +35,9 @@ public interface IRecipeService
     Task<List<IngredientRequirement>> AggregateOrderAsync(IEnumerable<ExplodeRequest> items, CancellationToken ct = default);
     Task<int> ComputeProductCostAsync(Guid productId, CancellationToken ct = default);
     Task RecomputeAllProductCostsAsync(Guid storeId, CancellationToken ct = default);
+
+    /// <summary>Phiếu pha của một dòng đơn cho màn hình Pha chế. null nếu không có dòng đó.</summary>
+    Task<BarRecipeDto?> GetBrewCardAsync(Guid orderItemId, CancellationToken ct = default);
 }
 
 public record ExplodeRequest(
@@ -92,16 +96,47 @@ public class RecipeService : IRecipeService
                 .ToListAsync(ct)
             : new List<ModifierRecipeItem>();
 
+        // ---- Mức đá, mức đường, nóng hay đá khách đã chọn --------------------
+        // Ba nhóm này không có công thức riêng, nhưng chúng thay đổi lượng đá
+        // và nước đường THẬT SỰ rời khỏi kho. Bỏ qua chúng thì ly "không đá"
+        // vẫn trừ 150g đá, ly nóng vẫn trừ đá, ly "không đường" vẫn trừ nước
+        // đường — cuối tháng kiểm kê sẽ thấy đá và nước đường "thừa" hoài.
+        var choices = new List<(string Name, string Kind)>();
+        if (req.ModifierIds.Count > 0)
+        {
+            var rows = await _db.Modifiers
+                .AsNoTracking()
+                .Where(m => req.ModifierIds.Contains(m.Id))
+                .Select(m => new { m.Name, m.Group!.Kind })
+                .ToListAsync(ct);
+            choices = rows.Select(r => (r.Name, r.Kind)).ToList();
+        }
+
+        var iceFactor = IceFactor(
+            choices.Where(c => c.Kind == ModifierGroupKinds.Ice).Select(c => c.Name).FirstOrDefault(),
+            choices.Where(c => c.Kind == ModifierGroupKinds.Temperature).Select(c => c.Name).FirstOrDefault());
+
+        var sugarFactor = SugarFactor(
+            choices.Where(c => c.Kind == ModifierGroupKinds.Sugar).Select(c => c.Name).FirstOrDefault());
+
         // ---- Gộp lại --------------------------------------------------------
         // Dùng Dictionary vì một nguyên liệu có thể xuất hiện ở cả công thức gốc
         // lẫn topping (VD: sữa có trong trà sữa, và topping "thêm sữa" cũng dùng sữa).
         var acc = new Dictionary<Guid, (string Name, double Qty, double Wastage, int Cost)>();
 
-        // Bước 1 — công thức gốc, CÓ nhân hệ số size
+        // Bước 1 — công thức gốc, CÓ nhân hệ số size và hệ số đá / đường
         foreach (var r in recipeItems)
         {
             if (r.Ingredient is null) continue;
-            Accumulate(acc, r.Ingredient, r.Quantity * multiplier);
+
+            var factor = r.Ingredient.Sku == IceSku ? iceFactor
+                       // Chỉ dòng đường TÙY CHỌN mới theo mức đường khách chọn.
+                       // Dòng bắt buộc là đường thuộc về cấu trúc món (ngâm topping…).
+                       : r.Ingredient.Sku == SugarSyrupSku && r.IsOptional ? sugarFactor
+                       : 1.0;
+
+            if (factor <= 0) continue;
+            Accumulate(acc, r.Ingredient, r.Quantity * multiplier * factor);
         }
 
         // Bước 2 — topping, KHÔNG nhân hệ số size
@@ -118,6 +153,160 @@ public class RecipeService : IRecipeService
             Math.Round(kv.Value.Qty * (1 + kv.Value.Wastage) * req.Quantity, 4),
             kv.Value.Cost
         )).ToList();
+    }
+
+    // ==========================================================================
+    //  MỨC ĐÁ / MỨC ĐƯỜNG
+    // ==========================================================================
+
+    /// <summary>Mã đá viên trong kho (MenuCatalog). Dòng mang mã này theo mức đá.</summary>
+    public const string IceSku = "OTH-ICE-01";
+
+    /// <summary>Mã nước đường nhà nấu. Dòng TÙY CHỌN mang mã này theo mức đường.</summary>
+    public const string SugarSyrupSku = "SYR-SUG-01";
+
+    // ==========================================================================
+    //  PHIẾU PHA — công thức hiện cho người pha ở màn hình Pha chế
+    // ==========================================================================
+
+    /// <summary>
+    /// Công thức của MỘT dòng đơn, đúng như ly khách gọi: nhân hệ số size, áp
+    /// mức đá / mức đường, cộng topping. Định lượng là cho MỘT ly và KHÔNG gồm
+    /// hao hụt — hao hụt là phần rơi vãi của kho, người pha đong đúng công thức.
+    /// <para>
+    /// Dùng CÙNG hệ số với <see cref="ExplodeOrderItemAsync"/>, nên thứ người
+    /// pha nhìn thấy khớp với thứ kho sẽ trừ khi bấm Hoàn tất.
+    /// </para>
+    /// </summary>
+    public async Task<BarRecipeDto?> GetBrewCardAsync(Guid orderItemId, CancellationToken ct = default)
+    {
+        var item = await _db.OrderItems.AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == orderItemId, ct);
+        if (item is null) return null;
+
+        var multiplier = 1.0;
+        if (item.VariantId is Guid vId)
+            multiplier = await _db.ProductVariants.AsNoTracking()
+                .Where(v => v.Id == vId)
+                .Select(v => (double?)v.RecipeMultiplier)
+                .FirstOrDefaultAsync(ct) ?? 1.0;
+
+        var modifierIds = OrderService.ParseModifierIds(item.ModifiersJson);
+
+        var chosen = await _db.Modifiers.AsNoTracking()
+            .Where(m => modifierIds.Contains(m.Id))
+            .Select(m => new { m.Id, m.Name, m.Group!.Kind, m.SortOrder })
+            .ToListAsync(ct);
+
+        string? Pick(string kind) => chosen.Where(c => c.Kind == kind).Select(c => c.Name).FirstOrDefault();
+        var iceChoice   = Pick(ModifierGroupKinds.Ice);
+        var tempChoice  = Pick(ModifierGroupKinds.Temperature);
+        var sugarChoice = Pick(ModifierGroupKinds.Sugar);
+        var iceFactor   = IceFactor(iceChoice, tempChoice);
+        var sugarFactor = SugarFactor(sugarChoice);
+
+        var recipe = await _db.RecipeItems.AsNoTracking()
+            .Include(r => r.Ingredient)
+            .Where(r => r.ProductId == item.ProductId)
+            .OrderBy(r => r.IsOptional).ThenBy(r => r.Ingredient!.Category)
+            .ToListAsync(ct);
+
+        var lines = new List<BarRecipeLineDto>();
+
+        foreach (var r in recipe)
+        {
+            if (r.Ingredient is null) continue;
+            var ing = r.Ingredient;
+
+            // Bao bì không phải thứ "đong" — người pha lấy ly theo size, không cần đọc.
+            if (ing.Category == Domain.Enums.IngredientCategory.Packaging) continue;
+
+            var isIce = ing.Sku == IceSku;
+            var isSugar = ing.Sku == SugarSyrupSku && r.IsOptional;
+            var factor = isIce ? iceFactor : isSugar ? sugarFactor : 1.0;
+
+            string? skip = null;
+            if (factor <= 0)
+                skip = isIce
+                    ? (tempChoice is not null && ModifierGroupKinds.IsHotChoice(tempChoice)
+                        ? "Dùng nóng — không cho đá" : "Khách chọn không đá")
+                    : "Khách chọn không đường";
+
+            var note = r.Note;
+            if (factor is > 0 and < 1)
+                note = string.IsNullOrEmpty(note)
+                    ? $"Theo lựa chọn: {(isIce ? iceChoice : sugarChoice)}"
+                    : $"{note} · {(isIce ? iceChoice : sugarChoice)}";
+
+            lines.Add(new BarRecipeLineDto(
+                ing.Name, ing.ColorHex,
+                Math.Round(r.Quantity * multiplier * Math.Max(factor, 0), 1),
+                UnitLabelOf(ing.BaseUnit), r.IsOptional, IsTopping: false, note, skip));
+        }
+
+        // Topping: không nhân size — một muỗng là một muỗng, ly to hay nhỏ.
+        var toppingIds = chosen.Where(c => c.Kind == ModifierGroupKinds.Topping).Select(c => c.Id).ToList();
+        if (toppingIds.Count > 0)
+        {
+            var toppingLines = await _db.ModifierRecipeItems.AsNoTracking()
+                .Include(m => m.Ingredient)
+                .Where(m => toppingIds.Contains(m.ModifierId))
+                .ToListAsync(ct);
+
+            foreach (var t in toppingLines.Where(t => t.Ingredient is not null))
+                lines.Add(new BarRecipeLineDto(
+                    t.Ingredient!.Name, t.Ingredient.ColorHex, Math.Round(t.Quantity, 1),
+                    UnitLabelOf(t.Ingredient.BaseUnit), IsOptional: false, IsTopping: true,
+                    "Topping khách chọn thêm", null));
+        }
+
+        var choices = string.Join(" · ", chosen
+            .Where(c => c.Kind != ModifierGroupKinds.Topping)
+            .Select(c => c.Name));
+
+        return new BarRecipeDto(item.Id, item.ProductName, item.VariantName, item.Quantity, choices, lines);
+    }
+
+    private static string UnitLabelOf(Domain.Enums.BaseUnit u) => u switch
+    {
+        Domain.Enums.BaseUnit.Gram       => "g",
+        Domain.Enums.BaseUnit.Milliliter => "ml",
+        _                                => "cái"
+    };
+
+    /// <summary>
+    /// Tỉ lệ đá thật sự dùng. Chọn "Dùng nóng" là 0 bất kể mức đá (nhóm mức đá
+    /// bị ẩn nhưng có thể còn giá trị mặc định cũ gửi lên).
+    /// Không chọn gì = dùng đủ công thức, giữ nguyên hành vi cũ cho đơn cũ.
+    /// </summary>
+    public static double IceFactor(string? iceChoice, string? temperatureChoice)
+    {
+        if (temperatureChoice is not null && ModifierGroupKinds.IsHotChoice(temperatureChoice))
+            return 0;
+
+        if (string.IsNullOrWhiteSpace(iceChoice)) return 1;
+
+        var s = iceChoice.ToLowerInvariant();
+        if (s.Contains("không")) return 0;
+        if (s.Contains("ít"))    return 0.3;
+        return ParsePercent(s) ?? 1;
+    }
+
+    /// <summary>"70% đường" → 0,7 · "Không đường" → 0 · không chọn → 1.</summary>
+    public static double SugarFactor(string? sugarChoice)
+    {
+        if (string.IsNullOrWhiteSpace(sugarChoice)) return 1;
+
+        var s = sugarChoice.ToLowerInvariant();
+        if (s.Contains("không")) return 0;
+        if (s.Contains("ít"))    return 0.3;
+        return ParsePercent(s) ?? 1;
+    }
+
+    private static double? ParsePercent(string s)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(s, @"(\d{1,3})\s*%");
+        return m.Success ? Math.Clamp(int.Parse(m.Groups[1].Value) / 100.0, 0, 1) : null;
     }
 
     private static void Accumulate(

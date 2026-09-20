@@ -40,14 +40,88 @@ public class MediaController : BaseApiController
         _logger = logger;
     }
 
-    /// <summary>Đuôi file cho phép, kèm Content-Type hợp lệ tương ứng.</summary>
-    private static readonly Dictionary<string, string> AllowedTypes = new(StringComparer.OrdinalIgnoreCase)
+    /// <summary>
+    /// Đuôi file → Content-Type hợp lệ. Bảng tra đầy đủ mọi định dạng hệ thống
+    /// BIẾT cách kiểm chữ ký byte; danh sách thật sự cho phép lọc ra từ bảng này
+    /// theo <c>ALLOWED_IMAGE_TYPES</c> trong .env.
+    /// </summary>
+    private static readonly Dictionary<string, string> KnownTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         [".jpg"]  = "image/jpeg",
         [".jpeg"] = "image/jpeg",
         [".png"]  = "image/png",
         [".webp"] = "image/webp"
     };
+
+    /// <summary>
+    /// Định dạng ảnh quán cho phép tải lên, đọc từ <c>ALLOWED_IMAGE_TYPES</c>.
+    /// <para>
+    /// Chỉ SIẾT được chứ không nới ra: gõ thêm "image/gif" vào .env cũng không có
+    /// tác dụng, vì <see cref="LooksLikeImage"/> không biết chữ ký byte của GIF —
+    /// mà tầng kiểm chữ ký mới là tầng thật sự chặn được file giả dạng ảnh.
+    /// Nới thêm định dạng thì phải sửa cả hai chỗ.
+    /// </para>
+    /// </summary>
+    private static Dictionary<string, string> AllowedTypes
+    {
+        get
+        {
+            var raw = Environment.GetEnvironmentVariable("ALLOWED_IMAGE_TYPES");
+            if (string.IsNullOrWhiteSpace(raw)) return KnownTypes;
+
+            var wanted = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var filtered = KnownTypes
+                .Where(kv => wanted.Contains(kv.Value))
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.OrdinalIgnoreCase);
+
+            // Cấu hình sai (gõ nhầm, hoặc chỉ liệt kê định dạng lạ) thì quay về
+            // bảng đầy đủ. Khóa sạch đường tải ảnh vì một dấu phẩy đặt sai là
+            // phản ứng tệ hơn nhiều so với việc cho phép đúng bốn định dạng cũ.
+            return filtered.Count > 0 ? filtered : KnownTypes;
+        }
+    }
+
+    /// <summary>
+    /// Thư mục chứa ảnh món trên đĩa, dựng từ <c>STORAGE_LOCAL_PATH</c> trong .env.
+    /// <para>
+    /// Biến trong .env ghi đường dẫn TƯƠNG ĐỐI so với thư mục chạy ứng dụng
+    /// (mặc định <c>wwwroot/uploads</c>). Ảnh món nằm ở thư mục con
+    /// <c>products/</c> để sau này còn chỗ cho ảnh nguyên liệu, logo, ảnh nhân viên.
+    /// </para>
+    /// <para>
+    /// Đường dẫn ra ngoài thư mục gốc bị chặn: cấu hình gõ nhầm thành "../../"
+    /// sẽ khiến ảnh khách tải lên rơi ra ngoài vùng phục vụ file tĩnh, và tệ hơn
+    /// là ghi đè file hệ thống.
+    /// </para>
+    /// </summary>
+    private static string ProductImageDir(IWebHostEnvironment env)
+    {
+        var webRoot = env.WebRootPath ?? Path.Combine(env.ContentRootPath, "wwwroot");
+        var configured = Environment.GetEnvironmentVariable("STORAGE_LOCAL_PATH");
+
+        // Không cấu hình gì thì dùng mặc định cũ, không đổi hành vi.
+        if (string.IsNullOrWhiteSpace(configured))
+            return Path.Combine(webRoot, "uploads", "products");
+
+        // ".env" ghi "wwwroot/uploads" — phần "wwwroot/" đã nằm trong webRoot rồi
+        var relative = configured.Trim()
+            .Replace('\\', '/')
+            .TrimStart('/');
+
+        if (relative.StartsWith("wwwroot/", StringComparison.OrdinalIgnoreCase))
+            relative = relative["wwwroot/".Length..];
+
+        var dir = Path.GetFullPath(Path.Combine(webRoot, relative, "products"));
+
+        // Chặn đường vượt ra ngoài wwwroot
+        var rootFull = Path.GetFullPath(webRoot);
+        if (!dir.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
+            return Path.Combine(webRoot, "uploads", "products");
+
+        return dir;
+    }
 
     /// <summary>
     /// Chữ ký byte đầu file (magic number) của từng định dạng ảnh.
@@ -91,10 +165,15 @@ public class MediaController : BaseApiController
                 $"Ảnh {file.Length / 1024 / 1024}MB, vượt giới hạn {maxMb}MB. Nén bớt rồi thử lại.");
 
         // ---- Tầng 1: đuôi file --------------------------------------------
+        // Câu báo lỗi liệt kê ĐÚNG những đuôi đang được phép, không viết cứng:
+        // quán siết ALLOWED_IMAGE_TYPES lại mà thông báo vẫn mời tải .png lên
+        // thì nhân viên sẽ thử đi thử lại một việc chắc chắn thất bại.
+        var allowed = AllowedTypes;
         var ext = Path.GetExtension(file.FileName);
-        if (string.IsNullOrEmpty(ext) || !AllowedTypes.TryGetValue(ext, out var expectedMime))
+
+        if (string.IsNullOrEmpty(ext) || !allowed.TryGetValue(ext, out var expectedMime))
             return Fail<object>(400, "BAD_TYPE",
-                "Chỉ nhận ảnh .jpg, .png hoặc .webp.");
+                $"Chỉ nhận ảnh {string.Join(", ", allowed.Keys.Order())}.");
 
         // ---- Tầng 2: Content-Type phải khớp đuôi --------------------------
         if (!string.Equals(file.ContentType, expectedMime, StringComparison.OrdinalIgnoreCase))
@@ -114,10 +193,7 @@ public class MediaController : BaseApiController
         // ---- Ghi xuống đĩa -------------------------------------------------
         // Tên file do SERVER sinh. Không bao giờ dùng file.FileName để đặt tên:
         // client có thể gửi "../../appsettings.json" hoặc tên trùng đè ảnh khác.
-        // STORAGE_LOCAL_PATH trong .env trỏ tới wwwroot/uploads; ảnh món nằm ở
-        // thư mục con products/ để sau này còn chỗ cho ảnh nguyên liệu, logo…
-        var absoluteDir = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"),
-                                       "uploads", "products");
+        var absoluteDir = ProductImageDir(_env);
         Directory.CreateDirectory(absoluteDir);
 
         var fileName = $"{GuidV7.New():N}{ext.ToLowerInvariant()}";
@@ -188,9 +264,7 @@ public class MediaController : BaseApiController
 
         if (!string.IsNullOrEmpty(old) && old.StartsWith("/uploads/products/"))
         {
-            var dir = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"),
-                                   "uploads", "products");
-            var path = Path.Combine(dir, Path.GetFileName(old));
+            var path = Path.Combine(ProductImageDir(_env), Path.GetFileName(old));
             if (System.IO.File.Exists(path))
             {
                 try { System.IO.File.Delete(path); }
