@@ -124,12 +124,19 @@
                     <a href="mailto:@StoreEmail" class="small" itemprop="email">@StoreEmail</a>
                 </div>
 
-                <div class="stack stack-2">
-                    <span class="label">Dành cho nhân viên</span>
-                    @* rel="nofollow": không muốn bot dồn "sức mạnh liên kết" vào
-                       trang quản lý, vốn đã bị chặn lập chỉ mục. *@
-                    <a href="/admin" class="small" rel="nofollow">Trang quản lý</a>
-                </div>
+                @* Trang quản lý giờ là ứng dụng riêng, có thể ở tên miền khác,
+                   nên địa chỉ lấy từ cấu hình. Không khai báo thì khối này biến
+                   mất hoàn toàn — xem AppLinks.cs.
+
+                   rel="nofollow": không muốn bot dồn "sức mạnh liên kết" vào
+                   trang quản lý, vốn đã bị chặn lập chỉ mục. *@
+                @if (AppLinks.HasAdminUrl)
+                {
+                    <div class="stack stack-2">
+                        <span class="label">Dành cho nhân viên</span>
+                        <a href="@AppLinks.AdminUrl" class="small" rel="nofollow">Trang quản lý</a>
+                    </div>
+                }
             </div>
 
             <div class="footer-bottom">

@@ -121,11 +121,19 @@ Windows của máy chủ.
 Mở `.env` ở gốc dự án và sửa các dòng sau cho đúng tên miền thật:
 
 ```ini
+# Địa chỉ backend — cả hai app frontend đều gọi tới đây
 CLIENT_API_URL=https://api.motchutcoffee.vn
-ADMIN_SHOP_URL=https://motchutcoffee.vn
+
+# Hai app trỏ sang nhau. Mỗi biến lo một chiều:
+ADMIN_SHOP_URL=https://motchutcoffee.vn          # quản lý -> bán hàng
+ADMIN_BASE_URL=https://quanly.motchutcoffee.vn   # bán hàng -> quản lý
 
 CORS_ALLOWED_ORIGINS=https://motchutcoffee.vn,https://quanly.motchutcoffee.vn
 ```
+
+> Để trống `ADMIN_BASE_URL` thì liên kết "Trang quản lý" ở chân trang bán hàng
+> tự ẩn đi. Đó là lựa chọn hợp lý nếu bạn không muốn lộ địa chỉ trang quản lý
+> ra trang công khai — nhân viên vẫn vào được bằng dấu trang trên máy của quán.
 
 > ⚠️ `CORS_ALLOWED_ORIGINS` phải có **cả hai** tên miền frontend. Thiếu tên miền
 > app quản lý thì trình duyệt chặn mọi lời gọi từ nó, và triệu chứng rất dễ chẩn

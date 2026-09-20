@@ -33,7 +33,7 @@ else if (_product is null)
     <div class="empty">
         <CupIcon Size="52" CssClass="empty-icon" />
         <span class="empty-title">Không tìm thấy món</span>
-        <a href="/admin/mon" class="btn btn-secondary">Quay lại danh sách món</a>
+        <a href="/mon" class="btn btn-secondary">Quay lại danh sách món</a>
     </div>
 }
 else
@@ -59,7 +59,7 @@ else
                 </div>
 
                 <div class="row row-2">
-                    <a href="/admin/mon" class="btn btn-ghost btn-sm">Quay lại</a>
+                    <a href="/mon" class="btn btn-ghost btn-sm">Quay lại</a>
                     <button class="btn btn-primary btn-sm" @onclick="SaveAsync" disabled="@(!CanSave)">
                         @if (_saving)
                         {

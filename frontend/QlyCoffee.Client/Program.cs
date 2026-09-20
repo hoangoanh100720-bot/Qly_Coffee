@@ -33,6 +33,11 @@ if (string.IsNullOrWhiteSpace(apiBaseUrl))
 // Ảnh món lưu ở backend nên cần biết địa chỉ backend để ghép đường dẫn
 Media.ApiBaseUrl = apiBaseUrl;
 
+// --- Liên kết sang app quản lý ----------------------------------------------
+// Hai ứng dụng có thể ở hai tên miền, nên đây là cấu hình chứ không phải "/admin".
+// Để trống thì liên kết ở chân trang tự ẩn đi.
+AppLinks.AdminUrl = builder.Configuration["AdminUrl"] ?? "";
+
 builder.Services.AddScoped(_ => new HttpClient
 {
     BaseAddress = new Uri(apiBaseUrl),

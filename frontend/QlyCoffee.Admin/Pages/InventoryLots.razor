@@ -35,7 +35,7 @@
         </div>
 
         <div class="row row-2">
-            <a href="/admin/nhap-kho" class="btn btn-primary btn-sm">
+            <a href="/nhap-kho" class="btn btn-primary btn-sm">
                 <PlusIcon Size="14" /> Nhập kho
             </a>
             <button class="btn btn-secondary btn-sm" @onclick="LoadAsync">
@@ -121,7 +121,7 @@
             </span>
             @if (_allLots.Count == 0)
             {
-                <a href="/admin/nhap-kho" class="btn btn-primary">
+                <a href="/nhap-kho" class="btn btn-primary">
                     <PlusIcon Size="16" /> Nhập kho
                 </a>
             }
@@ -226,9 +226,17 @@
                                             <TrashIcon Size="14" />
                                         </button>
                                     }
-                                    <a href="/admin/nguyen-lieu/@lot.IngredientId"
+                                    @* Trỏ về DANH SÁCH nguyên liệu, không kèm mã.
+                                       Bản trước là "/admin/nguyen-lieu/@lot.IngredientId",
+                                       nhưng trang Nguyên liệu chỉ khai báo đúng một route
+                                       không tham số, nên đường dẫn đó luôn rơi vào trang
+                                       "không tìm thấy" — lỗi có sẵn từ trước khi tách dự án.
+                                       Muốn giữ đúng ý định ban đầu thì phải làm thêm màn
+                                       hình chi tiết một nguyên liệu, hoặc cho trang danh
+                                       sách nhận tham số rồi tự cuộn tới đúng dòng. *@
+                                    <a href="/nguyen-lieu"
                                        class="btn btn-ghost btn-sm"
-                                       title="Xem nguyên liệu">
+                                       title="Xem danh sách nguyên liệu">
                                         <ArrowIcon Size="14" />
                                     </a>
                                 </div>

@@ -78,7 +78,7 @@
             </button>
             @if (Mode == RestockMode.Plan && _data is not null && _data.Items.Count > 0)
             {
-                <a href="/admin/nhap-kho" class="btn btn-primary btn-sm">
+                <a href="/nhap-kho" class="btn btn-primary btn-sm">
                     Nhập kho theo danh sách <ArrowIcon Size="14" />
                 </a>
             }
@@ -291,7 +291,7 @@
                             $"{p.Name} ({p.StatusLabel.ToLowerInvariant()}, còn {Qty.Format(p.Available)} {p.UnitLabel})"))
                     </span>
                 </div>
-                <a href="/admin/so-che" class="btn btn-ghost btn-sm">Sơ chế <ArrowIcon Size="14" /></a>
+                <a href="/so-che" class="btn btn-ghost btn-sm">Sơ chế <ArrowIcon Size="14" /></a>
             </div>
         }
     }

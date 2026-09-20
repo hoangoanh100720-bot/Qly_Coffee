@@ -19,10 +19,17 @@
     lặp lại trên 12 trang con. "nofollow" ở đây (khác với trang giỏ hàng dùng
     "follow") vì mọi liên kết trong khối quản lý đều dẫn tới trang quản lý khác —
     không có gì đáng để bot đi theo.
-    Đây là lớp phòng thủ THỨ HAI: lớp thứ nhất là Disallow: /admin trong
-    wwwroot/robots.txt. Cần cả hai vì robots.txt chỉ ngăn bot TRUY CẬP, còn thẻ
-    meta này ngăn trang xuất hiện trên kết quả kể cả khi bot tìm thấy đường dẫn
-    từ nơi khác.                                                                *@
+    Đây là lớp phòng thủ THỨ HAI trong ba lớp:
+      1. Disallow: / trong wwwroot/robots.txt — ngăn bot tử tế GHÉ vào.
+      2. Thẻ meta này (và thẻ tĩnh trong index.html) — ngăn trang lên kết quả
+         tìm kiếm kể cả khi bot tìm thấy đường dẫn từ nơi khác.
+      3. Header X-Robots-Tag trong wwwroot/web.config — áp cho MỌI phản hồi,
+         kể cả file không phải HTML.
+    Cần cả ba vì robots.txt một mình không ngăn được việc lập chỉ mục: Google
+    có thể đưa một URL lên kết quả chỉ dựa vào liên kết trỏ tới nó.
+
+    ⚠️ Cả ba đều chỉ là lời đề nghị với bot tử tế. Chốt chặn thật là JWT ở
+    backend, trên từng controller.                                              *@
 <HeadContent>
     <meta name="robots" content="noindex, nofollow" />
 </HeadContent>

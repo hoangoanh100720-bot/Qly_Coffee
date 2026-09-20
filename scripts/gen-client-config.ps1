@@ -29,6 +29,7 @@ $envPath = Join-Path $root ".env"
 # Gia tri mac dinh khi .env thieu bien tuong ung
 $apiUrl      = "http://localhost:5080"
 $shopUrl     = "http://localhost:5180"
+$adminUrl    = "http://localhost:5190"
 $bankCode    = ""
 $bankAccount = ""
 $bankName    = ""
@@ -37,6 +38,7 @@ if (Test-Path $envPath) {
     Get-Content $envPath | ForEach-Object {
         if ($_ -match '^\s*CLIENT_API_URL\s*=\s*(.+)$')       { $apiUrl      = $Matches[1].Trim() }
         if ($_ -match '^\s*ADMIN_SHOP_URL\s*=\s*(.*)$')       { $shopUrl     = $Matches[1].Trim() }
+        if ($_ -match '^\s*ADMIN_BASE_URL\s*=\s*(.*)$')       { $adminUrl    = $Matches[1].Trim() }
         if ($_ -match '^\s*BANK_CODE\s*=\s*(.*)$')            { $bankCode    = $Matches[1].Trim() }
         if ($_ -match '^\s*BANK_ACCOUNT_NUMBER\s*=\s*(.*)$')  { $bankAccount = $Matches[1].Trim() }
         if ($_ -match '^\s*BANK_ACCOUNT_NAME\s*=\s*(.*)$')    { $bankName    = $Matches[1].Trim() }
@@ -60,9 +62,15 @@ function Write-Config {
 Write-Host "Dang sinh cau hinh frontend tu .env"
 
 # --- Trang ban hang ----------------------------------------------------------
+#  AdminUrl chi de dat lien ket "Trang quan ly" o chan trang. De TRONG bien
+#  ADMIN_BASE_URL trong .env thi lien ket do tu an di — hop ly neu quan khong
+#  muon lo dia chi trang quan ly ra trang cong khai.
 Write-Config -Label "Trang ban hang" `
     -Path (Join-Path $root "frontend/QlyCoffee.Client/wwwroot/appsettings.json") `
-    -Data @{ ApiBaseUrl = $apiUrl }
+    -Data @{
+        ApiBaseUrl = $apiUrl
+        AdminUrl   = $adminUrl
+    }
 
 # --- App quan ly -------------------------------------------------------------
 Write-Config -Label "App quan ly   " `
@@ -79,7 +87,8 @@ Write-Config -Label "App quan ly   " `
 
 Write-Host ""
 Write-Host "ApiBaseUrl = $apiUrl"
-Write-Host "ShopUrl    = $shopUrl"
+Write-Host "ShopUrl    = $shopUrl   (app quan ly -> trang ban hang)"
+Write-Host "AdminUrl   = $adminUrl   (trang ban hang -> app quan ly)"
 
 if ([string]::IsNullOrWhiteSpace($bankCode) -or [string]::IsNullOrWhiteSpace($bankAccount)) {
     Write-Host "Chua khai bao BANK_CODE / BANK_ACCOUNT_NUMBER trong .env - man hinh quay se khong hien ma QR." -ForegroundColor Yellow

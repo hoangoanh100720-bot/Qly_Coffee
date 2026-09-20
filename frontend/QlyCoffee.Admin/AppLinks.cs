@@ -19,4 +19,15 @@ public static class AppLinks
 
     /// <summary>Có đáng hiện liên kết sang trang bán hàng hay không.</summary>
     public static bool HasShopUrl => !string.IsNullOrWhiteSpace(ShopUrl);
+
+    /// <summary>
+    /// Thực đơn trên trang bán hàng — dùng cho nút "Xem trang bán hàng" ở màn
+    /// hình Món, để quản lý xem ngay món vừa sửa hiện ra thế nào với khách.
+    ///
+    /// Ghép ở đây chứ không viết "@AppLinks.ShopUrl/menu" ngay trong .razor:
+    /// địa chỉ trong cấu hình có thể có hoặc không có dấu "/" ở cuối, mà ghép
+    /// thẳng thì ra "https://…//menu". Một số máy chủ trả 404 cho đường dẫn hai
+    /// dấu gạch như vậy.
+    /// </summary>
+    public static string ShopMenuUrl => HasShopUrl ? ShopUrl.TrimEnd('/') + "/menu" : "";
 }

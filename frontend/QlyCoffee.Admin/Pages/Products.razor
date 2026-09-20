@@ -28,9 +28,15 @@
                 Giá vốn là số tính từ công thức, không nhập tay — sửa công thức là giá vốn đổi theo
             </span>
         </div>
-        <a href="/menu" target="_blank" class="btn btn-secondary btn-sm">
-            <ExternalIcon Size="14" /> Xem trang bán hàng
-        </a>
+        @* "/menu" là đường dẫn của TRANG BÁN HÀNG, không phải của app này — ở
+           đây nó chỉ dẫn tới trang không tìm thấy. Lấy địa chỉ đầy đủ từ cấu
+           hình; chưa khai báo thì ẩn nút đi thay vì để nó dẫn vào ngõ cụt. *@
+        @if (AppLinks.HasShopUrl)
+        {
+            <a href="@AppLinks.ShopMenuUrl" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">
+                <ExternalIcon Size="14" /> Xem trang bán hàng
+            </a>
+        }
     </div>
 
     @* ── THẺ TỔNG QUAN ───────────────────────────────────────────────────── *@
@@ -314,7 +320,7 @@
                             </td>
 
                             <td>
-                                <a href="/admin/mon/@p.Id/cong-thuc"
+                                <a href="/mon/@p.Id/cong-thuc"
                                    class="btn @(p.RecipeItemCount == 0 ? "btn-primary" : "btn-secondary") btn-sm"
                                    style="white-space: nowrap;"
                                    title="Soạn / sửa công thức định lượng">
