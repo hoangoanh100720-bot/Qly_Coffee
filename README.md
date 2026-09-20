@@ -33,18 +33,25 @@ Lần chạy đầu, log in ra:
 
 Copy mã đó vào dòng `DEFAULT_STORE_ID` trong `.env`, dừng backend rồi chạy lại.
 
-**Bước 3 — Frontend** (cửa sổ terminal khác):
+**Bước 3 — Frontend.** Đây là **hai ứng dụng riêng**, mỗi cái một cửa sổ terminal:
 
 ```bash
+# Trang bán hàng — công khai
 dotnet run --project frontend/QlyCoffee.Client
+
+# App quản lý — nội bộ
+dotnet run --project frontend/QlyCoffee.Admin
 ```
 
 | Địa chỉ | Nội dung |
 |---|---|
 | http://localhost:5180 | Trang bán hàng |
-| http://localhost:5180/admin | Trang quản lý |
+| http://localhost:5190 | App quản lý (đăng nhập tại `/dang-nhap`) |
 | http://localhost:5080/swagger | Tài liệu API (27 endpoint) |
 | http://localhost:5050 | pgAdmin (chạy `docker compose --profile tools up -d`) |
+
+> Chỉ sửa trang bán hàng thì không cần chạy app quản lý, và ngược lại. Hai bên
+> độc lập hoàn toàn, chỉ gặp nhau ở backend.
 
 > **Đổi schema về sau** thì tạo migration mới rồi chạy lại backend:
 > ```bash
@@ -84,8 +91,10 @@ QlyCoffee.sln
 │   ├── QlyCoffee.Application/    ⭐ TOÀN BỘ logic nghiệp vụ
 │   └── QlyCoffee.Api/            Controllers + Program.cs + tích hợp Claude
 │
-├── frontend/
-│   └── QlyCoffee.Client/         Blazor WebAssembly
+├── frontend/                     Hai ứng dụng Blazor WebAssembly ĐỘC LẬP
+│   ├── QlyCoffee.Ui/             Thư viện dùng chung: dịch vụ, component nền, design-system
+│   ├── QlyCoffee.Client/         Trang bán hàng — công khai, tối ưu cho tìm kiếm
+│   └── QlyCoffee.Admin/          App quản lý — chặn khỏi tìm kiếm, cài được lên máy (PWA)
 │
 └── shared/
     └── QlyCoffee.Shared/         DTO dùng chung — đổi tên trường là cả hai phía cùng báo lỗi
@@ -312,7 +321,7 @@ nguyên hình vẽ SVG còn tử tế hơn.
 Ảnh lưu ở `backend/QlyCoffee.Api/wwwroot/uploads/products/`, tên file do server tự
 sinh. Thay ảnh thì ảnh cũ bị xóa luôn nên thư mục không phình ra.
 
-**Design system** ([design-system.css](frontend/QlyCoffee.Client/wwwroot/css/design-system.css)):
+**Design system** ([design-system.css](frontend/QlyCoffee.Ui/wwwroot/css/design-system.css)):
 neutrals ám nâu ấm (hue 28–35) thay vì xám chết, một accent duy nhất là màu crema espresso
 `hsl(24 72% 42%)`, ba màu ngữ nghĩa chỉ dùng mã hóa trạng thái. Chế độ tối được thiết kế
 riêng chứ không đảo ngược chế độ sáng.

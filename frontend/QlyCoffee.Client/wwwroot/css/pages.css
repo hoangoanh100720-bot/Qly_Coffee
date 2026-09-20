@@ -4,14 +4,27 @@
    Tầng thứ ba, xây trên design-system.css và app.css.
    Mọi giá trị vẫn tham chiếu token — không có mã màu thô hay số pixel tùy tiện.
 
+   CHỈ TRANG BÁN HÀNG NẠP FILE NÀY.
+
    MỤC LỤC
-   §1  Trang chủ            §6  Thông báo nổi
-   §2  Chi tiết món         §7  Menu tài khoản
-   §3  Giỏ hàng             §8  Chọn ngày
-   §4  Tiến trình đơn       §9  Đăng nhập
-   §5  Bộ đếm số lượng      §10 Biểu đồ dashboard
-                            §11 Chi tiết nhỏ
-                            §12 Ảnh bay vào giỏ hàng
+   §1  Trang chủ
+   §2  Chi tiết món
+   §3  Giỏ hàng
+   §4  Tiến trình đơn
+   §12 Ảnh bay vào giỏ hàng
+
+   Số section giữ nguyên cách đánh cũ, không dồn lại. Cố ý: các số này xuất
+   hiện trong comment ở nhiều file .razor, đánh lại thì mọi tham chiếu đó sai
+   hết mà chẳng được thêm gì.
+
+   Những section đã chuyển đi khi tách dự án:
+     §5  Bộ đếm số lượng   -> QlyCoffee.Ui/wwwroot/css/design-system.css
+     §6  Thông báo nổi     -> design-system.css  (AlertHost là component dùng chung)
+     §11 Chi tiết nhỏ      -> design-system.css
+     §7  Menu tài khoản    -> QlyCoffee.Admin/wwwroot/css/admin.css
+     §8  Chọn ngày         -> admin.css
+     §9  Đăng nhập         -> admin.css  (đăng nhập giờ thuộc app quản lý)
+     §10 Biểu đồ dashboard -> admin.css
 ============================================================================= */
 
 /* =============================================================================
@@ -545,241 +558,6 @@
   box-shadow: 0 0 0 4px var(--accent-soft);
 }
 .order-step-active .step-label { color: var(--accent); font-weight: 700; }
-
-/* =============================================================================
-   §5  BỘ ĐẾM SỐ LƯỢNG
-============================================================================= */
-.qty-stepper {
-  display: inline-flex; align-items: center;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  overflow: hidden;
-}
-.qty-btn {
-  width: 40px; height: 44px;
-  display: grid; place-items: center;
-  background: transparent; border: none;
-  font-size: var(--text-lg); font-weight: 600;
-  color: var(--text); cursor: pointer;
-  transition: background var(--dur) var(--ease-out);
-}
-.qty-btn:hover:not(:disabled) { background: var(--surface-3); }
-.qty-btn:disabled { opacity: .35; cursor: not-allowed; }
-.qty-value {
-  min-width: 40px; text-align: center;
-  font-weight: 700; font-variant-numeric: tabular-nums;
-}
-.qty-sm .qty-btn { width: 32px; height: 34px; font-size: var(--text-base); }
-.qty-sm .qty-value { min-width: 30px; font-size: var(--text-sm); }
-
-/* =============================================================================
-   §6  THÔNG BÁO NỔI
-   Đặt góc dưới bên phải trên máy tính, dính đáy trên di động.
-   Thứ nổi lên khỏi mặt phẳng nên đây là chỗ HỢP LỆ để dùng đổ bóng.
-============================================================================= */
-.alert-host {
-  position: fixed;
-  bottom: var(--space-6); right: var(--space-6);
-  z-index: 200;
-  display: flex; flex-direction: column; gap: var(--space-2);
-  max-width: min(400px, calc(100vw - var(--space-8)));
-}
-@media (max-width: 560px) {
-  .alert-host {
-    left: var(--space-3); right: var(--space-3);
-    bottom: var(--space-3); max-width: none;
-  }
-}
-
-.toast {
-  display: flex; align-items: flex-start; gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left-width: 3px;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  font-size: var(--text-sm);
-  animation: toastIn var(--dur-slow) var(--ease-out);
-}
-@keyframes toastIn {
-  from { opacity: 0; transform: translateY(12px) scale(.97); }
-}
-
-.toast-icon { flex: none; margin-top: 1px; }
-.toast-message { flex: 1; line-height: 1.45; }
-.toast-close {
-  flex: none; width: 22px; height: 22px;
-  display: grid; place-items: center;
-  background: transparent; border: none;
-  color: var(--muted); font-size: 18px; line-height: 1;
-  cursor: pointer; border-radius: var(--radius-sm);
-}
-.toast-close:hover { background: var(--surface-3); color: var(--text); }
-
-.toast-ok     { border-left-color: var(--ok);     background: var(--ok-soft); }
-.toast-ok     .toast-icon { color: var(--ok); }
-.toast-danger { border-left-color: var(--danger); background: var(--danger-soft); }
-.toast-danger .toast-icon { color: var(--danger); }
-.toast-warn   { border-left-color: var(--warn);   background: var(--warn-soft); }
-.toast-warn   .toast-icon { color: var(--warn); }
-.toast-info   { border-left-color: var(--info);   background: var(--info-soft); }
-.toast-info   .toast-icon { color: var(--info); }
-
-/* =============================================================================
-   §7  MENU TÀI KHOẢN
-============================================================================= */
-.user-menu { position: relative; }
-
-.user-trigger {
-  display: flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
-  background: transparent; border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  transition: background var(--dur) var(--ease-out);
-}
-.user-trigger:hover { background: var(--surface-2); border-color: var(--border); }
-
-.user-avatar {
-  width: 30px; height: 30px; flex: none;
-  display: grid; place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--accent); color: var(--accent-fg);
-  font-size: var(--text-xs); font-weight: 700;
-}
-.user-name { font-size: var(--text-sm); font-weight: 500; }
-
-/* Lớp phủ trong suốt bắt sự kiện bấm ra ngoài để đóng menu */
-.menu-backdrop { position: fixed; inset: 0; z-index: 90; }
-
-.user-dropdown {
-  position: absolute; top: calc(100% + var(--space-2)); right: 0; z-index: 100;
-  min-width: 200px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  animation: fadeIn var(--dur) var(--ease-out);
-}
-.user-dropdown-head {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
-.dropdown-item {
-  display: block; width: 100%; text-align: left;
-  padding: var(--space-3) var(--space-4);
-  background: transparent; border: none;
-  font-size: var(--text-sm); color: var(--text);
-  cursor: pointer;
-}
-.dropdown-item:hover { background: var(--surface-2); }
-
-/* =============================================================================
-   §8  CHỌN NGÀY
-============================================================================= */
-.date-picker {
-  display: inline-flex; align-items: center; gap: var(--space-1);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 2px;
-}
-.date-input {
-  border: none; background: transparent;
-  padding: var(--space-2) var(--space-1);
-  font-size: var(--text-sm); font-variant-numeric: tabular-nums;
-  min-width: 130px;
-}
-.date-input:focus { outline: none; box-shadow: none; }
-
-/* =============================================================================
-   §9  ĐĂNG NHẬP
-============================================================================= */
-.auth-page {
-  min-height: 100dvh;
-  display: grid; place-items: center;
-  padding: var(--space-6);
-  background:
-    radial-gradient(90% 60% at 50% 0%, var(--accent-soft) 0%, transparent 60%),
-    var(--bg);
-}
-.auth-card {
-  width: 100%; max-width: 400px;
-  display: flex; flex-direction: column; gap: var(--space-6);
-  padding: clamp(var(--space-6), 5vw, var(--space-10));
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-}
-.pw-toggle {
-  background: var(--surface-2); border: 1px solid var(--border-strong);
-  border-left: none; cursor: pointer;
-  font-size: var(--text-xs); font-weight: 600; color: var(--muted);
-  padding-inline: var(--space-3);
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
-.pw-toggle:hover { color: var(--text); }
-
-/* =============================================================================
-   §10  BIỂU ĐỒ DASHBOARD
-   Cột dọc cho chuỗi thời gian (7 ngày) — trục ngang tự nhiên là thời gian.
-   Thanh ngang dùng cho xếp hạng (món bán chạy) vì nhãn dài hơn.
-============================================================================= */
-.bar-chart {
-  display: grid; grid-template-columns: repeat(7, 1fr);
-  gap: var(--space-2);
-  align-items: end;
-  height: 180px;
-  padding-top: var(--space-4);
-}
-.bar-col {
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
-  height: 100%;
-}
-.bar-track {
-  flex: 1; width: 100%;
-  display: flex; align-items: flex-end;
-  min-height: 0;
-}
-.bar-fill {
-  width: 100%;
-  background: linear-gradient(180deg,
-    var(--accent) 0%,
-    color-mix(in srgb, var(--accent) 70%, transparent) 100%);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  min-height: 3px;
-  transition: height var(--dur-slow) var(--ease-out);
-}
-.bar-value { font-weight: 600; }
-.bar-label { white-space: nowrap; }
-
-.top-product {
-  display: flex; align-items: center; gap: var(--space-3);
-}
-
-/* =============================================================================
-   §11  CHI TIẾT NHỎ
-============================================================================= */
-
-/* Dấu hỏi giải thích chỉ số */
-.info-tip {
-  display: inline-flex; color: var(--muted); cursor: help;
-  vertical-align: -2px;
-}
-.info-tip:hover, .info-tip:focus-visible { color: var(--accent); }
-
-/* Vòng xoay chờ */
-.spin-path { transform-origin: center; animation: spin .8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Ô nhập tìm kiếm bên trong bảng lọc */
-.search-input::-webkit-search-cancel-button { cursor: pointer; }
 
 /* =============================================================================
    §12  ẢNH BAY VÀO GIỎ HÀNG

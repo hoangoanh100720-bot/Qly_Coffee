@@ -1146,3 +1146,225 @@ legend { padding: 0; }
   .shell { grid-template-columns: 1fr; }
   body { background: white; color: black; }
 }
+
+/* =============================================================================
+   §PHU LUC  TANG DUNG CHUNG GIUA TRANG BAN HANG VA APP QUAN LY
+=============================================================================
+   Nhung khoi duoi day truoc kia nam trong app.css va pages.css cua du an
+   frontend gop chung. Khi tach doi, ca hai ung dung deu con dung toi chung,
+   nen chung thuoc ve tang dung chung nay chu khong thuoc ve rieng ben nao.
+============================================================================= */
+
+/* =============================================================================
+   §1  TIỆN ÍCH
+============================================================================= */
+.text-danger { color: var(--danger); }
+.text-warn   { color: var(--warn); }
+.text-ok     { color: var(--ok); }
+
+.plain-link { color: inherit; text-decoration: none; }
+.plain-link:hover { color: var(--accent); }
+
+.product-link { display: block; text-decoration: none; color: inherit; }
+
+.section-sm { padding-block: clamp(var(--space-8), 5vw, var(--space-16)); }
+
+/* Ẩn/hiện theo bề rộng — dùng lớp thay vì kiểm tra JS để tránh nhấp nháy */
+.show-md-down { display: none; }
+@media (max-width: 900px) {
+  .show-md-down { display: inline-flex; }
+  .hide-md-down { display: none; }
+}
+@media (max-width: 560px) {
+  .hide-sm { display: none; }
+}
+
+/* =============================================================================
+   §3  THANH LỌC & Ô TÌM KIẾM
+============================================================================= */
+.filter-bar {
+  display: flex; align-items: center; gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+
+/* Trên màn hình hẹp, chip cuộn ngang thay vì xuống dòng lộn xộn */
+@media (max-width: 640px) {
+  .filter-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--space-2);
+    scrollbar-width: none;
+  }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .filter-bar .grow { display: none; }
+}
+
+.search-box {
+  position: relative;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding-left: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  min-width: 240px;
+}
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.search-input {
+  border: none; background: transparent; padding-left: 0;
+}
+.search-input:focus { outline: none; box-shadow: none; border-color: transparent; }
+
+/* =============================================================================
+   §4  BẢNG LÃI LỖ
+   Dùng ở hai nơi: thẻ đề xuất AI và trang soạn công thức.
+   Thiết kế cố ý giống bảng kế toán: nhãn trái, số phải, dòng tổng có kẻ trên.
+============================================================================= */
+.pl-table {
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-1);
+}
+
+/* Nhãn nhắc rằng đây là số hệ thống tính, không phải AI đoán */
+.pl-caption {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
+  border-bottom: 1px dashed var(--border);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pl-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  padding-block: var(--space-1);
+  font-size: var(--text-sm);
+}
+.pl-label {
+  color: var(--text-2);
+  display: inline-flex; align-items: center; gap: var(--space-1);
+}
+.pl-value { font-weight: 600; white-space: nowrap; }
+.pl-positive { color: var(--ok); }
+.pl-negative { color: var(--danger); }
+
+.pl-total {
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+  font-size: var(--text-base);
+}
+.pl-total .pl-label { color: var(--text); font-weight: 700; }
+.pl-total .pl-value { font-weight: 800; font-size: var(--text-lg); }
+
+/* =============================================================================
+   §5  BỘ ĐẾM SỐ LƯỢNG
+============================================================================= */
+.qty-stepper {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.qty-btn {
+  width: 40px; height: 44px;
+  display: grid; place-items: center;
+  background: transparent; border: none;
+  font-size: var(--text-lg); font-weight: 600;
+  color: var(--text); cursor: pointer;
+  transition: background var(--dur) var(--ease-out);
+}
+.qty-btn:hover:not(:disabled) { background: var(--surface-3); }
+.qty-btn:disabled { opacity: .35; cursor: not-allowed; }
+.qty-value {
+  min-width: 40px; text-align: center;
+  font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.qty-sm .qty-btn { width: 32px; height: 34px; font-size: var(--text-base); }
+.qty-sm .qty-value { min-width: 30px; font-size: var(--text-sm); }
+
+/* =============================================================================
+   §6  THÔNG BÁO NỔI
+   Đặt góc dưới bên phải trên máy tính, dính đáy trên di động.
+   Thứ nổi lên khỏi mặt phẳng nên đây là chỗ HỢP LỆ để dùng đổ bóng.
+============================================================================= */
+.alert-host {
+  position: fixed;
+  bottom: var(--space-6); right: var(--space-6);
+  z-index: 200;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  max-width: min(400px, calc(100vw - var(--space-8)));
+}
+@media (max-width: 560px) {
+  .alert-host {
+    left: var(--space-3); right: var(--space-3);
+    bottom: var(--space-3); max-width: none;
+  }
+}
+
+.toast {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  animation: toastIn var(--dur-slow) var(--ease-out);
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+}
+
+.toast-icon { flex: none; margin-top: 1px; }
+.toast-message { flex: 1; line-height: 1.45; }
+.toast-close {
+  flex: none; width: 22px; height: 22px;
+  display: grid; place-items: center;
+  background: transparent; border: none;
+  color: var(--muted); font-size: 18px; line-height: 1;
+  cursor: pointer; border-radius: var(--radius-sm);
+}
+.toast-close:hover { background: var(--surface-3); color: var(--text); }
+
+.toast-ok     { border-left-color: var(--ok);     background: var(--ok-soft); }
+.toast-ok     .toast-icon { color: var(--ok); }
+.toast-danger { border-left-color: var(--danger); background: var(--danger-soft); }
+.toast-danger .toast-icon { color: var(--danger); }
+.toast-warn   { border-left-color: var(--warn);   background: var(--warn-soft); }
+.toast-warn   .toast-icon { color: var(--warn); }
+.toast-info   { border-left-color: var(--info);   background: var(--info-soft); }
+.toast-info   .toast-icon { color: var(--info); }
+
+/* =============================================================================
+   §11  CHI TIẾT NHỎ
+============================================================================= */
+
+/* Dấu hỏi giải thích chỉ số */
+.info-tip {
+  display: inline-flex; color: var(--muted); cursor: help;
+  vertical-align: -2px;
+}
+.info-tip:hover, .info-tip:focus-visible { color: var(--accent); }
+
+/* Vòng xoay chờ */
+.spin-path { transform-origin: center; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Ô nhập tìm kiếm bên trong bảng lọc */
+.search-input::-webkit-search-cancel-button { cursor: pointer; }
+

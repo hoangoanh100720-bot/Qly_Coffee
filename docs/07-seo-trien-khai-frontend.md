@@ -32,7 +32,10 @@ cho toàn site. Bot không chạy JavaScript vẫn có tiêu đề, mô tả, �
 
 ## 2. Những gì đã cài đặt
 
-### 2.1 `Components/Common/SeoHead.razor`
+### 2.1 `frontend/QlyCoffee.Ui/Components/Common/SeoHead.razor`
+
+> Component này nằm trong thư viện dùng chung `QlyCoffee.Ui` chứ không nằm trong
+> dự án trang bán hàng. App quản lý cũng dùng nó — ở đó để `NoIndex="true"`.
 
 Component dùng chung, sinh ra cho mỗi trang: `<title>`, `meta description`,
 `link canonical`, `meta robots`, bộ Open Graph và Twitter Card.
@@ -66,13 +69,27 @@ Cách giải quyết: các thẻ mặc định trong `index.html` mang thuộc t
 | `/tra-cuu-don` | index, follow | Trang công cụ công khai |
 | `/don-hang/{ma}` | **noindex**, follow | Chứa đơn của một người cụ thể |
 | `/gio-hang`, `/dat-mon` | **noindex**, follow | Riêng tư, nội dung mỏng |
-| `/dang-nhap` | **noindex**, follow | Không có lý do lên Google |
-| `/admin/**` | **noindex, nofollow** | Khai báo một lần ở `AdminLayout.razor` |
 
-Khối quản lý được chặn **hai lớp**: `Disallow: /admin` trong `robots.txt` ngăn bot
-truy cập, còn thẻ `meta robots` ngăn trang xuất hiện trên kết quả kể cả khi bot
-tìm ra đường dẫn từ nơi khác. Cần cả hai vì `robots.txt` một mình không ngăn được
-việc lập chỉ mục.
+Bảng trên chỉ còn nói về **trang bán hàng**. Từ bản tách dự án, đăng nhập và toàn
+bộ màn hình quản lý đã chuyển sang ứng dụng riêng (`QlyCoffee.Admin`), chạy ở tên
+miền riêng, nên chúng không còn là đường dẫn của site này nữa.
+
+Ứng dụng quản lý được chặn **ba lớp**, mỗi lớp lo một tình huống khác nhau:
+
+| Lớp | Ở đâu | Ngăn điều gì |
+|---|---|---|
+| `Disallow: /` trong `robots.txt` | `QlyCoffee.Admin/wwwroot/robots.txt` | Bot tử tế GHÉ vào |
+| `<meta name="robots" content="noindex, nofollow">` | `QlyCoffee.Admin/wwwroot/index.html` | Bot đã ghé rồi thì cũng không lập chỉ mục |
+| Header `X-Robots-Tag: noindex` | `QlyCoffee.Admin/wwwroot/web.config` | Áp dụng cho MỌI phản hồi, kể cả file không phải HTML |
+
+Cần cả ba vì `robots.txt` một mình **không** ngăn được việc lập chỉ mục: Google có
+thể đưa một URL lên kết quả chỉ dựa vào liên kết trỏ tới nó, mà không cần đọc nội
+dung. Và cả ba đều chỉ là lời đề nghị với bot tử tế — chốt chặn thật là JWT ở
+backend.
+
+Trang bán hàng vẫn giữ hai dòng `Disallow: /admin` và `Disallow: /dang-nhap` trong
+`robots.txt` của nó. Hai đường dẫn đó không còn tồn tại ở đây, nhưng chúng từng
+tồn tại và có thể đã nằm trong chỉ mục của Google.
 
 ### 2.3 Mô tả riêng cho từng trang
 
@@ -124,13 +141,34 @@ Kỹ thuật đi kèm:
 
 | File | Nội dung |
 |---|---|
-| `wwwroot/robots.txt` | Cho phép nội dung công khai, chặn `/admin`, `/gio-hang`, `/dang-nhap`, `/don-hang/`, `_framework/` |
+| `wwwroot/robots.txt` | Chặn `/gio-hang`, `/dat-mon`, `/don-hang/` — và **không** chặn `_framework/` hay `_content/`, xem cảnh báo bên dưới |
 | `wwwroot/sitemap.xml` | Ba trang tĩnh + ảnh trang chủ |
 | `wwwroot/manifest.json` | Tên, mô tả, màu chủ đề đúng theo bảng màu mới, hai shortcut |
 
 `index.html` cũng có khối `<noscript>` chứa tên quán, mô tả, địa chỉ, giờ mở cửa
 và số điện thoại dưới dạng HTML thật — đây là nội dung duy nhất bot không chạy
 JavaScript đọc được ngoài các thẻ meta.
+
+#### ⚠️ Không bao giờ chặn `_framework/` và `_content/` trong robots.txt
+
+Bản `robots.txt` trước đây chặn cả hai thư mục này. Nghe rất hợp lý — chúng là
+file kỹ thuật, không ai tìm kiếm chúng. Nhưng hậu quả thì ngược hẳn với ý định,
+và đây là lỗi SEO nặng nhất từng có trong dự án.
+
+Đây là ứng dụng Blazor WebAssembly: HTML thật **không** nằm sẵn trong
+`index.html`, nó do mã WebAssembly trong `_framework/` dựng ra sau khi tải xong.
+Googlebot có chạy JavaScript, nhưng nó **tôn trọng `robots.txt` khi đi lấy tài
+nguyên con**. Chặn `_framework/` nghĩa là Googlebot tải `index.html`, không lấy
+được runtime, không chạy được gì, và thứ duy nhất nó lập chỉ mục là khối
+`<noscript>`. Toàn bộ thực đơn — nội dung đáng lên Google nhất — trở nên vô hình.
+
+`_content/` cũng vậy: từ khi tách dự án, `design-system.css` nằm trong thư viện
+dùng chung nên đường dẫn thật của nó là `/_content/QlyCoffee.Ui/css/`. Chặn thư
+mục đó là chặn bộ CSS chính, và Google dựng trang không có CSS sẽ thấy một trang
+vỡ bố cục rồi đánh trượt tiêu chí thân thiện di động.
+
+**Quy tắc rút ra:** chặn theo *nội dung* (trang nào không nên lên chỉ mục), không
+chặn theo *loại file*.
 
 ---
 
@@ -158,6 +196,11 @@ lúc chạy nên tự đúng.
 Đây là ứng dụng một trang. Nếu máy chủ trả 404 cho `/menu` thì Google sẽ loại
 toàn bộ trang con khỏi chỉ mục. Cấu hình fallback tới `index.html` cho mọi route
 không khớp file tĩnh.
+
+Trên IIS việc này đã có sẵn trong `wwwroot/web.config` (quy tắc
+`Blazor SPA fallback`), nhưng **module URL Rewrite phải được cài riêng** — nó
+không đi kèm IIS. Các bước đầy đủ nằm ở
+[08-deploy-iis-winscp.md](08-deploy-iis-winscp.md).
 
 ### 3.4 Gửi sitemap
 

@@ -1176,3 +1176,378 @@
 .recipe-inline-table th.num, .recipe-inline-table td.num { text-align: right; white-space: nowrap; }
 .recipe-inline-table td .swatch { display: inline-block; vertical-align: -1px; margin-right: 6px; }
 .recipe-inline-table tr.is-optional td:first-child { color: var(--text-2); }
+
+/* =============================================================================
+   §PHU LUC  MAN HINH QUAN LY — chuyen sang tu app.css va pages.css
+=============================================================================
+   Nhung khoi duoi day truoc kia nam trong CSS cua du an frontend gop chung,
+   nghia la moi khach vao xem thuc don deu phai tai chung ve du khong bao gio
+   nhin thay. Nay chung nam dung cho: chi app quan ly nap file nay.
+============================================================================= */
+
+/* Lop phu khi mo thanh ben tren man hinh hep (tu app.css §2) */
+.sidebar-overlay {
+  position: fixed; inset: 0; z-index: 35;
+  background: hsl(26 30% 8% / .45);
+  backdrop-filter: blur(2px);
+  animation: fadeIn var(--dur) var(--ease-out);
+}
+
+/* =============================================================================
+   §5  TRANG KẾ HOẠCH AI
+============================================================================= */
+
+/* Khối diễn giải của AI — viền trái accent để phân biệt rõ với khối số liệu */
+.ai-summary {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(100deg, var(--accent-soft) 0%, var(--surface) 55%);
+}
+.ai-avatar {
+  width: 34px; height: 34px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.ai-headline {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* --- Biểu đồ rủi ro ---------------------------------------------------------
+   Thanh ngang thay vì cột dọc: nhãn đọc được mà không phải nghiêng đầu,
+   và thêm bao nhiêu nhóm cũng không vỡ bố cục.                                */
+.risk-chart { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.risk-bar-row {
+  display: grid;
+  grid-template-columns: 92px 1fr 110px 56px;
+  align-items: center;
+  gap: var(--space-3);
+}
+.risk-bar-label { font-size: var(--text-sm); font-weight: 600; }
+.risk-bar-track {
+  height: 22px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.risk-bar-fill {
+  height: 100%;
+  border-radius: calc(var(--radius-sm) - 1px);
+  transition: width var(--dur-slow) var(--ease-out);
+  min-width: 2px;
+}
+.risk-bar-value {
+  text-align: right; font-weight: 700; font-size: var(--text-sm);
+}
+.risk-bar-count { text-align: right; }
+
+@media (max-width: 640px) {
+  .risk-bar-row { grid-template-columns: 80px 1fr 92px; }
+  .risk-bar-count { display: none; }
+}
+
+/* =============================================================================
+   §6  THẺ ĐỀ XUẤT
+============================================================================= */
+.suggestion {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  transition: border-color var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out);
+}
+.suggestion:hover { box-shadow: var(--shadow); }
+
+/* Sọc trái mã hóa mức ưu tiên — nhận ra bằng ngoại vi mắt khi cuộn nhanh */
+.priority-critical { border-left-color: var(--danger); }
+.priority-high     { border-left-color: var(--warn); }
+.priority-medium   { border-left-color: var(--accent); }
+.priority-low      { border-left-color: var(--border-strong); }
+
+/* Đề xuất đã xử lý thì lùi về sau, nhưng vẫn đọc được (không dùng opacity thấp) */
+.suggestion.is-decided { background: var(--surface-2); }
+.suggestion.is-decided .suggestion-title { color: var(--text-2); }
+
+.suggestion-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--space-3);
+}
+.suggestion-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+.suggestion-reason {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  max-width: 72ch;
+}
+
+/* Chỉ số phụ trợ xếp thành hàng ngang, ngăn cách bằng đường kẻ dọc mảnh */
+.suggestion-metrics {
+  display: flex; flex-wrap: wrap;
+  gap: var(--space-6);
+  padding: var(--space-3) 0;
+}
+.metric { display: flex; flex-direction: column; gap: 2px; }
+.metric-label {
+  font-size: var(--text-2xs); font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+.metric-value { font-size: var(--text-sm); font-weight: 700; }
+
+/* Xem trước banner — nền pha từ màu của chính món được giảm giá */
+.banner-preview {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  border: 1px dashed color-mix(in srgb, var(--drink, var(--accent)) 40%, transparent);
+  background: color-mix(in srgb, var(--drink, var(--accent)) 10%, var(--surface));
+}
+.banner-text { font-size: var(--text-base); font-weight: 600; }
+
+.suggestion-actions {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.suggestion-edit {
+  display: flex; flex-direction: column; gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* =============================================================================
+   §7  TRANG SOẠN CÔNG THỨC
+============================================================================= */
+.recipe-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: var(--space-6);
+  align-items: start;
+}
+/* Cột phải dính theo cuộn: bảng lợi nhuận luôn trong tầm mắt khi sửa định lượng */
+.recipe-sidebar { position: sticky; top: calc(var(--shell-topbar) + var(--space-6)); }
+
+@media (max-width: 1080px) {
+  .recipe-layout { grid-template-columns: 1fr; }
+  .recipe-sidebar { position: static; }
+}
+
+.recipe-table { display: flex; flex-direction: column; gap: 2px; }
+
+.recipe-head {
+  display: grid;
+  grid-template-columns: auto 1fr 118px 88px 64px 40px;
+  align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.recipe-row {
+  grid-template-columns: auto 1fr 118px 88px 64px 40px;
+}
+
+@media (max-width: 720px) {
+  .recipe-head { display: none; }
+  .recipe-row {
+    grid-template-columns: auto 1fr auto;
+    row-gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+}
+
+.recipe-total {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 2px solid var(--border-strong);
+}
+
+.checkbox-cell { display: grid; place-items: center; cursor: pointer; }
+.checkbox-cell input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+.add-ingredient {
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.add-ingredient legend { margin-bottom: var(--space-1); }
+
+/* =============================================================================
+   §8  CHỌN MÀU
+   Ô màu gốc của trình duyệt xấu và khác nhau giữa các hệ điều hành,
+   nên bọc lại để đồng nhất và ghép cùng ô nhập mã hex.
+============================================================================= */
+.color-field { display: flex; align-items: stretch; gap: var(--space-2); }
+
+.color-input {
+  width: 42px; height: 38px; flex: none;
+  padding: 2px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+.color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.color-input::-webkit-color-swatch { border: none; border-radius: calc(var(--radius) - 3px); }
+.color-input::-moz-color-swatch { border: none; border-radius: calc(var(--radius) - 3px); }
+
+/* =============================================================================
+   §9  IN ẤN — bản kế hoạch thường được in ra dán ở quầy
+============================================================================= */
+@media print {
+  .suggestion-actions, .filter-bar, .search-box { display: none !important; }
+  .suggestion { break-inside: avoid; border-left-width: 4px; }
+  .card, .table-wrap { break-inside: avoid; }
+}
+/* =============================================================================
+   §7  MENU TÀI KHOẢN
+============================================================================= */
+.user-menu { position: relative; }
+
+.user-trigger {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease-out);
+}
+.user-trigger:hover { background: var(--surface-2); border-color: var(--border); }
+
+.user-avatar {
+  width: 30px; height: 30px; flex: none;
+  display: grid; place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--accent); color: var(--accent-fg);
+  font-size: var(--text-xs); font-weight: 700;
+}
+.user-name { font-size: var(--text-sm); font-weight: 500; }
+
+/* Lớp phủ trong suốt bắt sự kiện bấm ra ngoài để đóng menu */
+.menu-backdrop { position: fixed; inset: 0; z-index: 90; }
+
+.user-dropdown {
+  position: absolute; top: calc(100% + var(--space-2)); right: 0; z-index: 100;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: fadeIn var(--dur) var(--ease-out);
+}
+.user-dropdown-head {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.dropdown-item {
+  display: block; width: 100%; text-align: left;
+  padding: var(--space-3) var(--space-4);
+  background: transparent; border: none;
+  font-size: var(--text-sm); color: var(--text);
+  cursor: pointer;
+}
+.dropdown-item:hover { background: var(--surface-2); }
+
+/* =============================================================================
+   §8  CHỌN NGÀY
+============================================================================= */
+.date-picker {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 2px;
+}
+.date-input {
+  border: none; background: transparent;
+  padding: var(--space-2) var(--space-1);
+  font-size: var(--text-sm); font-variant-numeric: tabular-nums;
+  min-width: 130px;
+}
+.date-input:focus { outline: none; box-shadow: none; }
+
+/* =============================================================================
+   §9  ĐĂNG NHẬP
+============================================================================= */
+.auth-page {
+  min-height: 100dvh;
+  display: grid; place-items: center;
+  padding: var(--space-6);
+  background:
+    radial-gradient(90% 60% at 50% 0%, var(--accent-soft) 0%, transparent 60%),
+    var(--bg);
+}
+.auth-card {
+  width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; gap: var(--space-6);
+  padding: clamp(var(--space-6), 5vw, var(--space-10));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.pw-toggle {
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  border-left: none; cursor: pointer;
+  font-size: var(--text-xs); font-weight: 600; color: var(--muted);
+  padding-inline: var(--space-3);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.pw-toggle:hover { color: var(--text); }
+
+/* =============================================================================
+   §10  BIỂU ĐỒ DASHBOARD
+   Cột dọc cho chuỗi thời gian (7 ngày) — trục ngang tự nhiên là thời gian.
+   Thanh ngang dùng cho xếp hạng (món bán chạy) vì nhãn dài hơn.
+============================================================================= */
+.bar-chart {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-2);
+  align-items: end;
+  height: 180px;
+  padding-top: var(--space-4);
+}
+.bar-col {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-1);
+  height: 100%;
+}
+.bar-track {
+  flex: 1; width: 100%;
+  display: flex; align-items: flex-end;
+  min-height: 0;
+}
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(180deg,
+    var(--accent) 0%,
+    color-mix(in srgb, var(--accent) 70%, transparent) 100%);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  min-height: 3px;
+  transition: height var(--dur-slow) var(--ease-out);
+}
+.bar-value { font-weight: 600; }
+.bar-label { white-space: nowrap; }
+
+.top-product {
+  display: flex; align-items: center; gap: var(--space-3);
+}
+
