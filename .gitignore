@@ -13,8 +13,15 @@ obj/
 # Ghi chú: file .env gốc ĐƯỢC commit vì chỉ chứa giá trị mẫu cho môi trường dev.
 # Trước khi lên production phải thay JWT_SECRET, ANTHROPIC_API_KEY, DB_PASSWORD.
 
-# Cấu hình frontend sinh tự động từ .env
+# Cấu hình frontend sinh tự động từ .env (cả hai ứng dụng)
 frontend/QlyCoffee.Client/wwwroot/appsettings.json
+frontend/QlyCoffee.Admin/wwwroot/appsettings.json
+
+# Gói deploy do scripts/build-deploy.ps1 dựng ra.
+# Ngoài chuyện nặng và tái tạo được bất cứ lúc nào, deploy/api/.env còn chứa
+# mật khẩu database, JWT_SECRET và khóa API thật — commit nhầm một lần là phải
+# đổi toàn bộ khóa, vì lịch sử git thì không xóa sạch được.
+deploy/
 
 # Ảnh người dùng tải lên
 backend/QlyCoffee.Api/wwwroot/uploads/
