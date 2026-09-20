@@ -1,0 +1,1237 @@
+@*
+    =============================================================================
+    BÁN HÀNG TẠI QUẦY
+    =============================================================================
+    Archetype: màn hình thao tác nhanh, dùng liên tục cả ngày.
+
+    Đây là trang nhân viên chạm vào nhiều nhất, nên nguyên tắc khác hẳn các trang
+    quản lý còn lại:
+
+      · Nút to, bấm được bằng ngón cái trên máy tính bảng dựng ở quầy
+      · KHÔNG hộp thoại xác nhận ở đường chính — mỗi lần hỏi lại là một lần
+        bắt khách đứng chờ. Bấm nhầm thì sửa ở giỏ, còn nhanh hơn bấm xác nhận.
+      · Thời gian chờ tính lại NGAY mỗi khi giỏ đổi, để nhân viên nói được với
+        khách trước lúc chốt đơn chứ không phải sau.
+      · Món hết vẫn HIỆN nhưng mờ và không bấm được — nhân viên cần thấy để
+        giải thích, thay vì món tự nhiên biến mất.
+    =============================================================================
+*@
+@page "/ban-hang"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Bán hàng tại quầy — Một Chút Coffee</PageTitle>
+
+<div class="pos-layout">
+
+    @* ══════════════════════════════════════════════════════════════════════
+       CỘT TRÁI — LƯỚI MÓN
+       ══════════════════════════════════════════════════════════════════════ *@
+    <div class="pos-menu">
+
+        <div class="pos-filters">
+            <button class="chip @(_activeCat is null && !_showToppings ? "is-active" : "")"
+                    @onclick="() => { _activeCat = null; _showToppings = false; }">
+                Tất cả <span class="xs muted num">@_products.Count</span>
+            </button>
+            @foreach (var c in _categories)
+            {
+                var n = _products.Count(p => p.CategoryId == c.Id);
+                <button class="chip @(_activeCat == c.Id && !_showToppings ? "is-active" : "")"
+                        style="--chip-color: @c.ColorHex;"
+                        @onclick="() => { _activeCat = c.Id; _showToppings = false; }">
+                    @c.Name <span class="xs muted num">@n</span>
+                </button>
+            }
+
+            @*  Khu TOPPING riêng. Đứng tách khỏi các nhóm món vì nó không phải
+                một món để bán lẻ — nó gắn VÀO ly đang chọn trong giỏ. *@
+            <button class="chip chip-topping @(_showToppings ? "is-active" : "")"
+                    @onclick="OpenToppings">
+                <PlusIcon Size="12" /> Topping
+                <span class="xs muted num">@_toppings.Count(t => t.IsAvailable)</span>
+            </button>
+
+            <div class="grow"></div>
+
+            <div class="search-box">
+                <SearchIcon Size="15" />
+                <input type="search" class="input search-input" placeholder="Tìm món…"
+                       @bind="_search" @bind:event="oninput" aria-label="Tìm món" />
+            </div>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="pos-grid" aria-busy="true">
+                @for (int i = 0; i < 12; i++)
+                {
+                    <div class="skeleton" style="aspect-ratio: 1; border-radius: var(--radius-lg);"></div>
+                }
+            </div>
+        }
+        else if (_showToppings)
+        {
+            @* ══ KHU TOPPING ═════════════════════════════════════════════════
+               Bấm một topping = gắn vào LY ĐANG CHỌN trong giỏ (viền cam bên
+               phải). Bấm lại lần nữa = bỏ. Ly vừa thêm vào giỏ tự thành ly
+               đang chọn, nên luồng thường là: bấm món → bấm Topping → bấm
+               trân châu, không phải tìm ly nào trong giỏ.                  *@
+            var target = TargetLine;
+            <div class="pos-topping-target @(target is null ? "is-empty" : "")">
+                @if (target is null)
+                {
+                    <WarnIcon Size="16" />
+                    <span>Chưa có ly nào trong giỏ — bấm món trước, rồi mới thêm topping.</span>
+                }
+                else if (target.ToppingIds.Count == 0)
+                {
+                    <WarnIcon Size="16" />
+                    <span><strong>@target.Name</strong> không nhận topping. Bấm vào ly khác trong giỏ để chọn.</span>
+                }
+                else
+                {
+                    <span>Đang thêm topping cho</span>
+                    <strong>@target.Name</strong>
+                    @if (!string.IsNullOrEmpty(target.VariantName)) { <span class="muted">· @target.VariantName</span> }
+                    @if (target.Quantity > 1) { <span class="muted">· áp cho cả @target.Quantity ly</span> }
+                    <span class="xs muted">(bấm tên ly khác trong giỏ để đổi)</span>
+                }
+                <div class="grow"></div>
+                <button class="btn btn-ghost btn-sm" @onclick="() => _showToppings = false">
+                    Quay lại thực đơn
+                </button>
+            </div>
+
+            <div class="pos-grid pos-topping-grid">
+                @foreach (var t in _toppings)
+                {
+                    var onTarget = target?.Toppings.Any(x => x.Id == t.Id) ?? false;
+                    var accepts  = target?.ToppingIds.Contains(t.Id) ?? false;
+                    <div class="pos-tile-wrap" @key="t.Id">
+                        @if (!t.IsAvailable && t.PrepRecipeId is Guid nauTopping)
+                        {
+                            <button class="pos-nau-them"
+                                    disabled="@(_dangNau == nauTopping)"
+                                    @onclick="() => NauThemAsync(nauTopping, t.Name)"
+                                    title="@($"{t.PrepName} — khoảng {t.PrepMinutes} phút")">
+                                @if (_dangNau == nauTopping) { <SpinnerIcon Size="13" /> } else { <PlusIcon Size="14" /> }
+                            </button>
+                        }
+                        <button class="pos-tile pos-topping-tile @(onTarget ? "is-selected" : "") @(t.IsAvailable ? "" : "is-out")"
+                                style="--drink: @t.ColorHex;"
+                                disabled="@((!t.IsAvailable && !onTarget) || !accepts)"
+                                aria-pressed="@onTarget"
+                                title="@(!accepts && target is not null ? "Ly đang chọn không nhận topping này" : null)"
+                                @onclick="() => ToggleToppingOnTarget(t)">
+                            <span class="pos-topping-swatch" aria-hidden="true">
+                                @if (onTarget) { <CheckIcon Size="18" /> }
+                            </span>
+                            <span class="pos-tile-name">@t.Name</span>
+                            <span class="pos-tile-price num">+@Money.Format(t.PriceDelta)</span>
+                            @if (!t.IsAvailable)
+                            {
+                                <span class="pos-tile-flag @(t.PrepRecipeId is null ? "" : "prep")">
+                                    @(t.PrepRecipeId is null ? "Hết" : $"Nấu ~{t.PrepMinutes}′")
+                                </span>
+                            }
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+        else if (Filtered.Count == 0)
+        {
+            <div class="empty">
+                <CupIcon Size="44" CssClass="empty-icon" />
+                <span class="empty-title">Không có món nào khớp</span>
+                <span class="empty-text">Thử xóa từ khóa hoặc chọn nhóm khác.</span>
+            </div>
+        }
+        else
+        {
+            <div class="pos-grid">
+                @foreach (var p in Filtered)
+                {
+                    @*  Bọc ngoài để chỗ cho nút "+" nấu thêm: ô món là <button>,
+                        mà lồng button trong button là HTML không hợp lệ.        *@
+                    <div class="pos-tile-wrap" @key="p.Id">
+
+                    @if (p.PrepRecipeId is Guid congThuc)
+                    {
+                        @*  Nút lấy thêm hàng ngay tại quầy. Đặt ở ĐÂY chứ không bắt
+                            chạy sang trang Sơ chế: thiếu hàng chỉ lộ ra đúng lúc có
+                            khách đứng trước mặt, mà bỏ khách để đi sang trang khác
+                            rồi quay lại là mất cả mạch bán hàng.                  *@
+                        <button class="pos-nau-them"
+                                disabled="@(_dangNau == congThuc)"
+                                @onclick="() => NauThemAsync(congThuc, p.Name)"
+                                title="@($"Nấu thêm để bán tiếp {p.Name} — khoảng {p.PrepWaitMinutes} phút")">
+                            @if (_dangNau == congThuc)
+                            {
+                                <SpinnerIcon Size="13" />
+                            }
+                            else
+                            {
+                                <PlusIcon Size="14" />
+                            }
+                        </button>
+                    }
+
+                    <button class="pos-tile @(p.IsAvailable ? "" : "is-out")"
+                            style="--drink: @p.ColorPrimaryHex; --foam: @p.ColorAccentHex;"
+                            disabled="@(!p.IsAvailable)"
+                            @onclick="() => AddToCart(p)">
+
+                        @*  Luôn là ẢNH CHỤP: ảnh riêng của món nếu quán đã tải lên,
+                            không thì ảnh mẫu theo nhóm. Nhân viên quầy nhận ra món
+                            bằng ảnh nhanh hơn bằng chữ, mà 56 ô hình ly vẽ cùng một
+                            dáng chỉ khác màu thì nhìn lướt không phân biệt nổi.
+                            alt="" vì tên món nằm ngay dưới ô ảnh.                  *@
+                        <div class="pos-tile-visual">
+                            <img src="@DrinkPhoto.PhotoFor(p.ImageUrl, null, p.Name)"
+                                 alt="" loading="lazy" decoding="async" />
+
+                            @* Số ly đã có trong giỏ — nhìn là biết đã bấm mấy lần *@
+                            @if (CartQty(p.Id) > 0)
+                            {
+                                <span class="pos-tile-count num">@CartQty(p.Id)</span>
+                            }
+                        </div>
+
+                        <span class="pos-tile-name">@p.Name</span>
+                        <span class="pos-tile-price num">@Money.Format(p.BasePrice)</span>
+
+                        @*  "Hết" là câu trả lời cụt. Nhân viên đứng trước khách cần
+                            biết LÀM GÌ TIẾP: nấu thêm 15 phút rồi bán, hay hôm nay
+                            xin lỗi khách. Ba nhãn dưới đây nói đúng ba tình huống. *@
+                        @if (p.PrepWaitMinutes > 0)
+                        {
+                            <span class="pos-tile-flag prep">Nấu ~@p.PrepWaitMinutes′</span>
+                        }
+                        else if (p.IsSuspended)
+                        {
+                            <span class="pos-tile-flag">Tạm ngưng</span>
+                        }
+                        else if (!p.IsAvailable)
+                        {
+                            <span class="pos-tile-flag">Hết</span>
+                        }
+                        else if (p.MaxServings < 9999 && p.MaxServings <= 5)
+                        {
+                            <span class="pos-tile-flag warn">Còn @p.MaxServings</span>
+                        }
+                    </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ══════════════════════════════════════════════════════════════════════
+       CỘT PHẢI — GIỎ & CHỐT ĐƠN
+       ══════════════════════════════════════════════════════════════════════ *@
+    <aside class="pos-cart">
+
+        <div class="pos-cart-head">
+            <div class="stack stack-1">
+                <h3>Đơn đang bấm</h3>
+                <span class="xs muted">@_cart.Sum(l => l.Quantity) phần · @_cart.Count dòng</span>
+            </div>
+            @if (_cart.Count > 0)
+            {
+                <button class="btn btn-ghost btn-sm text-danger" @onclick="ClearCart">
+                    Xóa hết
+                </button>
+            }
+        </div>
+
+        @if (_cart.Count == 0)
+        {
+            <div class="pos-cart-empty">
+                <CartIcon Size="40" CssClass="empty-icon" />
+                <span class="empty-text">Bấm vào món bên trái để thêm vào đơn.</span>
+            </div>
+        }
+        else
+        {
+            <div class="pos-cart-lines">
+                @foreach (var line in _cart)
+                {
+                    @*  @key dùng LineId chứ KHÔNG dùng "mã món:size" — xem chú
+                        thích ở lớp CartLine để biết vì sao khóa phải cố định. *@
+                    @*  data-line là móc để JS cuộn khay vừa mở vào tầm nhìn —
+                        xem OnAfterRenderAsync. Dùng thuộc tính DOM chứ không dùng
+                        ElementReference vì Blazor dựng lại khay mỗi lần mở, tham
+                        chiếu phần tử có thể đã cũ khi JS chạy tới. *@
+                    <div class="pos-line-wrap @(line.NoteOpen ? "is-editing" : "") @(_showToppings && line.LineId == _targetLineId ? "is-target" : "")"
+                         @key="line.LineId" data-line="@line.LineId"
+                         style="--drink: @line.ColorPrimaryHex;">
+
+                        <div class="pos-line">
+
+                            <div class="stack stack-1 grow" style="min-width: 0;">
+                                @* Bấm tên ly = chọn ly này để gắn topping từ khu Topping *@
+                                <button type="button" class="pos-line-name pos-line-pick"
+                                        @onclick="() => _targetLineId = line.LineId"
+                                        title="Chọn ly này để thêm topping">
+                                    @line.Name
+                                </button>
+                                @if (!string.IsNullOrEmpty(line.VariantName))
+                                {
+                                    <span class="xs muted">@line.VariantName</span>
+                                }
+
+                                @*  Ghi chú hiện ngay dưới tên món, kể cả khi khay
+                                    đã đóng: nhân viên phải đọc lại được cả đơn
+                                    trước lúc bấm chốt mà không cần mở lại từng
+                                    dòng. In nghiêng trong ngoặc kép để mắt tách
+                                    ngay khỏi tên món và size.                   *@
+                                @*  Topping hiện ngay trên dòng kèm phụ thu, không
+                                    giấu trong khay: nhân viên đọc lại đơn trước khi
+                                    chốt phải thấy được vì sao ly này đắt hơn ly kia. *@
+                                @if (line.Toppings.Count > 0)
+                                {
+                                    <span class="pos-line-toppings">
+                                        @foreach (var t in line.Toppings)
+                                        {
+                                            <span class="pos-topping-chip">
+                                                <span class="dot" style="background: @t.ColorHex;"></span>
+                                                @t.Name
+                                                <span class="num">+@(t.PriceDelta / 1000)k</span>
+                                            </span>
+                                        }
+                                    </span>
+                                }
+
+                                @if (line.HasNote)
+                                {
+                                    <span class="pos-line-note-text">“@line.Note”</span>
+                                }
+
+                                @*  Nút "+ Topping" NẰM NGOÀI, ngay dưới tên món. Trước
+                                    đây chọn topping phải mở nút ✎ — nhân viên tưởng đó
+                                    là nút ghi chú nên không ai biết quầy gọi được topping.
+                                    Chỉ hiện với món nhận topping (bánh, cà phê máy thì không). *@
+                                @if (line.ToppingIds.Count > 0 && !line.NoteOpen)
+                                {
+                                    <button type="button" class="pos-add-topping"
+                                            @onclick="() => OpenToppingsFor(line)"
+                                            aria-label="Thêm topping cho @line.Name">
+                                        <PlusIcon Size="12" />
+                                        @(line.Toppings.Count > 0 ? "Đổi topping" : "Topping")
+                                    </button>
+                                }
+                            </div>
+
+                            <div class="qty-stepper qty-sm" role="group"
+                                 aria-label="Số lượng @line.Name">
+                                <button class="qty-btn" @onclick="() => Bump(line, -1)"
+                                        aria-label="Bớt">−</button>
+                                <span class="qty-value num">@line.Quantity</span>
+                                <button class="qty-btn" @onclick="() => Bump(line, 1)"
+                                        disabled="@(CartQty(line.ProductId) >= line.MaxServings)"
+                                        aria-label="Thêm">+</button>
+                            </div>
+
+                            <span class="pos-line-total num">@Money.Format(line.LineTotal)</span>
+
+                            @*  Nút mở khay tùy chọn. Sáng lên khi dòng đã có topping
+                                hoặc ghi chú — liếc qua giỏ là thấy ngay dòng nào
+                                đặc biệt mà không phải mở từng khay. *@
+                            <button class="btn btn-ghost btn-icon btn-sm pos-note-btn @(line.HasExtras ? "has-note" : "")"
+                                    @onclick="() => ToggleNote(line)"
+                                    aria-expanded="@line.NoteOpen"
+                                    aria-label="Topping và ghi chú cho @line.Name"
+                                    title="Thêm topping · ghi chú (ít đá, giảm ngọt…)">
+                                <EditIcon Size="14" />
+                            </button>
+
+                            <button class="btn btn-ghost btn-icon btn-sm"
+                                    @onclick="() => Remove(line)"
+                                    aria-label="Bỏ @line.Name khỏi đơn">
+                                <TrashIcon Size="14" />
+                            </button>
+                        </div>
+
+                        @*  ── KHAY GHI CHÚ ────────────────────────────────────
+                            Chỉ dựng khi mở. Không dùng cách ẩn bằng CSS: khay
+                            đóng vẫn nằm trong DOM thì ô input vẫn bắt được Tab,
+                            và nhân viên dùng bàn phím sẽ lạc vào những ô vô hình. *@
+                        @if (line.NoteOpen)
+                        {
+                            <div class="pos-note-tray">
+
+                                @*  ── TOPPING ──────────────────────────────────
+                                    Đứng TRƯỚC ghi chú vì nó là thứ có tiền: khách
+                                    gọi thêm trân châu thì phải bấm ở đây, không
+                                    phải gõ vào ô ghi chú. Món không nhận topping
+                                    (bánh, đồ ăn) thì khối này không hiện.        *@
+                                @{
+                                    var canhChon = _toppings
+                                        .Where(t => line.ToppingIds.Contains(t.Id))
+                                        .ToList();
+                                }
+                                @if (canhChon.Count > 0)
+                                {
+                                    <div class="stack stack-2">
+                                        <span class="nhan-khay">Gọi thêm topping</span>
+                                        <div class="choice-group">
+                                            @foreach (var t in canhChon)
+                                            {
+                                                var chon = line.Toppings.Any(x => x.Id == t.Id);
+
+                                                @*  Hết nguyên liệu thì VẪN HIỆN nhưng khóa nút,
+                                                    kèm gạch ngang (xem .choice:disabled). Ẩn đi
+                                                    thì nhân viên tưởng mình bấm nhầm chỗ; hiện mà
+                                                    khóa thì họ nói được ngay với khách là hôm nay
+                                                    hết món đó.                                    *@
+                                                <button type="button"
+                                                        class="choice choice-sm @(chon ? "is-selected" : "")"
+                                                        aria-pressed="@chon"
+                                                        disabled="@(!t.IsAvailable && !chon)"
+                                                        title="@(t.IsAvailable ? null : "Hết nguyên liệu")"
+                                                        @onclick="() => ToggleTopping(line, t)">
+                                                    <span class="dot" style="background: @t.ColorHex;"></span>
+                                                    @t.Name
+                                                    <span class="num muted">+@Money.FormatShort(t.PriceDelta)</span>
+                                                </button>
+
+                                                @*  Topping hết nhưng nấu thêm được: nút "+" ngay
+                                                    cạnh, kèm số phút để nhân viên nói luôn với khách
+                                                    "hết trân châu rồi, chờ em 15 phút nhé".      *@
+                                                @if (!t.IsAvailable && t.PrepRecipeId is Guid ct2)
+                                                {
+                                                    <button type="button" class="choice choice-sm pos-nau-chip"
+                                                            disabled="@(_dangNau == ct2)"
+                                                            @onclick="() => NauThemAsync(ct2, t.Name)"
+                                                            title="@($"{t.PrepName} — khoảng {t.PrepMinutes} phút")">
+                                                        @if (_dangNau == ct2)
+                                                        {
+                                                            <SpinnerIcon Size="12" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <PlusIcon Size="12" />
+                                                        }
+                                                        <span>nấu ~@t.PrepMinutes′</span>
+                                                    </button>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                <span class="nhan-khay">Ghi chú cho người pha</span>
+                                <div class="choice-group">
+                                    @foreach (var (label, group) in QuickNotes)
+                                    {
+                                        var on = line.Tags.Contains(label);
+                                        <button type="button"
+                                                class="choice choice-sm @(on ? "is-selected" : "")"
+                                                aria-pressed="@on"
+                                                @onclick="() => ToggleTag(line, label, group)">
+                                            @label
+                                        </button>
+                                    }
+                                </div>
+
+                                <div class="row row-2">
+                                    @*  @bind:event="oninput" để ghi chú hiện ra
+                                        ngay lúc gõ, không phải đợi rời ô — nhân
+                                        viên thường bấm thẳng sang nút khác.     *@
+                                    <input type="text" class="input input-sm grow"
+                                           maxlength="80"
+                                           placeholder="Ghi chú khác cho người pha…"
+                                           @bind="line.FreeNote" @bind:event="oninput" />
+
+                                    @if (line.HasNote)
+                                    {
+                                        <button class="btn btn-ghost btn-sm text-danger"
+                                                @onclick="() => ClearNote(line)">
+                                            Xóa
+                                        </button>
+                                    }
+                                    <button class="btn btn-secondary btn-sm"
+                                            @onclick="() => line.NoteOpen = false">
+                                        Xong
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* ── THỜI GIAN CHỜ ─────────────────────────────────────────────
+               Đặt ngay trên nút chốt đơn vì đây là câu nhân viên phải nói ra
+               miệng ngay trước khi bấm. *@
+            <div class="pos-eta @(_eta is not null && _eta.Minutes > 10 ? "is-long" : "")">
+                <ClockIcon Size="18" />
+                @if (_etaLoading)
+                {
+                    <span class="small muted">Đang tính…</span>
+                }
+                else if (_eta is not null)
+                {
+                    <div class="stack stack-1 grow">
+                        <span class="pos-eta-main">
+                            Khoảng <strong class="num">@_eta.Minutes phút</strong>
+                        </span>
+                        <span class="xs muted">
+                            @if (_eta.QueuedItemsAhead > 0)
+                            {
+                                <span>@_eta.QueuedItemsAhead phần đang chờ trước · </span>
+                            }
+                            <span>@_eta.Stations người pha</span>
+                        </span>
+                    </div>
+                }
+            </div>
+
+            @* ── THÔNG TIN KHÁCH ─────────────────────────────────────────── *@
+            <div class="pos-customer">
+                <input type="text" class="input" maxlength="50"
+                       placeholder="Tên khách (để gọi khi xong)"
+                       @bind="_customerName" @bind:event="oninput" />
+
+                @*  Hình thức và thanh toán gộp về MỘT hàng, ngăn nhau bằng vạch
+                    dọc. Trước đây là hai hàng riêng, ăn mất khoảng 90px chiều cao
+                    của panel — chỗ đó nay nhường cho vùng dòng đơn, nơi khay chọn
+                    topping cần không gian. Bốn nút vẫn nằm gọn một hàng ở bề rộng
+                    cột mới, và tự xuống dòng khi màn hình hẹp.                   *@
+                <div class="pos-chon-nhanh">
+                    <div class="choice-group">
+                        <button type="button" class="choice @(_orderType == 0 ? "is-selected" : "")"
+                                @onclick="() => _orderType = 0">Tại quán</button>
+                        <button type="button" class="choice @(_orderType == 1 ? "is-selected" : "")"
+                                @onclick="() => _orderType = 1">Mang đi</button>
+                    </div>
+
+                    <span class="pos-chon-vach" aria-hidden="true"></span>
+
+                    <div class="choice-group">
+                        <button type="button" class="choice @(_payment == 0 ? "is-selected" : "")"
+                                @onclick="() => SetPayment(0)">Tiền mặt</button>
+                        <button type="button" class="choice @(_payment == 1 ? "is-selected" : "")"
+                                @onclick="() => SetPayment(1)">Chuyển khoản</button>
+                    </div>
+                </div>
+
+                @*  ── MÃ QR CHUYỂN KHOẢN ──────────────────────────────────────
+                    Hiện NGAY khi chọn "Chuyển khoản", trước lúc chốt đơn, vì đó
+                    đúng là thứ tự việc ở quầy: khách quét và trả tiền trong lúc
+                    nhân viên còn đang bấm nốt đơn, rồi mới bấm "Nhận đơn".
+                    Bắt khách đợi chốt đơn xong mới hiện QR là thêm một khoảng
+                    chết ngay giữa lúc đông khách.
+
+                    Số tiền nhúng sẵn trong mã nên khách không gõ tay — cũng có
+                    nghĩa là mã tự đổi theo giỏ, thêm bớt một ly là QR mới.      *@
+                @if (_payment == 1)
+                {
+                    <div class="pos-qr">
+                        @if (BankQr.IsConfigured)
+                        {
+                            <img class="pos-qr-img"
+                                 src="@BankQr.ImageUrl(CartTotal, _payRef)"
+                                 alt="Mã QR chuyển khoản @Money.Format(CartTotal)"
+                                 width="360" height="360" />
+
+                            <div class="stack stack-1 grow">
+                                <span class="pos-qr-amount num">@Money.Format(CartTotal)</span>
+                                <span class="xs muted">
+                                    @BankQr.BankCode · <span class="num">@BankQr.AccountNumber</span>
+                                </span>
+                                @if (!string.IsNullOrWhiteSpace(BankQr.AccountName))
+                                {
+                                    <span class="xs muted">@BankQr.AccountName</span>
+                                }
+
+                                @*  Mã tham chiếu: hai khách liên tiếp cùng trả
+                                    45.000đ thì thông báo ngân hàng giống hệt
+                                    nhau. Có mã này thì đối chiếu được ngay.    *@
+                                <span class="pos-qr-ref mono">@_payRef</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="stack stack-1">
+                                <span class="small" style="font-weight: 700;">Chưa cài số tài khoản</span>
+                                <span class="xs muted">
+                                    Điền <span class="mono">BANK_CODE</span> và
+                                    <span class="mono">BANK_ACCOUNT_NUMBER</span> trong
+                                    <span class="mono">.env</span>, chạy lại
+                                    <span class="mono">scripts/gen-client-config.ps1</span>.
+                                    Vẫn nhận đơn bình thường, chỉ là khách phải chuyển khoản thủ công.
+                                </span>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @* ── THIẾU NGUYÊN LIỆU ─────────────────────────────────────────
+               Đặt ngay trên nút chốt: nhân viên vừa bấm xong là thấy, và thấy
+               ĐỦ mọi thứ thiếu trong một lần thay vì bấm lại từng lượt. *@
+            <ShortageAlert Items="_shortages" OnDismiss="() => _shortages = new()" />
+
+            @* ── CHỐT ĐƠN ────────────────────────────────────────────────── *@
+            <div class="pos-checkout">
+                <div class="row row-between">
+                    <span style="font-weight: 700;">Tổng cộng</span>
+                    <span class="price num" style="font-size: var(--text-xl);">
+                        @Money.Format(CartTotal)
+                    </span>
+                </div>
+
+                <button class="btn btn-primary btn-lg" style="width: 100%;"
+                        @onclick="PlaceOrder" disabled="@_placing">
+                    @if (_placing)
+                    {
+                        <span class="spinner" aria-hidden="true"></span>
+                        <span>Đang gửi…</span>
+                    }
+                    else
+                    {
+                        <CheckIcon Size="18" />
+                        <span>Nhận đơn &amp; đưa vào pha</span>
+                    }
+                </button>
+            </div>
+        }
+
+        @* ── ĐƠN VỪA NHẬN ────────────────────────────────────────────────
+           Giữ lại trên màn hình sau khi chốt để nhân viên còn đọc mã đơn và
+           thời gian cho khách nghe. Tự biến mất sau 20 giây. *@
+        @if (_justPlaced is not null)
+        {
+            <div class="pos-receipt fade-in" role="status">
+                <div class="row row-between">
+                    <span class="mono" style="font-weight: 700;">@_justPlaced.Code</span>
+                    <button class="btn btn-ghost btn-icon btn-sm" @onclick="() => _justPlaced = null"
+                            aria-label="Đóng">×</button>
+                </div>
+                <span class="small">
+                    @_justPlaced.TotalCups phần · @Money.Format(_justPlaced.GrandTotal)
+                </span>
+                <span class="pos-receipt-eta">
+                    Báo khách: khoảng <strong class="num">@_justPlaced.EtaMinutes phút</strong>
+                </span>
+
+                @* Đơn trả bằng chuyển khoản: nhắc lại mã để đối chiếu với thông
+                   báo ngân hàng, vốn hay về chậm hơn lúc chốt đơn vài giây. *@
+                @if (_justPlacedRef is not null)
+                {
+                    <span class="xs muted">
+                        Chuyển khoản · <span class="mono">@_justPlacedRef</span>
+                    </span>
+                }
+                <a href="/admin/pha-che" class="btn btn-secondary btn-sm">
+                    Xem hàng pha
+                </a>
+            </div>
+        }
+    </aside>
+</div>
+
+@code {
+    private List<PosCategoryDto> _categories = new();
+    private List<PosProductDto> _products = new();
+    private List<PosToppingDto> _toppings = new();
+    private readonly List<CartLine> _cart = new();
+
+    private Guid? _activeCat;
+    private string _search = "";
+    private bool _loading = true;
+    private bool _placing;
+
+    private string _customerName = "";
+    private int _orderType = 0;   // 0 = tại quán, 1 = mang đi
+    private int _payment = 0;     // 0 = tiền mặt, 1 = chuyển khoản
+
+    /// <summary>
+    /// Mã tham chiếu in trong nội dung chuyển khoản của đơn đang bấm.
+    ///
+    /// Sinh MỘT LẦN cho mỗi đơn, không sinh lại mỗi lần vẽ: khách vừa quét xong
+    /// mà nhân viên bấm thêm một ly, nếu mã đổi luôn thì tiền về mang mã cũ,
+    /// đối chiếu hỏng. Số tiền trong QR thì được phép đổi theo giỏ — đó là điều
+    /// khách nhìn thấy trước khi bấm xác nhận trên app ngân hàng.
+    /// </summary>
+    private string _payRef = BankQr.NewReference();
+
+    private EtaDto? _eta;
+    private bool _etaLoading;
+    private PosOrderResultDto? _justPlaced;
+
+    /// <summary>Nguyên liệu thiếu của lần bấm chốt gần nhất. Rỗng = không có gì để báo.</summary>
+    private List<IngredientShortageDto> _shortages = new();
+
+    /// <summary>Mã tham chiếu của đơn vừa chốt, chỉ có khi đơn đó trả bằng chuyển khoản.</summary>
+    private string? _justPlacedRef;
+
+    private Timer? _receiptTimer;
+    private CancellationTokenSource? _etaDebounce;
+
+    /// <summary>
+    /// Một dòng trong giỏ. Gộp theo món + size + GHI CHÚ.
+    ///
+    /// Ghi chú phải nằm trong khóa gộp: hai ly trà đào, một ly ít đá một ly bình
+    /// thường, là hai dòng khác nhau — gộp lại thì người pha không biết ly nào
+    /// theo ý nào. Ngược lại, bấm thêm một ly y hệt (chưa ghi chú gì) thì vẫn
+    /// phải rơi vào đúng dòng chưa ghi chú đang có, chứ không đẻ ra dòng mới.
+    /// Xem AddToCart để thấy quy tắc đó được áp dụng thế nào.
+    /// </summary>
+    private class CartLine
+    {
+        /// <summary>
+        /// Định danh CỐ ĐỊNH suốt đời dòng giỏ, chỉ dùng cho @@key của Blazor.
+        ///
+        /// Trước đây @@key dùng "mã món:size". Từ khi ghi chú sửa được ngay trên
+        /// dòng, khóa đó đổi giá trị giữa chừng lúc nhân viên đang gõ — Blazor
+        /// coi đó là phần tử khác, dựng lại thẻ input và ô nhập MẤT CON TRỎ ngay
+        /// sau ký tự đầu tiên. Khóa ổn định thì không bao giờ gặp chuyện đó.
+        /// </summary>
+        public Guid LineId { get; } = Guid.NewGuid();
+
+        public Guid ProductId { get; set; }
+        public Guid? VariantId { get; set; }
+        public string Name { get; set; } = "";
+        public string? VariantName { get; set; }
+        public string ColorPrimaryHex { get; set; } = "#8B5E3C";
+        public int Quantity { get; set; }
+        public int MaxServings { get; set; } = 9999;
+
+        // --- Giá -------------------------------------------------------------
+
+        /// <summary>Giá món cộng phụ thu size, CHƯA gồm topping.</summary>
+        public int BasePrice { get; set; }
+
+        /// <summary>
+        /// Topping khách gọi thêm cho dòng này.
+        /// <para>
+        /// Phải là dữ liệu của ĐƠN chứ không phải ghi chú: topping có tiền và có
+        /// trừ kho. Viết "thêm trân châu" vào ô ghi chú thì khách trả thiếu 8.000đ
+        /// và cuối tháng kiểm kê hụt mất phần trân châu đã dùng.
+        /// </para>
+        /// </summary>
+        public List<PosToppingDto> Toppings { get; } = new();
+
+        /// <summary>
+        /// Topping mà MÓN NÀY nhận được. Chép từ PosProductDto lúc thêm vào giỏ,
+        /// để khay tùy chọn chỉ hiện đúng những gì bấm được — bánh croissant
+        /// không có dòng "thêm trân châu".
+        /// </summary>
+        public List<Guid> ToppingIds { get; set; } = new();
+
+        /// <summary>Đơn giá thực thu một phần = giá món + size + mọi topping.</summary>
+        public int UnitPrice => BasePrice + Toppings.Sum(t => t.PriceDelta);
+
+        public int LineTotal => UnitPrice * Quantity;
+
+        // --- Ghi chú ---------------------------------------------------------
+        /// <summary>Các ý chọn nhanh bằng nút bấm ("Ít đá", "Không ngọt"…).</summary>
+        public List<string> Tags { get; } = new();
+
+        /// <summary>Phần nhân viên tự gõ, cho những yêu cầu không có nút sẵn.</summary>
+        public string FreeNote { get; set; } = "";
+
+        /// <summary>Đang mở khay ghi chú hay không. Chỉ là trạng thái giao diện.</summary>
+        public bool NoteOpen { get; set; }
+
+        /// <summary>Ghi chú hoàn chỉnh gửi xuống backend và in ra màn hình pha chế.</summary>
+        public string Note => string.Join(", ",
+            Tags.Append(FreeNote.Trim()).Where(s => !string.IsNullOrWhiteSpace(s)));
+
+        public bool HasNote => Tags.Count > 0 || !string.IsNullOrWhiteSpace(FreeNote);
+
+        /// <summary>
+        /// Dòng đã được cá biệt hóa — có ghi chú hoặc có topping.
+        /// <para>
+        /// Dùng làm điều kiện GỘP: chỉ dồn ly mới vào dòng chưa cá biệt hóa.
+        /// Cộng thêm một ly vào dòng khách trước đã gọi kèm trân châu là vừa
+        /// tính dư tiền của khách sau, vừa trừ dư kho.
+        /// </para>
+        /// </summary>
+        public bool HasExtras => HasNote || Toppings.Count > 0;
+    }
+
+    // ── GHI CHÚ CHỌN NHANH ──────────────────────────────────────────────────
+    //
+    //  Bàn phím ảo trên máy tính bảng là kẻ thù của tốc độ ở quầy: mở lên đã
+    //  che mất nửa màn hình, gõ "ít đá" mất vài giây trong lúc khách đứng chờ.
+    //  Sáu ý dưới đây phủ gần hết yêu cầu thực tế của một quán cà phê — một
+    //  chạm là xong. Ô gõ tay vẫn còn đó cho những trường hợp còn lại.
+    //
+    //  Group dùng để loại trừ nhau: chọn "Không đá" thì "Ít đá" và "Đá riêng"
+    //  tự bỏ chọn, vì một ly không thể vừa không đá vừa ít đá. "Ít sữa" đứng
+    //  riêng nên chọn kèm với bất kỳ ý nào cũng được.
+    private static readonly (string Label, string Group)[] QuickNotes =
+    {
+        ("Ít đá",      "da"),
+        ("Không đá",   "da"),
+        ("Đá riêng",   "da"),
+        ("Ít ngọt",    "ngot"),
+        ("Không ngọt", "ngot"),
+        ("Ít sữa",     "sua"),
+    };
+
+    private List<PosProductDto> Filtered
+    {
+        get
+        {
+            IEnumerable<PosProductDto> q = _products;
+
+            if (_activeCat is Guid c) q = q.Where(p => p.CategoryId == c);
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var s = _search.Trim();
+                q = q.Where(p => p.Name.Contains(s, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Món hết dồn xuống cuối — vẫn thấy được nhưng không chắn đường
+            return q.OrderByDescending(p => p.IsAvailable).ToList();
+        }
+    }
+
+    private int CartQty(Guid productId) => _cart.Where(l => l.ProductId == productId).Sum(l => l.Quantity);
+
+    /// <summary>Tổng tiền đơn đang bấm — dùng cho cả dòng tổng cộng lẫn số tiền trong QR.</summary>
+    private int CartTotal => _cart.Sum(l => l.LineTotal);
+
+    /// <summary>
+    /// Đổi hình thức thanh toán.
+    ///
+    /// Chuyển sang "Chuyển khoản" thì cấp mã tham chiếu mới, phòng trường hợp
+    /// nhân viên bấm nhầm sang "Tiền mặt" rồi quay lại — lúc đó khách trước có
+    /// thể đã quét mã cũ, dùng lại mã đó cho đơn mới là hai đơn chung một mã.
+    /// </summary>
+    private void SetPayment(int method)
+    {
+        if (method == 1 && _payment != 1) _payRef = BankQr.NewReference();
+        _payment = method;
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadMenuAsync();
+
+    private async Task LoadMenuAsync()
+    {
+        _loading = true;
+        var res = await Api.GetPosMenuAsync();
+        if (res.Success && res.Data is not null)
+        {
+            _categories = res.Data.Categories;
+            _products = res.Data.Products;
+            _toppings = res.Data.Toppings;
+        }
+        _loading = false;
+    }
+
+    // ── GIỎ HÀNG ────────────────────────────────────────────────────────────
+
+    private void AddToCart(PosProductDto p)
+    {
+        // Size mặc định nếu món có nhiều size. Nhân viên đổi size ở giỏ nếu cần —
+        // bắt chọn size ngay lúc bấm sẽ chậm hơn cho 80% trường hợp dùng size M.
+        var variant = p.Variants.FirstOrDefault(v => v.IsDefault) ?? p.Variants.FirstOrDefault();
+
+        // Số ly còn làm được tính trên TOÀN BỘ các dòng của món này, không phải
+        // trên một dòng. Từ khi ghi chú tách dòng, ba ly cùng món có thể nằm ở ba
+        // dòng riêng — kiểm tra từng dòng thì nhận đơn vượt quá nguyên liệu thật.
+        if (CartQty(p.Id) >= p.MaxServings)
+        {
+            Alerts.Warning($"{p.Name} chỉ còn {p.MaxServings} ly.");
+            return;
+        }
+
+        // Chỉ dồn vào dòng CHƯA cá biệt hóa. Dòng đã ghi "ít đá" hoặc đã gọi kèm
+        // trân châu là yêu cầu riêng của khách trước đó — cộng thêm ly mới vào đó
+        // là làm sai đơn, sai tiền và sai kho.
+        var line = _cart.FirstOrDefault(l => l.ProductId == p.Id
+                                          && l.VariantId == variant?.Id
+                                          && !l.HasExtras);
+        if (line is not null)
+        {
+            line.Quantity++;
+        }
+        else
+        {
+            line = new CartLine
+            {
+                ProductId       = p.Id,
+                VariantId       = variant?.Id,
+                Name            = p.Name,
+                VariantName     = variant?.Name,
+                ColorPrimaryHex = p.ColorPrimaryHex,
+                BasePrice       = p.BasePrice + (variant?.PriceDelta ?? 0),
+                Quantity        = 1,
+                MaxServings     = p.MaxServings,
+                ToppingIds      = p.ToppingIds
+            };
+            _cart.Add(line);
+        }
+
+        // Ly vừa bấm thành ly nhận topping: khách gọi món xong nói "thêm trân
+        // châu" thì nhân viên bấm khu Topping là gắn đúng ly đó luôn.
+        _targetLineId = line.LineId;
+
+        _ = RefreshEtaAsync();
+    }
+
+    private void Bump(CartLine line, int delta)
+    {
+        line.Quantity += delta;
+        if (line.Quantity <= 0) _cart.Remove(line);
+        _ = RefreshEtaAsync();
+    }
+
+    private void Remove(CartLine line)
+    {
+        _cart.Remove(line);
+        _ = RefreshEtaAsync();
+    }
+
+    /// <summary>
+    /// Dọn sạch để bắt đầu đơn của khách tiếp theo.
+    ///
+    /// Trả hình thức thanh toán về tiền mặt và cấp mã tham chiếu mới: mỗi khách
+    /// một mã, dùng lại mã của khách trước là hai giao dịch không tách được ra.
+    /// </summary>
+    private void ClearCart()
+    {
+        _cart.Clear();
+        _eta = null;
+        _payment = 0;
+        _payRef = BankQr.NewReference();
+        _shortages = new();
+    }
+
+    // ── GHI CHÚ TỪNG MÓN ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Mở/đóng khay ghi chú của một dòng. Mỗi lúc chỉ mở MỘT khay: giỏ hàng nằm
+    /// trong cột hẹp và tự cuộn, mở cùng lúc ba khay thì đẩy nút chốt đơn ra
+    /// khỏi tầm mắt — đúng thứ nhân viên cần bấm tiếp theo.
+    /// </summary>
+    private void ToggleNote(CartLine line)
+    {
+        var opening = !line.NoteOpen;
+        foreach (var l in _cart) l.NoteOpen = false;
+        line.NoteOpen = opening;
+
+        // Ghi lại để cuộn khay vào tầm nhìn SAU khi Blazor dựng xong nó — xem
+        // OnAfterRenderAsync. Gọi JS ngay tại đây thì khay còn chưa có trong DOM.
+        _scrollToLine = opening ? line.LineId : null;
+    }
+
+    /// <summary>Dòng cần cuộn vào tầm nhìn ở lần vẽ tiếp theo. null = không cần.</summary>
+    private Guid? _scrollToLine;
+
+    /// <summary>
+    /// Cuộn khay vừa mở vào tầm nhìn.
+    /// <para>
+    /// Giỏ hàng có vùng cuộn riêng và cao có hạn. Khay topping mở ra thường dài
+    /// hơn phần còn trống nên bị khuất một nửa dưới khối thời gian chờ — nhân
+    /// viên tưởng khay chỉ có bấy nhiêu và bỏ sót phần ghi chú bên dưới.
+    /// </para>
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_scrollToLine is not Guid lineId) return;
+        _scrollToLine = null;
+
+        try
+        {
+            // Cuộn vào chính KHAY, không phải dòng đơn: dòng đơn vốn đã nằm
+            // trong tầm nhìn (vừa bấm nút trên nó), thứ bị khuất là khay bên dưới.
+            await JS.InvokeVoidAsync(
+                "qlyScroll.intoView", $"[data-line=\"{lineId}\"] .pos-note-tray", "end");
+        }
+        catch
+        {
+            // Cuộn hỏng thì khay vẫn mở và vẫn cuộn tay được — không đáng làm
+            // sập màn hình bán hàng giữa lúc có khách.
+        }
+    }
+
+    /// <summary>
+    /// Bật/tắt một ý chọn nhanh. Chọn ý mới trong cùng nhóm thì ý cũ tự nhường
+    /// chỗ — nhân viên không phải bỏ chọn thủ công trước khi chọn cái khác.
+    /// </summary>
+    private void ToggleTag(CartLine line, string label, string group)
+    {
+        if (line.Tags.Remove(label)) return;
+
+        // Dọn các ý cùng nhóm rồi mới thêm — "Không đá" và "Ít đá" không thể
+        // cùng đúng, để cả hai thì người pha phải đoán.
+        var sameGroup = QuickNotes.Where(q => q.Group == group).Select(q => q.Label);
+        line.Tags.RemoveAll(t => sameGroup.Contains(t));
+
+        line.Tags.Add(label);
+    }
+
+    /// <summary>
+    /// Bật/tắt một topping. Khác ghi chú ở chỗ nó ĐỔI TIỀN, nên phải tính lại
+    /// thời gian chờ: topping có công thức riêng và có thể làm món hết nguyên liệu.
+    /// </summary>
+    // ── KHU TOPPING RIÊNG ───────────────────────────────────────────────────
+
+    /// <summary>Lưới bên trái đang hiện topping thay cho món.</summary>
+    private bool _showToppings;
+
+    /// <summary>
+    /// Ly trong giỏ sẽ nhận topping khi bấm ở khu Topping. Tự trỏ vào ly vừa
+    /// thêm (xem AddToCart) — trường hợp phổ biến nhất là khách gọi món rồi nói
+    /// luôn "thêm trân châu", nên nhân viên không phải chọn lại ly.
+    /// </summary>
+    private Guid? _targetLineId;
+
+    private CartLine? TargetLine =>
+        _cart.FirstOrDefault(l => l.LineId == _targetLineId)
+        ?? _cart.LastOrDefault(l => l.ToppingIds.Count > 0)
+        ?? _cart.LastOrDefault();
+
+    private void OpenToppings()
+    {
+        _showToppings = true;
+        _targetLineId ??= TargetLine?.LineId;
+    }
+
+    private void OpenToppingsFor(CartLine line)
+    {
+        _targetLineId = line.LineId;
+        _showToppings = true;
+    }
+
+    private void ToggleToppingOnTarget(PosToppingDto topping)
+    {
+        var line = TargetLine;
+        if (line is null)
+        {
+            Alerts.Warning("Bấm món trước rồi mới thêm topping.");
+            return;
+        }
+        if (!line.ToppingIds.Contains(topping.Id))
+        {
+            Alerts.Warning($"{line.Name} không nhận topping {topping.Name}.");
+            return;
+        }
+
+        _targetLineId = line.LineId;
+        ToggleTopping(line, topping);
+    }
+
+    private void ToggleTopping(CartLine line, PosToppingDto topping)
+    {
+        var existing = line.Toppings.FirstOrDefault(t => t.Id == topping.Id);
+        if (existing is not null) line.Toppings.Remove(existing);
+        else line.Toppings.Add(topping);
+
+        _ = RefreshEtaAsync();
+    }
+
+    // ── LẤY THÊM HÀNG NGAY TẠI QUẦY ─────────────────────────────────────────
+
+    /// <summary>Công thức sơ chế đang chạy. null = không chạy mẻ nào.</summary>
+    private Guid? _dangNau;
+
+    /// <summary>
+    /// Chạy một mẻ sơ chế ngay từ màn hình quầy để bán tiếp.
+    /// <para>
+    /// Đây là thao tác TRỪ NGUYÊN LIỆU THÔ thật, không phải nút hiển thị: backend
+    /// tính đúng công thức, tạo lô bán thành phẩm mới kèm hạn dùng, và ghi bút
+    /// toán kho. Cùng một đường mà trang Sơ chế đi.
+    /// </para>
+    /// <para>
+    /// Một mẻ mỗi lần bấm. Cần nửa mẻ hay ba mẻ thì sang trang Sơ chế — ở quầy
+    /// giữa lúc có khách, thêm một ô nhập số là thêm một chỗ bấm nhầm.
+    /// </para>
+    /// </summary>
+    private async Task NauThemAsync(Guid prepRecipeId, string tenMon)
+    {
+        if (_dangNau is not null) return;
+
+        _dangNau = prepRecipeId;
+        try
+        {
+            var res = await Api.ProduceBatchAsync(new ProduceBatchRequest
+            {
+                PrepRecipeId = prepRecipeId,
+                BatchCount   = 1,
+                Note         = $"Nấu thêm tại quầy để bán tiếp {tenMon}"
+            });
+
+            if (res.Success && res.Data is not null)
+            {
+                var d = res.Data;
+                Alerts.Success(
+                    $"Đã làm {Qty.WithUnit(d.OutputQuantity, d.UnitLabel)} {d.OutputName}. " +
+                    $"Dùng tới {d.ExpiresAt.ToLocalTime():HH:mm dd/MM}.");
+
+                // Nạp lại thực đơn: món và topping vừa được mở khóa, và số ly còn
+                // làm được của MỌI món dùng nguyên liệu đó cũng đổi theo.
+                await LoadMenuAsync();
+                await RefreshEtaAsync();
+            }
+            else
+            {
+                Alerts.Error(res.Error?.Message ?? "Không chạy được mẻ sơ chế.");
+            }
+        }
+        finally { _dangNau = null; }
+    }
+
+    /// <summary>Xóa sạch ghi chú của một dòng và đóng khay lại.</summary>
+    private void ClearNote(CartLine line)
+    {
+        line.Tags.Clear();
+        line.FreeNote = "";
+        line.NoteOpen = false;
+    }
+
+    // ── THỜI GIAN CHỜ ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Hỏi lại backend mỗi khi giỏ đổi, nhưng chờ 250ms trước đã.
+    /// Nhân viên bấm liên tiếp 5 ly thì chỉ cần một lần gọi, không phải năm.
+    /// </summary>
+    private async Task RefreshEtaAsync()
+    {
+        _etaDebounce?.Cancel();
+        _etaDebounce = new CancellationTokenSource();
+        var token = _etaDebounce.Token;
+
+        if (_cart.Count == 0)
+        {
+            _eta = null;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(250, token);
+
+            _etaLoading = true;
+            StateHasChanged();
+
+            var items = _cart
+                .GroupBy(l => l.ProductId)
+                .Select(g => new EstimateItem(g.Key, g.Sum(x => x.Quantity)))
+                .ToList();
+
+            var res = await Api.EstimateEtaAsync(items);
+            if (!token.IsCancellationRequested && res.Success)
+                _eta = res.Data;
+        }
+        catch (TaskCanceledException)
+        {
+            // Giỏ đổi tiếp trước khi hết 250ms — lần gọi sau sẽ lo
+        }
+        finally
+        {
+            _etaLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── CHỐT ĐƠN ────────────────────────────────────────────────────────────
+
+    private async Task PlaceOrder()
+    {
+        if (_cart.Count == 0) return;
+
+        _placing = true;
+        try
+        {
+            var req = new CreateOrderRequest
+            {
+                CustomerName = string.IsNullOrWhiteSpace(_customerName)
+                    ? "Khách tại quầy"
+                    : _customerName.Trim(),
+
+                // Đơn tại quầy không cần số điện thoại — khách đứng ngay đó và
+                // được gọi tên khi xong. Vẫn phải điền vì backend bắt buộc.
+                CustomerPhone = "0000000000",
+                OrderType     = _orderType,
+                PaymentMethod = _payment,
+
+                // Mã tham chiếu phải đi kèm đơn, đây chính là khóa để webhook
+                // SePay tìm ngược ra đơn khi tiền về. Gửi đúng mã đã in trên QR
+                // khách vừa quét — backend kiểm định dạng rồi lưu nguyên.
+                PaymentRef    = _payment == 1 ? _payRef : null,
+
+                Note          = null,
+                Items         = _cart.Select(l => new CreateOrderItem
+                {
+                    ProductId   = l.ProductId,
+                    VariantId   = l.VariantId,
+                    Quantity    = l.Quantity,
+                    // Topping đi vào ĐÂY chứ không vào ghi chú. Backend cộng phụ
+                    // thu từ chính danh sách này và trừ kho theo công thức của
+                    // từng topping — ghi chú không làm được cả hai việc đó.
+                    ModifierIds = l.Toppings.Select(t => t.Id).ToList(),
+
+                    // null chứ không phải chuỗi rỗng: màn hình pha chế kiểm tra
+                    // bằng IsNullOrEmpty rồi mới vẽ khung ghi chú, gửi "" xuống
+                    // thì mỗi ly đều mọc một khung trống.
+                    Note        = l.HasNote ? l.Note : null
+                }).ToList()
+            };
+
+            var res = await Api.CreatePosOrderAsync(req);
+
+            if (res.Success && res.Data is not null)
+            {
+                _justPlaced = res.Data;
+
+                // Giữ lại mã tham chiếu TRƯỚC khi ClearCart cấp mã mới. Tiền có
+                // thể về sau lúc chốt đơn vài giây, nhân viên vẫn cần đối chiếu
+                // được thông báo ngân hàng với đúng đơn vừa nhận.
+                _justPlacedRef = _payment == 1 ? _payRef : null;
+
+                Alerts.Success($"Đơn {res.Data.Code} đã vào hàng pha — báo khách {res.Data.EtaMinutes} phút.");
+
+                ClearCart();
+                _customerName = "";
+
+                // Nạp lại lưới: số ly còn làm được vừa giảm vì đơn mới đã chiếm chỗ
+                await LoadMenuAsync();
+
+                // Biên lai tự ẩn sau 20 giây để không chắn màn hình khách tiếp theo
+                _receiptTimer?.Dispose();
+                _receiptTimer = new Timer(_ =>
+                {
+                    _justPlaced = null;
+                    InvokeAsync(StateHasChanged);
+                }, null, 20_000, Timeout.Infinite);
+            }
+            else
+            {
+                _shortages = ApiClient.ReadIngredientShortages(res.Error);
+
+                // Có danh sách thì khung ShortageAlert đã nói đủ, thông báo nổi
+                // chỉ cần một câu ngắn. Không có (lỗi khác) thì hiện nguyên câu.
+                if (_shortages.Count > 0)
+                    Alerts.Error($"Thiếu {_shortages.Count} nguyên liệu — xem danh sách trong giỏ.");
+                else
+                    Alerts.Error(res.Error?.Message ?? "Không nhận được đơn.");
+            }
+        }
+        finally
+        {
+            _placing = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _receiptTimer?.Dispose();
+        _etaDebounce?.Cancel();
+        _etaDebounce?.Dispose();
+    }
+}

@@ -1,0 +1,411 @@
+@*
+    =============================================================================
+    RESTOCK PANEL — Bảng "Cần nhập hàng"
+    =============================================================================
+
+    Thay cho việc mở trang kho rà từng dòng. Một bảng, sắp theo độ gấp:
+
+        Hết hàng  →  Đã chặn đơn  →  Dưới tối thiểu  →  Chỉ đủ ~1 ngày  →  Sắp hết
+
+    Mỗi dòng trả lời đủ ba câu người đi nhập hàng cần:
+        · Thiếu cái gì, gấp cỡ nào          (tên + nhãn trạng thái + món bị ảnh hưởng)
+        · Còn dùng được bao lâu              (tồn trừ phần hàng chờ, số ngày đủ dùng)
+        · Nhập bao nhiêu, tốn khoảng bao nhiêu (đã làm tròn theo thùng / bao / kg)
+
+    Dùng ở HAI chỗ, khác nhau ở nút cuối dòng:
+        Mode = Plan     trang Kế hoạch   — nút "Nhập kho theo danh sách" ở đầu bảng
+        Mode = Receive  trang Nhập kho   — nút "Nhập" trên từng dòng, bấm là điền
+                                           sẵn form, nhập xong tự đánh dấu đã xong
+
+    Xem ngày cũ: chỉ hiện những nguyên liệu đã THỰC SỰ chặn đơn hôm đó. Cột tồn
+    kho vẫn là số hiện tại — để biết đã nhập bù hay chưa.
+
+    NHẬP RỒI THÌ THÔI BÁO. Nguyên liệu đã nhập bù đủ rời khỏi bảng và xuống
+    dòng "đã xong" ở cuối. Hết việc thì khung báo hoàn tất — chứ không im lặng
+    xóa sạch bảng, vì lúc đó người nhìn không phân biệt được "xong rồi" với
+    "hỏng nên không tải được".
+    =============================================================================
+*@
+@inject ApiClient Api
+@inject IJSRuntime JS
+@inject AlertService Alerts
+
+<section class="card restock-panel" aria-labelledby="restock-title">
+
+    <div class="card-header">
+        <div class="stack stack-1">
+            <div class="row row-2">
+                <TruckIcon Size="20" />
+                <h3 class="card-title" id="restock-title">
+                    @(_data is { IsToday: false } ? $"Nguyên liệu đã chặn đơn ngày {FormatDate(_data.BusinessDate)}" : "Cần nhập hàng")
+                </h3>
+                @if (_data is not null && _data.Items.Count > 0)
+                {
+                    <span class="badge @(HasUrgent ? "badge-danger" : "badge-warn")">@_data.Items.Count nguyên liệu</span>
+                }
+                else if (AllDone)
+                {
+                    <span class="badge badge-ok">Hoàn tất</span>
+                }
+            </div>
+            @if (_data is not null)
+            {
+                <span class="xs muted">
+                    @if (_data.IsToday)
+                    {
+                        <span>Tính theo tồn kho lúc @_data.ComputedAt.ToLocalTime().ToString("HH:mm")
+                              · đã trừ phần các ly đang chờ pha · gợi ý đủ dùng @_data.CoverDays ngày</span>
+                    }
+                    else
+                    {
+                        <span>Cột "Dùng được" là tồn kho hiện tại — để biết đã nhập bù hay chưa</span>
+                    }
+                </span>
+            }
+        </div>
+
+        <div class="row row-2 row-wrap">
+            @if (_data is not null && _data.Items.Count > 0)
+            {
+                <button class="btn btn-ghost btn-sm" @onclick="CopyAsync"
+                        title="Chép danh sách để gửi nhà cung cấp qua Zalo / tin nhắn">
+                    <ReceiptIcon Size="14" /> Chép danh sách
+                </button>
+            }
+            <button class="btn btn-ghost btn-icon btn-sm" @onclick="ReloadAsync"
+                    disabled="@_loading" aria-label="Tính lại" title="Tính lại theo tồn kho mới nhất">
+                <RefreshIcon Size="16" />
+            </button>
+            @if (Mode == RestockMode.Plan && _data is not null && _data.Items.Count > 0)
+            {
+                <a href="/admin/nhap-kho" class="btn btn-primary btn-sm">
+                    Nhập kho theo danh sách <ArrowIcon Size="14" />
+                </a>
+            }
+        </div>
+    </div>
+
+    @if (_loading && _data is null)
+    {
+        <div class="skeleton" style="height: 140px; border-radius: var(--radius);"></div>
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-warn">
+            <WarnIcon Size="18" />
+            <span class="small">Không tải được danh sách cần nhập: @_error</span>
+        </div>
+    }
+    else if (_data is not null)
+    {
+        @if (_data.Items.Count == 0)
+        {
+            <div class="alert alert-ok">
+                <CheckIcon Size="20" />
+                <div class="stack stack-1">
+                    <span class="alert-title">
+                        @if (AllDone)
+                        {
+                            <span>Hoàn tất công việc — đã nhập đủ @_data.DoneItems.Count nguyên liệu vừa báo thiếu</span>
+                        }
+                        else if (_data.IsToday)
+                        {
+                            <span>Kho đủ dùng, chưa cần nhập gì</span>
+                        }
+                        else
+                        {
+                            <span>Ngày này không có đơn nào bị chặn vì thiếu nguyên liệu</span>
+                        }
+                    </span>
+                    @if (AllDone)
+                    {
+                        <span class="small">Không còn nguyên liệu nào đang chờ nhập.</span>
+                    }
+                    else if (_data.IsToday)
+                    {
+                        <span class="small">
+                            Không nguyên liệu nào hết, dưới ngưỡng, hay vừa chặn đơn.
+                        </span>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            @* ── Tóm tắt một dòng — nắm tình hình trước khi đọc bảng ── *@
+            <div class="restock-summary">
+                @foreach (var g in _data.Items.GroupBy(i => i.Status).OrderBy(g => g.Key))
+                {
+                    <span class="badge @StatusBadge(g.Key)">@g.First().StatusLabel: @g.Count()</span>
+                }
+                @if (_data.TotalEstimatedCost > 0)
+                {
+                    <span class="restock-total">
+                        Ước tính <strong class="num">@Money.Format(_data.TotalEstimatedCost)</strong>
+                    </span>
+                }
+            </div>
+
+            <div class="table-wrap">
+                <table class="table restock-table">
+                    <thead>
+                        <tr>
+                            <th>Nguyên liệu</th>
+                            <th class="num">Dùng được</th>
+                            <th class="num">Tiêu thụ / ngày</th>
+                            <th>Nên nhập</th>
+                            <th class="num">Ước tính</th>
+                            @if (Mode == RestockMode.Receive)
+                            {
+                                <th><span class="sr-only">Thao tác</span></th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in _data.Items)
+                        {
+                            var done = DoneIds.Contains(r.IngredientId);
+                            <tr class="@RowClass(r.Status) @(done ? "is-done" : "")" @key="r.IngredientId">
+                                <td>
+                                    <div class="ingredient-cell">
+                                        <div class="ingredient-icon" style="--ing-color: @r.ColorHex">
+                                            <IngredientIcon IconKey="@r.IconKey" ColorHex="@r.ColorHex"
+                                                            Size="20" AriaLabel="@r.Name" />
+                                        </div>
+                                        <div class="ingredient-meta">
+                                            <span class="ingredient-name">
+                                                @if (done) { <CheckIcon Size="13" /> }
+                                                @r.Name
+                                            </span>
+                                            <span class="row row-2 row-wrap">
+                                                <span class="badge @StatusBadge(r.Status)">@r.StatusLabel</span>
+                                                @if (r.BlockedCount > 0)
+                                                {
+                                                    <span class="xs text-danger">
+                                                        chặn @r.BlockedCount lần · thiếu tới @Qty.Format(r.MaxMissingQuantity) @r.UnitLabel
+                                                    </span>
+                                                }
+                                            </span>
+                                            @if (!string.IsNullOrEmpty(r.AffectedProducts))
+                                            {
+                                                <span class="xs muted restock-products" title="@r.AffectedProducts">
+                                                    Ảnh hưởng: @r.AffectedProducts
+                                                </span>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td class="num">
+                                    <div class="stack stack-1" style="align-items: flex-end;">
+                                        <span class="@(r.Available <= 0 ? "text-danger" : "")" style="font-weight: 700;">
+                                            @Qty.Format(r.Available) @r.UnitLabel
+                                        </span>
+                                        @if (r.Reserved > 0)
+                                        {
+                                            <span class="xs muted" title="Tồn kho @Qty.Format(r.OnHand), các ly đang chờ pha đã giữ @Qty.Format(r.Reserved)">
+                                                tồn @Qty.Format(r.OnHand) − chờ pha @Qty.Format(r.Reserved)
+                                            </span>
+                                        }
+                                        @if (r.MinStockLevel > 0)
+                                        {
+                                            <span class="xs muted">tối thiểu @Qty.Format(r.MinStockLevel)</span>
+                                        }
+                                    </div>
+                                </td>
+
+                                <td class="num">
+                                    @if (r.AvgDailyUsage > 0)
+                                    {
+                                        <div class="stack stack-1" style="align-items: flex-end;">
+                                            <span>@Qty.Format(r.AvgDailyUsage) @r.UnitLabel</span>
+                                            <span class="xs @CoverClass(r.DaysOfCover)">@CoverText(r.DaysOfCover)</span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="xs muted">chưa có dữ liệu</span>
+                                    }
+                                </td>
+
+                                <td>
+                                    <div class="stack stack-1">
+                                        <strong>@r.SuggestedPurchaseText</strong>
+                                        @if (r.SuggestedQuantity > 0)
+                                        {
+                                            <span class="xs muted num">= @Qty.Format(r.SuggestedQuantity) @r.UnitLabel</span>
+                                        }
+                                    </div>
+                                </td>
+
+                                <td class="num">
+                                    @if (r.EstimatedCost > 0)
+                                    {
+                                        <span>@Money.Format(r.EstimatedCost)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="xs muted" title="Nguyên liệu chưa có giá vốn — chưa nhập lần nào">—</span>
+                                    }
+                                </td>
+
+                                @if (Mode == RestockMode.Receive)
+                                {
+                                    <td class="num">
+                                        <button class="btn btn-sm @(done ? "btn-ghost" : "btn-secondary")"
+                                                @onclick="() => OnPick.InvokeAsync(r)">
+                                            @(done ? "Nhập thêm" : "Nhập")
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @* ── Đã nhập bù xong: ghi công, không phải việc phải làm nữa ──
+             Vẫn hiện tên để nhân viên đối chiếu được với hóa đơn, nhưng nằm
+             ngoài bảng và ngoài mọi con số đếm. *@
+        @if (_data.DoneItems.Count > 0 && _data.Items.Count > 0)
+        {
+            <div class="alert alert-ok">
+                <CheckIcon Size="18" />
+                <div class="stack stack-1 grow">
+                    <span class="alert-title">Đã nhập xong @_data.DoneItems.Count nguyên liệu</span>
+                    <span class="small">@DoneSummary</span>
+                </div>
+            </div>
+        }
+
+        @* ── Bán thành phẩm: việc của bếp, không phải của người đi mua ── *@
+        @if (_data.PrepItems.Count > 0)
+        {
+            <div class="alert alert-info">
+                <JarIcon Size="18" />
+                <div class="stack stack-1 grow">
+                    <span class="alert-title">Bán thành phẩm cần sơ chế</span>
+                    <span class="small">
+                        @string.Join(" · ", _data.PrepItems.Select(p =>
+                            $"{p.Name} ({p.StatusLabel.ToLowerInvariant()}, còn {Qty.Format(p.Available)} {p.UnitLabel})"))
+                    </span>
+                </div>
+                <a href="/admin/so-che" class="btn btn-ghost btn-sm">Sơ chế <ArrowIcon Size="14" /></a>
+            </div>
+        }
+    }
+</section>
+
+@code {
+    public enum RestockMode { Plan, Receive }
+
+    /// <summary>"yyyy-MM-dd"; null = hôm nay.</summary>
+    [Parameter] public string? BusinessDate { get; set; }
+
+    [Parameter] public RestockMode Mode { get; set; } = RestockMode.Plan;
+
+    /// <summary>Mode = Receive: bấm "Nhập" trên một dòng.</summary>
+    [Parameter] public EventCallback<RestockItemDto> OnPick { get; set; }
+
+    /// <summary>Mode = Receive: nguyên liệu đã nhập trong phiên này, hiện dấu tích.</summary>
+    [Parameter] public IReadOnlySet<Guid> DoneIds { get; set; } = new HashSet<Guid>();
+
+    /// <summary>Báo cho trang cha khi dữ liệu thay đổi (trang Nhập kho dùng để biết dòng kế tiếp).</summary>
+    [Parameter] public EventCallback<RestockListDto> OnLoaded { get; set; }
+
+    private RestockListDto? _data;
+    private bool _loading;
+    private string? _error;
+    private string? _loadedFor = " ";
+
+    public RestockListDto? Data => _data;
+
+    private bool HasUrgent => _data?.Items.Any(i => i.Status <= 1) ?? false;
+
+    /// <summary>Có việc, và việc đã làm xong hết — khác hẳn với "hôm nay vốn không có việc gì".</summary>
+    private bool AllDone => _data is { Items.Count: 0, DoneItems.Count: > 0 };
+
+    private string DoneSummary => _data is null ? "" : string.Join(" · ",
+        _data.DoneItems.Select(d => $"{d.Name} (còn {Qty.Format(d.Available)} {d.UnitLabel})"));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Chỉ tải lại khi đổi ngày — trang cha vẽ lại vì lý do khác thì bỏ qua
+        if (_loadedFor == BusinessDate) return;
+        _loadedFor = BusinessDate;
+        await ReloadAsync();
+    }
+
+    /// <summary>Tính lại theo tồn kho mới nhất. Trang Nhập kho gọi sau mỗi lần nhập.</summary>
+    public async Task ReloadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var res = await Api.GetRestockListAsync(BusinessDate);
+        _loading = false;
+
+        if (res.Success && res.Data is not null)
+        {
+            _data = res.Data;
+            _error = null;
+            await OnLoaded.InvokeAsync(_data);
+        }
+        else
+        {
+            _error = res.Error?.Message ?? "lỗi không xác định";
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Chép danh sách dạng chữ để dán vào Zalo gửi nhà cung cấp — đỡ phải gõ
+    /// lại từng dòng, đúng thứ tốn thời gian nhất trước đây.
+    /// </summary>
+    private async Task CopyAsync()
+    {
+        if (_data is null) return;
+
+        var lines = _data.Items.Select(i => $"- {i.Name}: {i.SuggestedPurchaseText}");
+        var text = $"Cần nhập ngày {FormatDate(_data.BusinessDate)}:\n{string.Join("\n", lines)}";
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            Alerts.Success($"Đã chép {_data.Items.Count} dòng. Dán vào tin nhắn gửi nhà cung cấp.");
+        }
+        catch (JSException)
+        {
+            // Trình duyệt chặn quyền bộ nhớ tạm (trang không chạy HTTPS chẳng hạn)
+            Alerts.Error("Trình duyệt không cho chép tự động. Hãy bôi đen bảng để chép tay.");
+        }
+    }
+
+    private static string StatusBadge(int status) => status switch
+    {
+        0 or 1 => "badge-danger",
+        2 or 3 => "badge-warn",
+        9      => "badge-ok",
+        _      => "badge-neutral"
+    };
+
+    private static string RowClass(int status)
+        => status <= 1 ? "row-critical" : status <= 3 ? "row-warn" : "";
+
+    private static string CoverText(double? days)
+        => days is null ? ""
+         : days < 0.1 ? "không đủ dùng"
+         : $"đủ ~{days.Value.ToString("0.#")} ngày";
+
+    // Toán tử ba ngôi thay cho switch có mẫu quan hệ: Razor đọc nhầm "<" đầu dòng là thẻ HTML.
+    private static string CoverClass(double? days)
+        => days is null ? "muted"
+         : days.Value < 1 ? "text-danger"
+         : days.Value < 3 ? "text-warn"
+         : "muted";
+
+    private static string FormatDate(string businessDate) =>
+        DateTime.TryParse(businessDate, out var d) ? d.ToString("dd/MM/yyyy") : businessDate;
+}

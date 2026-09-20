@@ -138,6 +138,13 @@
             </div>
         </div>
     </footer>
+
+    @* ── THÔNG BÁO NỔI ─────────────────────────────────────────────────────
+         Các trang bán hàng gọi AlertService khi thêm giỏ hàng hoặc gặp lỗi,
+         nhưng trước đây khung trang này không hề dựng AlertHost — nghĩa là mọi
+         thông báo đều rơi vào hư vô, khách bấm "Thêm vào giỏ" mà không thấy gì
+         phản hồi. Đặt ở cuối khung để nó nằm trên mọi nội dung khác. *@
+    <AlertHost />
 </div>
 
 @code {

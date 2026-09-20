@@ -1,16 +1,43 @@
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!-- ============================================================================
+       TRANG BÁN HÀNG — ứng dụng công khai
+       ============================================================================
+       Đây là bản mà khách và Google tải về. Nguyên tắc: KHÔNG có gì của trang
+       quản lý lọt vào đây. Không trang admin, không CSS admin, không tầng xác
+       thực. Mỗi ki-lô-byte thừa đều là điểm trừ của Core Web Vitals, mà Core Web
+       Vitals lại là yếu tố xếp hạng.
+
+       Trang quản lý nằm ở dự án QlyCoffee.Admin, phát hành riêng.
+       Phần dùng chung giữa hai bên nằm ở QlyCoffee.Ui.
+       ============================================================================ -->
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Bản đồ gỡ lỗi không cần cho người dùng cuối — bỏ đi cho nhẹ.
+         Đây là thay đổi DUY NHẤT về tối ưu ở đây, và là thay đổi an toàn.
+
+         CỐ Ý KHÔNG đặt <TrimMode>full</TrimMode>. Blazor WebAssembly bản
+         Release đã tự cắt mã thừa ở mức an toàn. Đẩy lên mức "full" thì trình
+         cắt sẽ gỡ cả những property mà System.Text.Json chỉ chạm tới qua
+         reflection — mã vẫn biên dịch, publish vẫn thành công, nhưng lúc chạy
+         thật thì DTO trả về từ API bị rỗng vài trường. Hỏng kiểu đó không có
+         thông báo lỗi nào, chỉ có giá tiền hiện thành 0 và không ai biết tại sao.
+         Muốn bật thì phải kèm TrimmerRootDescriptor hoặc source generator cho
+         JSON, và phải kiểm thử từng màn hình. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
   </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.11" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.11" />
-    <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
   </ItemGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\..\shared\QlyCoffee.Shared\QlyCoffee.Shared.csproj" />
+    <ProjectReference Include="..\QlyCoffee.Ui\QlyCoffee.Ui.csproj" />
   </ItemGroup>
+
 </Project>

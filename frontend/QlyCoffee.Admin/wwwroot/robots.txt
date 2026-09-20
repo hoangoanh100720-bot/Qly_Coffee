@@ -1,0 +1,18 @@
+# =============================================================================
+#  APP QUẢN LÝ — KHÔNG DÀNH CHO CÔNG CỤ TÌM KIẾM
+# =============================================================================
+#  Chặn toàn bộ. Không có gì ở đây đáng lên Google, mà để lọt thì tệ theo hai
+#  hướng cùng lúc:
+#
+#  1. Lộ cấu trúc nội bộ. Kết quả tìm kiếm hiện ra đường dẫn /ban-hang,
+#     /nhap-kho, /bao-cao… là bản đồ sẵn cho người muốn dò.
+#  2. Loãng thương hiệu. Khách gõ tên quán mà thấy trang đăng nhập nội bộ nằm
+#     lẫn trong kết quả thì site mất điểm tin cậy.
+#
+#  ⚠️ robots.txt chỉ là lời ĐỀ NGHỊ với bot tử tế, KHÔNG phải hàng rào bảo mật.
+#  Chốt chặn thật là JWT ở backend. Thêm thẻ <meta name="robots" content=
+#  "noindex"> trong index.html nữa để bot đã trót vào thì cũng không lập chỉ mục.
+# =============================================================================
+
+User-agent: *
+Disallow: /

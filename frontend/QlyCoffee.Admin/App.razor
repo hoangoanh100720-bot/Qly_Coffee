@@ -1,0 +1,74 @@
+@*
+    =============================================================================
+    APP — Gốc định tuyến của APP QUẢN LÝ
+    =============================================================================
+    CascadingAuthenticationState bọc toàn bộ để mọi trang dùng được <AuthorizeView>
+    và thuộc tính [Authorize] mà không phải truyền trạng thái thủ công.
+
+    Lưu ý về ranh giới an toàn: phân quyền ở đây chỉ để GIAO DIỆN không bày ra
+    thứ người dùng không được đụng. Nó không bảo vệ dữ liệu — mã WebAssembly nằm
+    trong máy người dùng, ai cũng sửa được. Chốt chặn thật nằm ở backend, trên
+    từng controller. Xem backend/QlyCoffee.Api/Controllers/AdminControllers.cs.
+    =============================================================================
+*@
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+
+        @* --- Đường dẫn khớp --- *@
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(AdminLayout)">
+
+                @* Chưa đăng nhập hoặc không đủ quyền *@
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        <div class="container section">
+                            <div class="empty">
+                                <WarnIcon Size="52" CssClass="empty-icon" />
+                                <span class="empty-title">Bạn không có quyền vào trang này</span>
+                                <span class="empty-text">
+                                    Trang này dành cho quản lý. Nếu bạn cần truy cập,
+                                    hãy liên hệ chủ quán để được cấp quyền.
+                                </span>
+                                <a href="/" class="btn btn-secondary">Về bảng điều khiển</a>
+                            </div>
+                        </div>
+                    }
+                </NotAuthorized>
+
+                @* Đang xác định quyền — hiện khung xương thay vì nhấp nháy *@
+                <Authorizing>
+                    <div class="container section">
+                        <div class="stack stack-4">
+                            <div class="skeleton skeleton-title"></div>
+                            <div class="skeleton" style="height: 200px; border-radius: var(--radius-lg);"></div>
+                        </div>
+                    </div>
+                </Authorizing>
+            </AuthorizeRouteView>
+
+            <FocusOnNavigate RouteData="@routeData" Selector="h1, h2" />
+        </Found>
+
+        @* --- Không tìm thấy đường dẫn --- *@
+        <NotFound>
+            <PageTitle>Không tìm thấy trang — Quản lý Một Chút</PageTitle>
+            <LayoutView Layout="@typeof(EmptyLayout)">
+                <div class="container section">
+                    <div class="empty">
+                        <CupIcon Size="56" CssClass="empty-icon" />
+                        <span class="empty-title">Không tìm thấy trang này</span>
+                        <span class="empty-text">
+                            Đường dẫn có thể đã đổi từ lần cập nhật trước.
+                        </span>
+                        <a href="/" class="btn btn-primary">Về bảng điều khiển</a>
+                    </div>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

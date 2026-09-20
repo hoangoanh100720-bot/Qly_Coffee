@@ -1,31 +1,48 @@
 # =============================================================================
-#  robots.txt — Quy tắc cho bot tìm kiếm
+#  robots.txt — Quy tắc cho bot tìm kiếm (TRANG BÁN HÀNG)
 # =============================================================================
 #  ⚠️ Đổi tên miền ở dòng Sitemap khi deploy lên tên miền thật.
 #
-#  Nguyên tắc: CHẶN mọi thứ không phải nội dung công khai.
-#  Trang giỏ hàng, đăng nhập, quản lý đều là nội dung mỏng hoặc riêng tư —
-#  để chúng lên chỉ mục chỉ làm loãng điểm chất lượng của cả site.
+#  Nguyên tắc: CHẶN nội dung riêng tư và nội dung mỏng, nhưng KHÔNG BAO GIỜ
+#  chặn thứ trình duyệt cần để dựng trang.
+#
+#  ---------------------------------------------------------------------------
+#  VÌ SAO /_framework/ VÀ /_content/ PHẢI ĐƯỢC CHO PHÉP
+#  ---------------------------------------------------------------------------
+#  Bản trước của file này chặn cả hai thư mục đó. Nghe hợp lý — chúng là file
+#  kỹ thuật, không ai tìm kiếm chúng. Nhưng hậu quả thì ngược hẳn với ý định:
+#
+#  Đây là ứng dụng Blazor WebAssembly. HTML thật KHÔNG có sẵn trong index.html;
+#  nó do mã WebAssembly trong /_framework/ dựng ra sau khi tải xong. Googlebot
+#  có chạy JavaScript, nhưng nó TÔN TRỌNG robots.txt khi đi lấy tài nguyên con.
+#  Chặn /_framework/ nghĩa là Googlebot tải index.html, không lấy được runtime,
+#  không chạy được gì, và thứ duy nhất nó lập chỉ mục là khối <noscript>.
+#  Toàn bộ thực đơn — thứ đáng lên Google nhất — trở nên vô hình.
+#
+#  /_content/ cũng vậy: từ khi tách dự án, design-system.css nằm trong thư viện
+#  dùng chung nên đường dẫn thật của nó là /_content/QlyCoffee.Ui/css/. Chặn
+#  thư mục đó là chặn bộ CSS chính. Google dựng trang không có CSS sẽ thấy một
+#  trang vỡ bố cục và đánh trượt tiêu chí thân thiện di động.
+#
+#  Quy tắc rút ra: chặn theo NỘI DUNG (trang nào không nên lên chỉ mục), không
+#  chặn theo LOẠI FILE.
 # =============================================================================
 
 User-agent: *
 
-# --- Cho phép: nội dung công khai --------------------------------------------
-Allow: /$
-Allow: /menu
-Allow: /img/
-Allow: /css/
-
-# --- Chặn: khu vực quản lý và trang riêng tư ---------------------------------
-Disallow: /admin
-Disallow: /dang-nhap
+# --- Chặn: nội dung riêng tư hoặc mỏng ---------------------------------------
+# Giỏ hàng và trang tra cứu theo mã đơn là nội dung của riêng một người, không
+# có giá trị với người tìm kiếm, và số đơn thì vô hạn.
 Disallow: /gio-hang
 Disallow: /dat-mon
 Disallow: /don-hang/
 
-# --- Chặn: file kỹ thuật, không có giá trị tìm kiếm --------------------------
-Disallow: /_framework/
-Disallow: /_content/
+# --- Chặn: dấu vết của bản cũ ------------------------------------------------
+# Trang quản lý từng nằm chung ứng dụng này ở /admin và /dang-nhap. Giờ nó là
+# app riêng nên các đường dẫn đó không còn tồn tại ở đây, nhưng giữ lại hai
+# dòng này để Google thôi quay lại dò những URL đã từng có trong chỉ mục.
+Disallow: /admin
+Disallow: /dang-nhap
 
 # --- Cho bot ảnh vào thư mục ảnh ---------------------------------------------
 # Ngành đồ uống có lượng truy cập đáng kể từ Google Images.

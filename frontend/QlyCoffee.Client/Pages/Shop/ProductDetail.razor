@@ -16,6 +16,7 @@
 @inject CartService Cart
 @inject AlertService Alerts
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 @*  SEO: đây là loại trang mang lại nhiều truy cập tự nhiên nhất — người ta gõ
     "trà sữa trân châu đường đen quận 1" chứ hiếm khi gõ tên quán.
@@ -121,15 +122,9 @@ else
                 {
                     <div class="alert alert-danger" role="status">
                         <WarnIcon Size="18" />
-                        <span>
-                            Món này tạm hết.
-                            @if (!string.IsNullOrEmpty(_product.UnavailableReason))
-                            {
-                                <AuthorizeView Roles="Staff,Manager,Owner">
-                                    <span class="muted">(@_product.UnavailableReason)</span>
-                                </AuthorizeView>
-                            }
-                        </span>
+                        @* Chỉ nói "tạm hết", không nói thiếu nguyên liệu gì.
+                           Lý do là thông tin nội bộ — nhân viên xem ở app quản lý. *@
+                        <span>Món này tạm hết.</span>
                     </div>
                 }
                 else if (CurrentMaxServings <= 5)
@@ -242,7 +237,11 @@ else
                                 disabled="@(_quantity >= CurrentMaxServings)" aria-label="Tăng số lượng">+</button>
                     </div>
 
-                    <button class="btn btn-primary btn-lg grow"
+                    @*  id là ĐIỂM XUẤT PHÁT của ảnh bay vào giỏ — JavaScript tìm
+                        nút này bằng selector, nên đừng đổi tên mà không sửa
+                        hằng FlySource bên dưới.                                 *@
+                    <button id="btn-add-to-cart"
+                            class="btn btn-primary btn-lg grow"
                             disabled="@(!CanAddToCart)"
                             @onclick="AddToCart">
                         <CartIcon Size="18" />
@@ -511,9 +510,33 @@ else
         });
 
         Alerts.Success($"Đã thêm {_quantity} {_product.Name} vào giỏ.");
+
+        //  Thông báo nổi ở góc màn hình là chưa đủ: mắt khách đang ở nút vừa
+        //  bấm, không ở góc. Ảnh món bay từ nút lên nút giỏ rồi nút giỏ nảy một
+        //  nhịp — khách thấy đúng chỗ mình đang nhìn có phản hồi, và thấy luôn
+        //  món đi về đâu, nên không bấm thêm lần nữa vì tưởng chưa ăn.
+        //
+        //  Gọi TRƯỚC khi đặt lại số lượng và ghi chú: hai dòng dưới kích hoạt
+        //  dựng lại giao diện, mà lệnh JS phải chụp được vị trí nút lúc nó còn
+        //  nguyên tại chỗ.
+        //
+        //  Bọc try/catch vì đây là hiệu ứng trang trí: trình duyệt cũ hoặc tiện
+        //  ích chặn script làm hỏng lệnh gọi thì món VẪN đã nằm trong giỏ, và
+        //  khách vẫn còn dòng thông báo ở trên — không lý do gì để ném lỗi.
+        try
+        {
+            await JS.InvokeVoidAsync("qlyCart.flyToCart",
+                DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name),
+                FlySource, FlyTarget);
+        }
+        catch (JSException) { }
+
         _quantity = 1;
         _note = null;
     }
+
+    private const string FlySource = "#btn-add-to-cart";
+    private const string FlyTarget = ".cart-btn";
 
     /// <summary>
     /// Dựng đoạn mô tả cho thẻ meta description của riêng món này.

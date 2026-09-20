@@ -143,6 +143,98 @@
                 return window.matchMedia('(prefers-color-scheme: dark)').matches;
             }
         };
+
+        // --------------------------------------------------------------------
+        //  ẢNH MÓN BAY VÀO GIỎ HÀNG
+        // --------------------------------------------------------------------
+        //  Bấm "Thêm vào giỏ" xong, trước đây chỉ có một dòng thông báo nổi ở
+        //  góc màn hình. Khách nhìn vào nút vừa bấm — chỗ con trỏ đang ở — nên
+        //  không thấy gì thay đổi và hay bấm thêm lần nữa, thành ra thừa ly.
+        //  Một ảnh nhỏ bay từ nút lên đúng nút giỏ hàng trả lời được hai câu
+        //  hỏi cùng lúc: ĐÃ thêm, và thêm VÀO ĐÂU.
+        //
+        //  Quỹ đạo cong dựng bằng HAI phần tử lồng nhau, không phải bằng đường
+        //  bezier: lớp ngoài lo phương ngang với nhịp chậm dần, lớp trong lo
+        //  phương dọc với nhịp nhanh dần. Hai nhịp khác nhau cộng lại thành một
+        //  đường vòng cung — ảnh trôi ngang trước rồi mới vút lên giỏ. Cho cả
+        //  hai vào một keyframe thì chúng buộc phải dùng chung một nhịp và
+        //  đường bay thành đường thẳng.
+        //
+        //  Nhận URL ảnh + selector chứ không nhận ElementReference, vì Blazor
+        //  dựng lại vùng nút sau khi giỏ đổi, tham chiếu phần tử có thể đã cũ.
+        // --------------------------------------------------------------------
+        window.qlyCart = {
+            flyToCart: function (imageUrl, sourceSelector, targetSelector) {
+                var source = document.querySelector(sourceSelector);
+                var target = document.querySelector(targetSelector);
+                if (!source || !target) return;
+
+                // Nảy nhẹ nút giỏ ở cuối đường bay. Đây là phần KHÔNG được bỏ:
+                // kể cả khi không chạy được hiệu ứng bay thì vẫn phải có một
+                // thay đổi nhìn thấy được ở giỏ hàng.
+                var bumpCart = function () {
+                    target.classList.remove('cart-bump');
+                    void target.offsetWidth;   // ép tính lại bố cục để hiệu ứng chạy lại từ đầu
+                    target.classList.add('cart-bump');
+                    setTimeout(function () { target.classList.remove('cart-bump'); }, 600);
+                };
+
+                // Người chọn "giảm chuyển động" trong hệ điều hành thường là
+                // người say chuyển động hoặc nhạy cảm tiền đình — cho họ cái
+                // nảy nhẹ là đủ, không bắn gì ngang màn hình.
+                var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                if (reduced || typeof Element.prototype.animate !== 'function') {
+                    bumpCart();
+                    return;
+                }
+
+                var from = source.getBoundingClientRect();
+                var to = target.getBoundingClientRect();
+                var size = 56;
+
+                var dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+                var dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+
+                var track = document.createElement('div');
+                track.className = 'fly-track';
+                track.style.left = (from.left + from.width / 2 - size / 2) + 'px';
+                track.style.top = (from.top + from.height / 2 - size / 2) + 'px';
+                track.style.width = size + 'px';
+                track.style.height = size + 'px';
+
+                var ball = document.createElement('div');
+                ball.className = 'fly-ball';
+                if (imageUrl) ball.style.backgroundImage = 'url("' + imageUrl + '")';
+                track.appendChild(ball);
+                document.body.appendChild(track);
+
+                var duration = 720;
+
+                track.animate(
+                    [{ transform: 'translateX(0)' },
+                     { transform: 'translateX(' + dx + 'px)' }],
+                    { duration: duration, easing: 'cubic-bezier(.12,.72,.3,1)', fill: 'forwards' }
+                );
+
+                var flight = ball.animate(
+                    [{ transform: 'translateY(0) scale(1)',   opacity: 1 },
+                     { transform: 'translateY(' + (dy * 0.72) + 'px) scale(.62)', opacity: 1, offset: .78 },
+                     { transform: 'translateY(' + dy + 'px) scale(.22)', opacity: .15 }],
+                    { duration: duration, easing: 'cubic-bezier(.66,0,.9,.4)', fill: 'forwards' }
+                );
+
+                // Dọn phần tử bay dù kết thúc bình thường hay bị hủy giữa chừng
+                // (khách chuyển tab thì trình duyệt có thể dừng animation) —
+                // không dọn thì mỗi lần thêm món để lại một div chết trong DOM.
+                var land = function () {
+                    if (track.parentNode) track.remove();
+                    bumpCart();
+                };
+                flight.onfinish = land;
+                flight.oncancel = land;
+            }
+        };
+
         try {
             var saved = localStorage.getItem('qly-theme');
             if (saved) window.qlyTheme.apply(saved);
@@ -199,10 +291,14 @@
          thay vì đợi Blazor khởi động xong mới biết cần tải ảnh nào. -->
     <link rel="preload" as="image" href="img/hero-ca-phe-da.webp" fetchpriority="high" />
 
-    <link rel="stylesheet" href="css/design-system.css" />
+    <!-- Bộ token và component nền dùng chung với app quản lý. Nằm trong thư viện
+         QlyCoffee.Ui nên đường dẫn có tiền tố _content/ — đó là quy ước tài
+         nguyên tĩnh của Razor Class Library, không phải thư mục thật trên đĩa.
+         admin.css KHÔNG còn ở đây: 47KB đó chỉ phục vụ màn hình quản lý, khách
+         mua cà phê không bao giờ chạm tới. -->
+    <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="css/pages.css" />
-    <link rel="stylesheet" href="css/admin.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="img/og-cover.jpg" />
     <link rel="manifest" href="manifest.json" />

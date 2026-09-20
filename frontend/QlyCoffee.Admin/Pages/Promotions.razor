@@ -1,0 +1,291 @@
+@*
+    =============================================================================
+    TRANG KHUYẾN MÃI
+    =============================================================================
+    Ngoài việc quản lý chương trình đang chạy, trang này còn là nơi ĐO CHẤT LƯỢNG
+    CỦA AI: nhãn "Do AI đề xuất" cho biết khuyến mãi nào sinh từ kế hoạch cận hạn,
+    và cột doanh thu cho biết nó có thực sự hiệu quả không.
+
+    Nếu khuyến mãi từ AI liên tục không đẩy được hàng, đó là tín hiệu phải xem lại
+    tham số DEFAULT_PRICE_ELASTICITY trong .env chứ không phải bỏ tính năng.
+    =============================================================================
+*@
+@page "/khuyen-mai"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+
+<PageTitle>Khuyến mãi — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    <div class="row row-between row-wrap" style="gap: var(--space-4);">
+        <div class="stack stack-1">
+            <h2>Khuyến mãi</h2>
+            <span class="xs muted">
+                Chương trình do AI đề xuất được tạo từ trang Kế hoạch hằng ngày
+            </span>
+        </div>
+        <a href="/admin/ke-hoach" class="btn btn-primary btn-sm">
+            <SparkIcon Size="14" /> Xem kế hoạch AI
+        </a>
+    </div>
+
+    @* ── THẺ TỔNG QUAN ───────────────────────────────────────────────────── *@
+    <div class="grid grid-stats">
+        <div class="stat @(_running > 0 ? "stat-ok" : "")">
+            <span class="stat-label">Đang chạy</span>
+            <span class="stat-value">@_running</span>
+            <span class="stat-meta">khách đang thấy giá giảm</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Do AI đề xuất</span>
+            <span class="stat-value">@_fromAi</span>
+            <span class="stat-meta">trên tổng @_items.Count chương trình</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Doanh thu từ khuyến mãi</span>
+            <span class="stat-value">@Money.FormatShort(_promoRevenue)</span>
+            <span class="stat-meta">@_promoUnits ly đã bán</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Đã kết thúc</span>
+            <span class="stat-value">@_ended</span>
+            <span class="stat-meta">giữ lại để đối chiếu</span>
+        </div>
+    </div>
+
+    @* ── LỌC ─────────────────────────────────────────────────────────────── *@
+    <div class="filter-bar" role="group" aria-label="Lọc khuyến mãi">
+        @foreach (var f in Filters)
+        {
+            <button class="chip @(_activeFilter == f.Key ? "is-active" : "")"
+                    @onclick="() => _activeFilter = f.Key"
+                    aria-pressed="@(_activeFilter == f.Key)">
+                @f.Label
+                <span class="xs muted num">@CountFor(f.Key)</span>
+            </button>
+        }
+    </div>
+
+    @* ── DANH SÁCH ───────────────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <div class="stack stack-3" aria-busy="true">
+            @for (int i = 0; i < 3; i++)
+            {
+                <div class="skeleton" style="height: 120px; border-radius: var(--radius-lg);"></div>
+            }
+        </div>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <div class="empty">
+            <TagIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">
+                @(_items.Count == 0 ? "Chưa có chương trình khuyến mãi nào" : "Không có kết quả khớp")
+            </span>
+            <span class="empty-text">
+                Cách nhanh nhất để tạo khuyến mãi là duyệt đề xuất ở trang Kế hoạch hằng ngày —
+                mức giảm đã được tính sẵn theo lợi ích ròng.
+            </span>
+            <a href="/admin/ke-hoach" class="btn btn-primary">Xem kế hoạch</a>
+        </div>
+    }
+    else
+    {
+        <div class="stack stack-3">
+            @foreach (var p in Filtered)
+            {
+                <article class="promo-card @(p.IsRunning ? "is-running" : "")"
+                         style="--drink: @(p.ProductColorHex ?? "var(--accent)")"
+                         @key="p.Id">
+
+                    <div class="promo-visual">
+                        @*  Khuyến mãi gắn với MỘT món thì hiện ảnh món đó; khuyến mãi
+                            áp cho toàn menu không có món nào để chụp nên giữ biểu
+                            tượng thẻ giá — đó là khác biệt có thật, không phải thiếu ảnh. *@
+                        @if (p.ProductName is not null)
+                        {
+                            <img class="promo-photo"
+                                 src="@DrinkPhoto.PhotoFor(p.ProductImageUrl, null, p.ProductName)"
+                                 alt="" loading="lazy" decoding="async"
+                                 width="52" height="52" />
+                        }
+                        else
+                        {
+                            <TagIcon Size="28" />
+                        }
+                    </div>
+
+                    <div class="stack stack-2 grow" style="min-width: 0;">
+                        <div class="row row-2 row-wrap">
+                            <span class="badge @StatusBadge(p)">@p.StatusLabel</span>
+                            <span class="badge badge-danger">−@p.Value%</span>
+                            @if (p.IsFromAi)
+                            {
+                                <span class="badge badge-accent">
+                                    <SparkIcon Size="10" /> Do AI đề xuất
+                                </span>
+                            }
+                        </div>
+
+                        <span style="font-weight: 700;">@p.Name</span>
+
+                        @if (!string.IsNullOrEmpty(p.ProductName))
+                        {
+                            <span class="xs muted">Áp dụng cho: @p.ProductName</span>
+                        }
+
+                        @if (!string.IsNullOrEmpty(p.BannerText))
+                        {
+                            <span class="xs" style="color: var(--accent);">
+                                Banner: “@p.BannerText”
+                            </span>
+                        }
+
+                        <span class="xs muted num">
+                            @p.StartsAt.ToLocalTime().ToString("dd/MM HH:mm")
+                            – @p.EndsAt.ToLocalTime().ToString("dd/MM HH:mm")
+                            @if (p.IsRunning)
+                            {
+                                <span class="text-ok"> · còn @RemainingLabel(p.EndsAt)</span>
+                            }
+                        </span>
+                    </div>
+
+                    @* Kết quả thực tế — thước đo hiệu quả *@
+                    <div class="stack stack-1 promo-stats">
+                        <span class="label">Kết quả</span>
+                        <span class="num" style="font-weight: 700;">@p.UnitsSold ly</span>
+                        <span class="xs muted num">@Money.Format(p.Revenue)</span>
+                    </div>
+
+                    <div class="stack stack-2 promo-actions">
+                        @if (p.Status is 1 or 2)
+                        {
+                            <button class="btn btn-secondary btn-sm"
+                                    disabled="@(_busyId == p.Id)"
+                                    @onclick="() => ToggleAsync(p)">
+                                @(p.Status == 1 ? "Tạm dừng" : "Chạy lại")
+                            </button>
+                            <button class="btn btn-ghost btn-sm"
+                                    disabled="@(_busyId == p.Id)"
+                                    @onclick="() => StopAsync(p)">
+                                Kết thúc
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="xs muted">Đã kết thúc</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<PromotionDto> _items = new();
+    private bool _loading = true;
+    private string _activeFilter = "all";
+    private Guid? _busyId;
+
+    private int _running, _fromAi, _ended, _promoRevenue, _promoUnits;
+
+    private record FilterDef(string Key, string Label);
+
+    private static readonly FilterDef[] Filters =
+    {
+        new("all",     "Tất cả"),
+        new("running", "Đang chạy"),
+        new("ai",      "Do AI đề xuất"),
+        new("ended",   "Đã kết thúc")
+    };
+
+    private List<PromotionDto> Filtered => _activeFilter switch
+    {
+        "running" => _items.Where(p => p.IsRunning).ToList(),
+        "ai"      => _items.Where(p => p.IsFromAi).ToList(),
+        "ended"   => _items.Where(p => p.Status == 3).ToList(),
+        _         => _items
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var res = await Api.GetPromotionsAsync();
+        _items = res.Success && res.Data is not null ? res.Data : new();
+
+        _running      = _items.Count(p => p.IsRunning);
+        _fromAi       = _items.Count(p => p.IsFromAi);
+        _ended        = _items.Count(p => p.Status == 3);
+        _promoRevenue = _items.Sum(p => p.Revenue);
+        _promoUnits   = _items.Sum(p => p.UnitsSold);
+
+        _loading = false;
+    }
+
+    private int CountFor(string key) => key switch
+    {
+        "running" => _running,
+        "ai"      => _fromAi,
+        "ended"   => _ended,
+        _         => _items.Count
+    };
+
+    private async Task ToggleAsync(PromotionDto p)
+    {
+        _busyId = p.Id;
+        var res = await Api.TogglePromotionAsync(p.Id);
+        _busyId = null;
+
+        if (res.Success)
+        {
+            Alerts.Success(p.Status == 1
+                ? $"Đã tạm dừng “{p.Name}”. Khách không còn thấy giá giảm."
+                : $"Đã bật lại “{p.Name}”.");
+            await LoadAsync();
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không đổi được trạng thái.");
+        }
+    }
+
+    private async Task StopAsync(PromotionDto p)
+    {
+        _busyId = p.Id;
+        var res = await Api.StopPromotionAsync(p.Id);
+        _busyId = null;
+
+        if (res.Success)
+        {
+            Alerts.Success($"Đã kết thúc “{p.Name}”.");
+            await LoadAsync();
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không kết thúc được chương trình.");
+        }
+    }
+
+    private static string StatusBadge(PromotionDto p)
+        => p.IsRunning ? "badge-ok"
+         : p.Status == 2 ? "badge-warn"
+         : "badge-neutral";
+
+    private static string RemainingLabel(DateTime endsAt)
+    {
+        var hours = (int)(endsAt - DateTime.UtcNow).TotalHours;
+        if (hours < 1) return "dưới 1 giờ";
+        if (hours < 24) return $"{hours} giờ";
+        return $"{hours / 24} ngày";
+    }
+}

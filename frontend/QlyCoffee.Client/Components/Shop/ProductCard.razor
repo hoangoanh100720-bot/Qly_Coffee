@@ -82,13 +82,11 @@
                 Chỉ còn @Product.MaxServings phần
             </span>
         }
-        else if (!Product.IsAvailable && !string.IsNullOrEmpty(Product.UnavailableReason))
-        {
-            @* Lý do hết hàng chỉ hiện cho nhân viên, khách không cần biết thiếu nguyên liệu gì *@
-            <AuthorizeView Roles="Staff,Manager,Owner">
-                <span class="xs muted">@Product.UnavailableReason</span>
-            </AuthorizeView>
-        }
+
+        @* Bản cũ có thêm một nhánh hiện LÝ DO hết hàng cho nhân viên đăng nhập.
+           Nhánh đó đã bỏ: trang bán hàng không còn đăng nhập, nên với mọi khách
+           vào đây nó là mã chết. Nhân viên xem lý do thiếu nguyên liệu ở app
+           quản lý, màn hình Nguyên liệu. *@
 
         <div class="product-footer">
             <div class="row row-2">

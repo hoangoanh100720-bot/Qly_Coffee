@@ -1,0 +1,226 @@
+@*
+    =============================================================================
+    ADMIN LAYOUT — Khung trang quản lý (app shell)
+    =============================================================================
+    Archetype: app shell + dashboard dữ liệu dày.
+      · Thanh bên và thanh trên đứng yên; CHỈ vùng nội dung được cuộn.
+      · Một cách thể hiện trạng thái đang xem duy nhất: nền nhạt + sọc trái + chữ đậm.
+      · Huy hiệu số bên phải mục điều hướng để thấy việc cần xử lý mà không phải bấm vào.
+    =============================================================================
+*@
+@inherits LayoutComponentBase
+@inject NavigationManager Nav
+@inject AlertService Alerts
+@inject ThemeService Theme
+@inject ApiClient Api
+@implements IDisposable
+
+@*  Chặn lập chỉ mục cho TOÀN BỘ khối quản lý, khai báo một lần ở layout thay vì
+    lặp lại trên 12 trang con. "nofollow" ở đây (khác với trang giỏ hàng dùng
+    "follow") vì mọi liên kết trong khối quản lý đều dẫn tới trang quản lý khác —
+    không có gì đáng để bot đi theo.
+    Đây là lớp phòng thủ THỨ HAI: lớp thứ nhất là Disallow: /admin trong
+    wwwroot/robots.txt. Cần cả hai vì robots.txt chỉ ngăn bot TRUY CẬP, còn thẻ
+    meta này ngăn trang xuất hiện trên kết quả kể cả khi bot tìm thấy đường dẫn
+    từ nơi khác.                                                                *@
+<HeadContent>
+    <meta name="robots" content="noindex, nofollow" />
+</HeadContent>
+
+<div class="shell">
+
+    @* ── THANH BÊN ───────────────────────────────────────────────────────── *@
+    <aside class="shell-sidebar @(_sidebarOpen ? "is-open" : "")" aria-label="Điều hướng quản lý">
+
+        <div class="brand">
+            <LogoMark Size="32" />
+            <div class="stack" style="gap: 0;">
+                <span class="brand-name">Một Chút Coffee</span>
+                <span class="brand-sub">Quản lý</span>
+            </div>
+        </div>
+
+        <nav class="nav">
+
+            <span class="label nav-group-label">Tổng quan</span>
+            <NavLink href="/" Match="NavLinkMatch.All" class="nav-link">
+                <DashboardIcon Size="17" /> Bảng điều khiển
+            </NavLink>
+
+            @* Kế hoạch AI là tính năng lõi nên đặt ngay dưới bảng điều khiển,
+               kèm huy hiệu số đề xuất chưa xử lý. *@
+            <NavLink href="/ke-hoach" class="nav-link">
+                <SparkIcon Size="17" /> Kế hoạch hằng ngày
+                @if (UndecidedSuggestions > 0)
+                {
+                    <span class="badge badge-danger nav-badge">@UndecidedSuggestions</span>
+                }
+            </NavLink>
+
+            <span class="label nav-group-label">Bán hàng</span>
+
+            @* Hai mục này là việc nhân viên làm CẢ NGÀY nên đặt trên cùng nhóm,
+               trước danh sách đơn — thứ chỉ mở ra khi cần tra lại. *@
+            <NavLink href="/ban-hang" class="nav-link">
+                <CartIcon Size="17" /> Bán tại quầy
+            </NavLink>
+            <NavLink href="/pha-che" class="nav-link">
+                <CupIcon Size="17" /> Pha chế
+                @if (CupsInQueue > 0)
+                {
+                    <span class="badge badge-warn nav-badge">@CupsInQueue</span>
+                }
+            </NavLink>
+
+            <NavLink href="/don-hang" class="nav-link">
+                <ReceiptIcon Size="17" /> Đơn hàng
+                @if (PendingOrders > 0)
+                {
+                    <span class="badge badge-accent nav-badge">@PendingOrders</span>
+                }
+            </NavLink>
+            <NavLink href="/khuyen-mai" class="nav-link">
+                <TagIcon Size="17" /> Khuyến mãi
+            </NavLink>
+
+            <span class="label nav-group-label">Thực đơn</span>
+            <NavLink href="/mon" class="nav-link">
+                <CupIcon Size="17" /> Món &amp; công thức
+            </NavLink>
+            @* Danh mục món hiếm khi thay đổi (5 nhóm cố định do seed tạo) nên
+               chưa làm màn hình quản lý riêng. Cần sửa thì dùng pgAdmin hoặc
+               thêm trang CRUD sau. *@
+
+            <span class="label nav-group-label">Kho</span>
+
+            @* Sơ chế đứng ĐẦU nhóm Kho vì nó là việc phải làm trước khi mở cửa:
+               chưa ủ trà thì nửa thực đơn không bán được. Huy hiệu đếm số bán
+               thành phẩm đã hết hoặc sắp hết, tức số mẻ cần làm ngay. *@
+            <NavLink href="/so-che" class="nav-link">
+                <CalcIcon Size="17" /> Sơ chế
+                @if (PrepNeeded > 0)
+                {
+                    <span class="badge badge-danger nav-badge">@PrepNeeded</span>
+                }
+            </NavLink>
+
+            <NavLink href="/nguyen-lieu" class="nav-link">
+                <JarIcon Size="17" /> Nguyên liệu
+            </NavLink>
+            <NavLink href="/lo-hang" class="nav-link">
+                <ClockIcon Size="17" /> Lô hàng &amp; hạn dùng
+                @if (CriticalLots > 0)
+                {
+                    <span class="badge badge-danger nav-badge">@CriticalLots</span>
+                }
+            </NavLink>
+            <NavLink href="/nhap-kho" class="nav-link">
+                <TruckIcon Size="17" /> Nhập kho
+            </NavLink>
+            <NavLink href="/hao-hut" class="nav-link">
+                <TrashIcon Size="17" /> Hao hụt
+            </NavLink>
+
+            <span class="label nav-group-label">Báo cáo</span>
+            <NavLink href="/bao-cao" class="nav-link">
+                <ChartIcon Size="17" /> Doanh thu &amp; giá vốn
+            </NavLink>
+        </nav>
+
+        @* Trang bán hàng giờ là ứng dụng riêng, có thể ở tên miền khác, nên địa
+           chỉ lấy từ cấu hình. Mở tab mới: nhân viên đang dở việc ở đây không
+           nên bị đá ra khỏi app. rel="noopener" là bắt buộc với target="_blank" —
+           thiếu nó thì trang được mở có thể điều khiển ngược tab này. *@
+        @if (AppLinks.HasShopUrl)
+        {
+            <div style="margin-top: auto; padding: var(--space-4);">
+                <a href="@AppLinks.ShopUrl" class="nav-link" target="_blank" rel="noopener">
+                    <ExternalIcon Size="17" /> Xem trang bán hàng
+                </a>
+            </div>
+        }
+    </aside>
+
+    @* ── THANH TRÊN ──────────────────────────────────────────────────────── *@
+    <header class="shell-topbar">
+        <button class="btn btn-ghost btn-icon show-md-down" @onclick="ToggleSidebar"
+                aria-label="Mở menu điều hướng" aria-expanded="@_sidebarOpen">
+            <MenuIcon Size="20" />
+        </button>
+
+        <div class="stack" style="gap: 0;">
+            <h1 style="font-size: var(--text-base); font-weight: 700;">@PageTitle</h1>
+            @if (!string.IsNullOrEmpty(PageSubtitle))
+            {
+                <span class="xs muted">@PageSubtitle</span>
+            }
+        </div>
+
+        <div class="row row-2" style="margin-left: auto;">
+            <span class="xs muted num hide-sm">@DateTime.Now.ToString("dddd, dd/MM/yyyy")</span>
+            <button class="btn btn-ghost btn-icon" @onclick="ToggleTheme"
+                    aria-label="Đổi giao diện sáng/tối">
+                <ThemeIcon Size="18" />
+            </button>
+            <UserMenu />
+        </div>
+    </header>
+
+    @* ── NỘI DUNG ────────────────────────────────────────────────────────── *@
+    <main class="shell-main">
+        <AlertHost />
+        @Body
+    </main>
+</div>
+
+@* Lớp phủ khi mở thanh bên trên màn hình hẹp *@
+@if (_sidebarOpen)
+{
+    <div class="sidebar-overlay" @onclick="ToggleSidebar" aria-hidden="true"></div>
+}
+
+@code {
+    /// <summary>Tiêu đề trang, đặt bởi từng trang qua CascadingValue.</summary>
+    [CascadingParameter(Name = "PageTitle")] public string PageTitle { get; set; } = "Bảng điều khiển";
+    [CascadingParameter(Name = "PageSubtitle")] public string? PageSubtitle { get; set; }
+
+    private bool _sidebarOpen;
+    private Timer? _badgeTimer;
+
+    // Các con số huy hiệu, nạp từ /api/admin/badges.
+    private int UndecidedSuggestions { get; set; }
+    private int PendingOrders { get; set; }
+    private int CupsInQueue { get; set; }
+    private int CriticalLots { get; set; }
+    private int PrepNeeded { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBadgesAsync();
+
+        // 60 giây một lần. Đủ nhanh để nhân viên thấy đơn mới mà không biến
+        // thanh điều hướng thành nguồn tải cho backend.
+        _badgeTimer = new Timer(async _ => await InvokeAsync(LoadBadgesAsync),
+                                null, 60_000, 60_000);
+    }
+
+    private async Task LoadBadgesAsync()
+    {
+        var res = await Api.GetNavBadgesAsync();
+        if (!res.Success || res.Data is null) return;
+
+        PendingOrders        = res.Data.PendingOrders;
+        CupsInQueue          = res.Data.CupsInQueue;
+        CriticalLots         = res.Data.CriticalLots;
+        PrepNeeded           = res.Data.PrepNeeded;
+        UndecidedSuggestions = res.Data.UndecidedSuggestions;
+
+        StateHasChanged();
+    }
+
+    private void ToggleSidebar() => _sidebarOpen = !_sidebarOpen;
+
+    private async Task ToggleTheme() => await Theme.ToggleAsync();
+
+    public void Dispose() => _badgeTimer?.Dispose();
+}

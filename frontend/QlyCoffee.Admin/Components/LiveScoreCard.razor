@@ -1,0 +1,379 @@
+@*
+    =============================================================================
+    BÓNG ĐÁ TRỰC TIẾP — thẻ tỉ số tự nhảy, không cần bấm F5
+    =============================================================================
+    Luồng dữ liệu:
+      1. Mở trang → GET api/live-score lấy bảng hiện tại. SignalR chỉ đẩy khi có
+         THAY ĐỔI, nên mở trang giữa trận mà không GET trước thì phải chờ tới
+         lần đổi tỉ số kế tiếp mới thấy gì.
+      2. Nối SignalR → mỗi lần máy chủ thấy tỉ số, phút hay trạng thái đổi, cả
+         bảng được đẩy xuống và vẽ lại.
+      3. Mất mạng → tự nối lại MÃI MÃI (wifi quán chập chờn là chuyện thường);
+         nối lại xong GET thêm một lần để bù những gói đã lỡ.
+
+    Bàn thắng mới được tô sáng vài giây: nhân viên đang pha chỉ liếc qua vẫn thấy.
+    =============================================================================
+*@
+@using Microsoft.AspNetCore.SignalR.Client
+@inject ApiClient Api
+@implements IAsyncDisposable
+
+@if (_board is null)
+{
+    @if (_loadFailed)
+    {
+        <section class="card card-flat">
+            <div class="row row-between row-wrap" style="gap: var(--space-3);">
+                <span class="small muted">Không tải được tỉ số bóng đá.</span>
+                <button class="btn btn-secondary btn-sm" @onclick="LoadAsync">Thử lại</button>
+            </div>
+        </section>
+    }
+    else
+    {
+        <div class="skeleton" style="height: 160px; border-radius: var(--radius-lg);"></div>
+    }
+}
+else if (!_board.Enabled)
+{
+    @* Chưa cấu hình: một dòng hướng dẫn gọn, không chiếm chỗ của số liệu bán hàng *@
+    <section class="card card-flat">
+        <div class="row row-3">
+            <BallIcon Size="20" />
+            <span class="small muted">
+                Muốn hiện tỉ số bóng đá trực tiếp ở đây? Lấy khóa miễn phí tại
+                <a href="https://www.football-data.org/client/register" target="_blank" rel="noopener">football-data.org</a>,
+                đặt vào <code>FOOTBALL_API_KEY</code> trong <code>.env</code> rồi khởi động lại backend.
+            </span>
+        </div>
+    </section>
+}
+else
+{
+    <section class="card" aria-labelledby="live-score-title">
+        <div class="card-header">
+            <div class="row row-2">
+                <BallIcon Size="20" />
+                <h3 class="card-title" id="live-score-title">Bóng đá trực tiếp</h3>
+            </div>
+            <span class="ls-conn @ConnClass" role="status">
+                <span class="@(_conn == Conn.Live ? "pulse-dot" : "ls-conn-dot")"></span>
+                @ConnLabel
+            </span>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_board.Notice))
+        {
+            <div class="ls-notice">@_board.Notice</div>
+        }
+
+        @if (_board.Matches.Count == 0)
+        {
+            <div class="empty" style="padding: var(--space-8) var(--space-4);">
+                <BallIcon Size="36" CssClass="empty-icon" />
+                <span class="empty-text">
+                    @(_board.UpdatedAtUtc is null
+                        ? "Đang lấy tỉ số lần đầu…"
+                        : "24 giờ tới không có trận nào trong các giải đang theo dõi.")
+                </span>
+            </div>
+        }
+        else
+        {
+            @foreach (var group in Groups())
+            {
+                <div class="ls-group">
+                    <span class="label">@group.Title</span>
+
+                    @foreach (var m in group.Matches)
+                    {
+                        <div class="ls-match @RowClass(m)" @key="m.Id">
+                            <span class="ls-comp">@m.Competition</span>
+
+                            <span class="ls-team ls-home">
+                                <span class="ls-name" title="@m.HomeTeam">@m.HomeTeam</span>
+                                @if (!string.IsNullOrEmpty(m.HomeCrest))
+                                {
+                                    <img class="ls-crest" src="@m.HomeCrest" alt="" width="22" height="22" loading="lazy" />
+                                }
+                            </span>
+
+                            <span class="ls-center">
+                                @if (m.Phase is MatchPhase.Upcoming or MatchPhase.Off)
+                                {
+                                    <span class="ls-kickoff">@m.KickoffUtc.ToLocalTime().ToString("HH:mm")</span>
+                                }
+                                else
+                                {
+                                    <span class="ls-score">@(m.HomeScore ?? 0)&nbsp;–&nbsp;@(m.AwayScore ?? 0)</span>
+                                }
+                                <span class="ls-status">@StatusText(m)</span>
+                            </span>
+
+                            <span class="ls-team ls-away">
+                                @if (!string.IsNullOrEmpty(m.AwayCrest))
+                                {
+                                    <img class="ls-crest" src="@m.AwayCrest" alt="" width="22" height="22" loading="lazy" />
+                                }
+                                <span class="ls-name" title="@m.AwayTeam">@m.AwayTeam</span>
+                            </span>
+                        </div>
+                    }
+
+                    @if (group.Hidden > 0)
+                    {
+                        <button class="btn btn-ghost btn-sm" style="align-self: center;"
+                                @onclick="() => _showAll = true">
+                            Xem thêm @group.Hidden trận
+                        </button>
+                    }
+                </div>
+            }
+        }
+
+        <div class="card-footer row row-between row-wrap xs muted" style="gap: var(--space-2);">
+            <span>Nguồn: football-data.org</span>
+            @if (_board.UpdatedAtUtc is { } updated)
+            {
+                <span class="num">Tỉ số đổi lần cuối lúc @updated.ToLocalTime().ToString("HH:mm")</span>
+            }
+        </div>
+
+        @* Trình đọc màn hình chỉ được báo khi CÓ BÀN THẮNG. Báo cả mỗi lần phút
+           nhảy thì thành tiếng ồn không dứt. *@
+        <span class="sr-only" aria-live="polite">@_announce</span>
+    </section>
+}
+
+@code {
+    private enum Conn { Connecting, Live, Reconnecting, Offline }
+
+    private record MatchGroup(string Title, List<LiveMatchDto> Matches, int Hidden);
+
+    private LiveScoreBoardDto? _board;
+    private bool _loadFailed;
+    private bool _showAll;
+
+    private HubConnection? _hub;
+    private Conn _conn = Conn.Connecting;
+    private bool _disposed;
+    private readonly CancellationTokenSource _cts = new();
+
+    // Trận vừa có bàn thắng — tô sáng vài giây rồi tự tắt
+    private readonly HashSet<long> _goalFlash = new();
+    private string _announce = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+
+        // Chưa cấu hình khóa thì máy chủ không hỏi nguồn — nối SignalR chẳng có gì để nghe
+        if (_board is { Enabled: false }) return;
+
+        _hub = new HubConnectionBuilder()
+            .WithUrl(Api.HubUrl(LiveScoreChannel.HubPath))
+            .WithAutomaticReconnect(new ForeverRetryPolicy())
+            .Build();
+
+        _hub.On<LiveScoreBoardDto>(LiveScoreChannel.BoardUpdated, board => InvokeAsync(() =>
+        {
+            if (_disposed) return;
+            Apply(board);
+            StateHasChanged();
+        }));
+
+        _hub.Reconnecting += _ => SetConnAsync(Conn.Reconnecting);
+        _hub.Reconnected += async _ =>
+        {
+            await SetConnAsync(Conn.Live);
+            await InvokeAsync(LoadAsync);   // bù những gói lỡ mất trong lúc đứt
+        };
+        // Tham số KHÔNG đặt tên "_": khi đó "_ = ConnectAsync()" bên dưới thành
+        // phép gán vào tham số chứ không còn là bỏ qua kết quả.
+        _hub.Closed += async error =>
+        {
+            if (_disposed) return;
+            await SetConnAsync(Conn.Offline);
+            _ = ConnectAsync();
+        };
+
+        _ = ConnectAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var res = await Api.GetLiveScoreAsync();
+        if (res.Success && res.Data is not null)
+        {
+            Apply(res.Data);
+            _loadFailed = false;
+        }
+        else if (_board is null)
+        {
+            _loadFailed = true;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Nối lần đầu. Tự nối lại của SignalR chỉ lo được khi ĐÃ từng nối thành
+    /// công, nên nếu backend chưa chạy lúc mở trang thì phải tự thử lại ở đây.
+    /// </summary>
+    private async Task ConnectAsync()
+    {
+        while (!_disposed && _hub is not null)
+        {
+            try
+            {
+                await _hub.StartAsync(_cts.Token);
+                await SetConnAsync(Conn.Live);
+                // Khoảng giữa lúc GET và lúc nối xong có thể đã có bàn thắng
+                await InvokeAsync(LoadAsync);
+                return;
+            }
+            catch (Exception)
+            {
+                if (_disposed) return;
+                await SetConnAsync(Conn.Offline);
+                try { await Task.Delay(TimeSpan.FromSeconds(15), _cts.Token); }
+                catch (OperationCanceledException) { return; }
+            }
+        }
+    }
+
+    private Task SetConnAsync(Conn state) => InvokeAsync(() =>
+    {
+        if (_disposed) return;
+        _conn = state;
+        StateHasChanged();
+    });
+
+    /// <summary>
+    /// Thay bảng mới, đồng thời dò bàn thắng bằng cách so tổng số bàn từng trận
+    /// với bảng cũ. Lần nạp đầu không có bảng cũ nên không tô sáng gì cả.
+    /// </summary>
+    private void Apply(LiveScoreBoardDto board)
+    {
+        if (_board is not null)
+        {
+            var before = new Dictionary<long, int>();
+            foreach (var m in _board.Matches) before[m.Id] = Goals(m);
+
+            foreach (var m in board.Matches)
+            {
+                if (before.TryGetValue(m.Id, out var old) && Goals(m) > old)
+                    MarkGoal(m);
+            }
+        }
+        _board = board;
+    }
+
+    private static int Goals(LiveMatchDto m) => (m.HomeScore ?? 0) + (m.AwayScore ?? 0);
+
+    private void MarkGoal(LiveMatchDto m)
+    {
+        _goalFlash.Add(m.Id);
+        _announce = $"Vào! {m.HomeTeam} {m.HomeScore}–{m.AwayScore} {m.AwayTeam}";
+        _ = ClearGoalLaterAsync(m.Id);
+    }
+
+    private async Task ClearGoalLaterAsync(long matchId)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(8), _cts.Token); }
+        catch (OperationCanceledException) { return; }
+
+        await InvokeAsync(() =>
+        {
+            if (_disposed) return;
+            _goalFlash.Remove(matchId);
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>
+    /// Chia bảng thành ba nhóm. Máy chủ đã xếp sẵn thứ tự nên ở đây chỉ việc chia.
+    /// Trận đang đá hiện HẾT; hai nhóm còn lại cắt bớt để tối thứ Bảy có ba chục
+    /// trận thì thẻ không dài hơn cả dashboard.
+    /// </summary>
+    private List<MatchGroup> Groups()
+    {
+        var groups = new List<MatchGroup>();
+
+        void Add(string title, IEnumerable<LiveMatchDto> source, int limit)
+        {
+            var all = source.ToList();
+            if (all.Count == 0) return;
+            var shown = _showAll ? all.Count : Math.Min(limit, all.Count);
+            groups.Add(new MatchGroup(title, all.Take(shown).ToList(), all.Count - shown));
+        }
+
+        var matches = _board!.Matches;
+        Add("Đang đá",      matches.Where(m => m.Phase is MatchPhase.Live or MatchPhase.Break), int.MaxValue);
+        Add("Sắp đá",       matches.Where(m => m.Phase is MatchPhase.Upcoming or MatchPhase.Off), 5);
+        Add("Vừa kết thúc", matches.Where(m => m.Phase == MatchPhase.Finished), 3);
+        return groups;
+    }
+
+    private string RowClass(LiveMatchDto m)
+        => (m.Phase is MatchPhase.Live or MatchPhase.Break ? "is-live " : "")
+         + (_goalFlash.Contains(m.Id) ? "is-goal" : "");
+
+    private static string StatusText(LiveMatchDto m) => m.Phase switch
+    {
+        MatchPhase.Live when m.Minute is { } min =>
+            m.InjuryTime is > 0 ? $"{min}+{m.InjuryTime}′" : $"{min}′",
+        MatchPhase.Upcoming => DayLabel(m.KickoffUtc),
+        _ => m.StatusLabel
+    };
+
+    /// <summary>"Hôm nay", "Ngày mai" hoặc ngày cụ thể, theo giờ của máy đang xem.</summary>
+    private static string DayLabel(DateTime kickoffUtc)
+    {
+        var day = kickoffUtc.ToLocalTime().Date;
+        var today = DateTime.Today;
+        return day == today ? "Hôm nay"
+             : day == today.AddDays(1) ? "Ngày mai"
+             : day.ToString("dd/MM");
+    }
+
+    private string ConnClass => _conn switch
+    {
+        Conn.Live    => "is-live",
+        Conn.Offline => "is-offline",
+        _            => ""
+    };
+
+    private string ConnLabel => _conn switch
+    {
+        Conn.Live         => "Trực tiếp",
+        Conn.Reconnecting => "Đang nối lại…",
+        Conn.Offline      => "Mất kết nối",
+        _                 => "Đang kết nối…"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _cts.Cancel();
+        if (_hub is not null) await _hub.DisposeAsync();
+        _cts.Dispose();
+    }
+
+    /// <summary>
+    /// Mặc định SignalR thử nối lại bốn lần (0, 2, 10, 30 giây) rồi BỎ CUỘC. Màn
+    /// hình để mở cả buổi tối thì không được bỏ cuộc: đứt wifi năm phút xong vẫn
+    /// phải tự chạy tiếp mà không ai phải bấm F5.
+    /// </summary>
+    private sealed class ForeverRetryPolicy : IRetryPolicy
+    {
+        private static readonly TimeSpan[] FirstSteps =
+        {
+            TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10)
+        };
+
+        public TimeSpan? NextRetryDelay(RetryContext retryContext)
+            => retryContext.PreviousRetryCount < FirstSteps.Length
+                ? FirstSteps[retryContext.PreviousRetryCount]
+                : TimeSpan.FromSeconds(30);
+    }
+}

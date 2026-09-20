@@ -1,0 +1,304 @@
+@*
+    =============================================================================
+    BẢNG ĐIỀU KHIỂN
+    =============================================================================
+    Archetype: dashboard dữ liệu dày. Ba nguyên tắc:
+
+    1. TÓM TẮT TRƯỚC, CHI TIẾT SAU
+       Bốn thẻ số liệu ở trên cùng. Người quản lý bận nên phải nắm tình hình
+       trong ba giây.
+
+    2. MÀU CHỈ MÃ HÓA TRẠNG THÁI
+       Sọc màu trên thẻ nghĩa là "cần chú ý", không phải trang trí.
+
+    3. VIỆC CẦN LÀM ĐẶT NGAY DƯỚI SỐ LIỆU
+       Bản kế hoạch AI mới nhất và đơn chờ xác nhận nằm trên cùng, vì đó là
+       thứ người quản lý mở dashboard để tìm.
+    =============================================================================
+*@
+@page "/"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Manager,Owner")]
+@inject ApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Bảng điều khiển — Một Chút Coffee</PageTitle>
+
+@if (_loading)
+{
+    <div class="stack stack-6" aria-busy="true">
+        <div class="grid grid-stats">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="skeleton" style="height: 92px; border-radius: var(--radius);"></div>
+            }
+        </div>
+        <div class="skeleton" style="height: 180px; border-radius: var(--radius-lg);"></div>
+        <div class="skeleton" style="height: 240px; border-radius: var(--radius-lg);"></div>
+    </div>
+}
+else if (_data is null)
+{
+    <div class="alert alert-danger" role="alert">
+        <WarnIcon Size="20" />
+        <div class="stack stack-2">
+            <span class="alert-title">Không tải được dữ liệu</span>
+            <button class="btn btn-secondary btn-sm" style="align-self: flex-start;"
+                    @onclick="LoadAsync">Thử lại</button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="stack stack-8 fade-in">
+
+        @* ══ BỐN THẺ SỐ LIỆU ═══════════════════════════════════════════════ *@
+        <div class="grid grid-stats">
+
+            <div class="stat">
+                <span class="stat-label">Doanh thu hôm nay</span>
+                <span class="stat-value">@Money.Format(_data.TodayRevenue)</span>
+                <span class="stat-meta">@_data.TodayOrderCount đơn</span>
+            </div>
+
+            <div class="stat">
+                <span class="stat-label">Lãi gộp hôm nay</span>
+                <span class="stat-value">@Money.Format(_data.TodayGrossProfit)</span>
+                <span class="stat-meta">
+                    biên @(_data.TodayRevenue > 0
+                        ? (int)(_data.TodayGrossProfit * 100.0 / _data.TodayRevenue)
+                        : 0)%
+                </span>
+            </div>
+
+            @* Con số quan trọng nhất của cả hệ thống — có sọc màu theo mức nghiêm trọng *@
+            <div class="stat @RiskClass">
+                <span class="stat-label">Nguyên liệu có nguy cơ bỏ</span>
+                <span class="stat-value">@Money.Format(_data.ValueAtRisk)</span>
+                <span class="stat-meta">@_data.CriticalLotCount lô khẩn cấp</span>
+            </div>
+
+            <div class="stat @(_data.LowStockIngredientCount > 0 ? "stat-warn" : "")">
+                <span class="stat-label">Nguyên liệu sắp hết</span>
+                <span class="stat-value">@_data.LowStockIngredientCount</span>
+                <span class="stat-meta">dưới ngưỡng tối thiểu</span>
+            </div>
+        </div>
+
+        @* ══ VIỆC CẦN LÀM ══════════════════════════════════════════════════ *@
+        @if (_data.PendingOrderCount > 0)
+        {
+            <div class="alert alert-info">
+                <ReceiptIcon Size="20" />
+                <div class="row row-between grow row-wrap" style="gap: var(--space-3);">
+                    <div class="stack stack-1">
+                        <span class="alert-title">
+                            @_data.PendingOrderCount đơn đang chờ xác nhận
+                        </span>
+                        <span class="xs muted">Kho chỉ bị trừ sau khi bạn xác nhận đơn.</span>
+                    </div>
+                    <a href="/admin/don-hang?status=0" class="btn btn-primary btn-sm">
+                        Xử lý ngay
+                    </a>
+                </div>
+            </div>
+        }
+
+        @* ══ KẾ HOẠCH AI MỚI NHẤT ══════════════════════════════════════════ *@
+        @if (_data.LatestPlan is { } plan)
+        {
+            <section class="card ai-summary">
+                <div class="row row-3">
+                    <div class="ai-avatar"><SparkIcon Size="18" /></div>
+                    <div class="stack stack-2 grow">
+                        <div class="row row-2 row-wrap">
+                            <span class="label">Kế hoạch ngày @FormatDate(plan.BusinessDate)</span>
+                            @if (plan.UndecidedCount > 0)
+                            {
+                                <span class="badge badge-danger">
+                                    @plan.UndecidedCount đề xuất chưa xử lý
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-ok">Đã xử lý xong</span>
+                            }
+                        </div>
+
+                        <h3 class="ai-headline">
+                            @(plan.Headline ?? "Chưa có tóm tắt")
+                        </h3>
+
+                        <div class="row row-4 row-wrap">
+                            <span class="small">
+                                <span class="muted">Giá trị rủi ro:</span>
+                                <strong class="num">@Money.Format(plan.TotalValueAtRisk)</strong>
+                            </span>
+                            <span class="small">
+                                <span class="muted">Khẩn cấp:</span>
+                                <strong class="num">@plan.CriticalCount</strong>
+                            </span>
+                        </div>
+                    </div>
+
+                    <a href="/admin/ke-hoach/@plan.BusinessDate" class="btn btn-primary btn-sm">
+                        Xem chi tiết
+                    </a>
+                </div>
+            </section>
+        }
+        else
+        {
+            <div class="alert alert-info">
+                <SparkIcon Size="20" />
+                <div class="stack stack-1">
+                    <span class="alert-title">Chưa có bản kế hoạch nào</span>
+                    <span class="small">
+                        Kế hoạch được sinh tự động lúc 23:00 mỗi ngày.
+                        <a href="/admin/ke-hoach">Tạo ngay để xem thử</a>.
+                    </span>
+                </div>
+            </div>
+        }
+
+        @* ══ BÓNG ĐÁ TRỰC TIẾP ════════════════════════════════════════════ *@
+        @* Dưới việc cần làm vì tỉ số không phải việc của người quản lý, nhưng
+           trên biểu đồ vì trong giờ có trận nó là thứ đổi từng phút. Thẻ tự nạp
+           dữ liệu và tự nối SignalR, không phụ thuộc _data của trang. *@
+        <LiveScoreCard />
+
+        @* ══ BIỂU ĐỒ DOANH THU 7 NGÀY ══════════════════════════════════════ *@
+        <section class="card">
+            <div class="card-header">
+                <div class="stack stack-1">
+                    <h3 class="card-title">Doanh thu 7 ngày</h3>
+                    <span class="xs muted">Cột cao nhất là ngày bán tốt nhất trong tuần</span>
+                </div>
+                <span class="small num" style="font-weight: 700;">
+                    @Money.Format(_data.RevenueTrend.Sum(r => r.Revenue))
+                </span>
+            </div>
+
+            <div class="bar-chart">
+                @foreach (var point in _data.RevenueTrend)
+                {
+                    var pct = _maxRevenue > 0 ? point.Revenue * 100.0 / _maxRevenue : 0;
+                    <div class="bar-col">
+                        <div class="bar-track">
+                            <div class="bar-fill"
+                                 style="height: @pct.ToString("0.#")%;"
+                                 role="img"
+                                 aria-label="@(FormatDay(point.BusinessDate)): @Money.Format(point.Revenue)">
+                            </div>
+                        </div>
+                        <span class="bar-value xs num">@Money.FormatShort(point.Revenue)</span>
+                        <span class="bar-label xs muted">@FormatDay(point.BusinessDate)</span>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @* ══ MÓN BÁN CHẠY HÔM NAY ══════════════════════════════════════════ *@
+        <section class="card">
+            <div class="card-header">
+                <h3 class="card-title">Món bán chạy hôm nay</h3>
+                <a href="/admin/bao-cao" class="btn btn-ghost btn-sm">
+                    Báo cáo đầy đủ <ArrowIcon Size="14" />
+                </a>
+            </div>
+
+            @if (_data.TopProducts.Count == 0)
+            {
+                <div class="empty" style="padding: var(--space-10) var(--space-4);">
+                    <CupIcon Size="36" CssClass="empty-icon" />
+                    <span class="empty-text">Hôm nay chưa có đơn nào.</span>
+                </div>
+            }
+            else
+            {
+                <div class="stack stack-3">
+                    @foreach (var p in _data.TopProducts)
+                    {
+                        var share = _topMax > 0 ? p.UnitsSold * 100.0 / _topMax : 0;
+                        <div class="top-product">
+                            <img class="top-product-photo"
+                                 src="@DrinkPhoto.PhotoFor(p.ImageUrl, null, p.Name)"
+                                 alt="" loading="lazy" decoding="async"
+                                 width="34" height="34" />
+                            <div class="stack stack-1 grow">
+                                <div class="row row-between">
+                                    <span class="small" style="font-weight: 600;">@p.Name</span>
+                                    <span class="xs num muted">@p.UnitsSold phần</span>
+                                </div>
+                                <div class="meter">
+                                    <div class="meter-fill"
+                                         style="width: @share.ToString("0.#")%;
+                                                --meter-color: @p.ColorPrimaryHex;"></div>
+                                </div>
+                            </div>
+                            <span class="small num" style="font-weight: 600; min-width: 78px; text-align: right;">
+                                @Money.Format(p.Revenue)
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private DashboardDto? _data;
+    private bool _loading = true;
+    private int _maxRevenue;
+    private int _topMax;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var res = await Api.GetDashboardAsync();
+        _data = res.Success ? res.Data : null;
+
+        if (_data is not null)
+        {
+            _maxRevenue = _data.RevenueTrend.Count > 0
+                ? _data.RevenueTrend.Max(r => r.Revenue) : 0;
+            _topMax = _data.TopProducts.Count > 0
+                ? _data.TopProducts.Max(p => p.UnitsSold) : 0;
+        }
+
+        _loading = false;
+    }
+
+    /// <summary>Sọc màu thẻ rủi ro theo ngưỡng tiền — không phải trang trí.</summary>
+    private string RiskClass => _data!.ValueAtRisk switch
+    {
+        > 500_000 => "stat-critical",
+        > 100_000 => "stat-warn",
+        > 0       => "",
+        _         => "stat-ok"
+    };
+
+    private static string FormatDate(string businessDate)
+        => DateTime.TryParse(businessDate, out var d) ? d.ToString("dd/MM/yyyy") : businessDate;
+
+    /// <summary>Nhãn trục ngang: "T2", "T3"… "CN".</summary>
+    private static string FormatDay(string businessDate)
+    {
+        if (!DateTime.TryParse(businessDate, out var d)) return businessDate;
+        return d.DayOfWeek switch
+        {
+            DayOfWeek.Monday    => "T2",
+            DayOfWeek.Tuesday   => "T3",
+            DayOfWeek.Wednesday => "T4",
+            DayOfWeek.Thursday  => "T5",
+            DayOfWeek.Friday    => "T6",
+            DayOfWeek.Saturday  => "T7",
+            _                   => "CN"
+        };
+    }
+}

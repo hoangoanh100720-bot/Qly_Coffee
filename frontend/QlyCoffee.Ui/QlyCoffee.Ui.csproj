@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- ============================================================================
+       THƯ VIỆN GIAO DIỆN DÙNG CHUNG
+       ============================================================================
+       Hai ứng dụng đứng riêng — trang bán hàng (QlyCoffee.Client) và trang quản lý
+       (QlyCoffee.Admin) — cùng lấy dịch vụ, component nền và bộ CSS gốc từ đây.
+       Sửa một lần, hai bên cùng đổi; không có chuyện hai bản sao lệch nhau.
+
+       RootNamespace giữ nguyên QlyCoffee.Client dù tên assembly là QlyCoffee.Ui.
+       Lý do: toàn bộ mã cũ đã dùng namespace đó. Đổi tên assembly mà giữ namespace
+       thì không file nào phải sửa @using, mà tài nguyên tĩnh vẫn nằm gọn trong
+       _content/QlyCoffee.Ui/ theo đúng quy ước của Razor Class Library.
+       ============================================================================ -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>QlyCoffee.Client</RootNamespace>
+    <!-- Không dựng gói NuGet — thư viện này chỉ dùng trong lời giải này -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\QlyCoffee.Shared\QlyCoffee.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,334 @@
+@*
+    =============================================================================
+    TRANG NGUYÊN LIỆU
+    =============================================================================
+    Archetype: bảng dữ liệu dày.
+
+    Khác với trang Lô hàng (theo dõi HẠN DÙNG của từng lô), trang này nhìn theo
+    LOẠI NGUYÊN LIỆU: tổng tồn bao nhiêu, có dưới ngưỡng không, giá vốn bao nhiêu.
+
+    Thanh đo tồn kho dùng ngưỡng tối thiểu làm mốc 100%, nên nhìn thanh là biết
+    ngay còn thoải mái hay sắp cạn — không cần đọc số rồi so trong đầu.
+    =============================================================================
+*@
+@page "/nguyen-lieu"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@inject ApiClient Api
+
+<PageTitle>Nguyên liệu — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    @* ── HÀNG TIÊU ĐỀ ────────────────────────────────────────────────────── *@
+    <div class="row row-between row-wrap" style="gap: var(--space-4);">
+        <div class="stack stack-1">
+            <h2>Nguyên liệu</h2>
+            <span class="xs muted">
+                Giá vốn tính theo bình quân gia quyền, tự cập nhật mỗi lần nhập hàng
+            </span>
+        </div>
+
+        <div class="row row-2">
+            <a href="/admin/nhap-kho" class="btn btn-primary btn-sm">
+                <TruckIcon Size="14" /> Nhập kho
+            </a>
+            <a href="/admin/lo-hang" class="btn btn-secondary btn-sm">
+                <ClockIcon Size="14" /> Xem theo lô
+            </a>
+        </div>
+    </div>
+
+    @* ── THẺ TỔNG QUAN ───────────────────────────────────────────────────── *@
+    <div class="grid grid-stats">
+        <div class="stat">
+            <span class="stat-label">Tổng giá trị tồn</span>
+            <span class="stat-value">@Money.Format(_totalValue)</span>
+            <span class="stat-meta">@_items.Count loại nguyên liệu</span>
+        </div>
+        <div class="stat @(_belowMin > 0 ? "stat-critical" : "stat-ok")">
+            <span class="stat-label">Dưới ngưỡng tối thiểu</span>
+            <span class="stat-value">@_belowMin</span>
+            <span class="stat-meta">cần nhập gấp</span>
+        </div>
+        <div class="stat @(_belowReorder > 0 ? "stat-warn" : "")">
+            <span class="stat-label">Tới điểm đặt hàng</span>
+            <span class="stat-value">@_belowReorder</span>
+            <span class="stat-meta">nên lên đơn nhập</span>
+        </div>
+        <div class="stat @(_nearExpiry > 0 ? "stat-warn" : "")">
+            <span class="stat-label">Có lô cận hạn</span>
+            <span class="stat-value">@_nearExpiry</span>
+            <span class="stat-meta">theo ngưỡng cảnh báo riêng</span>
+        </div>
+    </div>
+
+    @* ── LỌC & TÌM KIẾM ──────────────────────────────────────────────────── *@
+    <div class="filter-bar" role="group" aria-label="Lọc nguyên liệu">
+        <button class="chip @(_activeCategory is null ? "is-active" : "")"
+                @onclick="() => SetCategory(null)"
+                aria-pressed="@(_activeCategory is null)">
+            Tất cả
+            <span class="xs muted num">@_items.Count</span>
+        </button>
+
+        @foreach (var cat in _categories)
+        {
+            var isActive = _activeCategory == cat.Key;
+            <button class="chip @(isActive ? "is-active" : "")"
+                    @onclick="() => SetCategory(cat.Key)"
+                    aria-pressed="@isActive">
+                @cat.Label
+                <span class="xs muted num">@cat.Count</span>
+            </button>
+        }
+
+        <div class="grow"></div>
+
+        <div class="search-box">
+            <SearchIcon Size="15" />
+            <input type="search" class="input search-input"
+                   placeholder="Tìm theo tên hoặc mã SKU…"
+                   @bind="_search" @bind:event="oninput"
+                   aria-label="Tìm nguyên liệu" />
+        </div>
+    </div>
+
+    @* ── BẢNG ────────────────────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <div class="table-wrap">
+            <div class="stack stack-3" style="padding: var(--space-4);" aria-busy="true">
+                @for (int i = 0; i < 10; i++)
+                {
+                    <div class="skeleton skeleton-text" style="height: 40px;"></div>
+                }
+            </div>
+        </div>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <div class="empty">
+            <JarIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">
+                @(_items.Count == 0 ? "Chưa có nguyên liệu nào" : "Không có kết quả khớp")
+            </span>
+            <span class="empty-text">
+                @(_items.Count == 0
+                    ? "Nguyên liệu là nền tảng của công thức định lượng và việc tự trừ kho."
+                    : "Thử đổi bộ lọc hoặc xóa từ khóa tìm kiếm.")
+            </span>
+        </div>
+    }
+    else
+    {
+        <p class="sr-only" aria-live="polite">Hiển thị @Filtered.Count nguyên liệu.</p>
+
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nguyên liệu</th>
+                        <th class="num">Tồn kho</th>
+                        <th style="width: 150px;">Mức tồn</th>
+                        <th class="num">Giá vốn</th>
+                        <th class="num">Giá trị</th>
+                        <th class="num">Số lô</th>
+                        <th class="num">Cận hạn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ing in Filtered)
+                    {
+                        <tr class="@RowClass(ing)" @key="ing.Id">
+
+                            @* Icon SVG tô đúng màu thật của nguyên liệu *@
+                            <td>
+                                <div class="ingredient-cell">
+                                    <div class="ingredient-icon" style="--ing-color: @ing.ColorHex">
+                                        <IngredientIcon IconKey="@ing.IconKey"
+                                                        ColorHex="@ing.ColorHex"
+                                                        Size="20"
+                                                        AriaLabel="@ing.Name" />
+                                    </div>
+                                    <div class="ingredient-meta">
+                                        <span class="ingredient-name">@ing.Name</span>
+                                        <span class="ingredient-sku">@ing.Sku · @ing.CategoryLabel</span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td class="num">
+                                <div class="stack stack-1" style="align-items: flex-end;">
+                                    <span style="font-weight: 600;">
+                                        @Qty.Format(ing.TotalStock) @ing.UnitLabel
+                                    </span>
+                                    @if (ing.MinStockLevel > 0)
+                                    {
+                                        <span class="xs muted">
+                                            tối thiểu @Qty.Format(ing.MinStockLevel)
+                                        </span>
+                                    }
+                                </div>
+                            </td>
+
+                            @* Thanh đo: 100% = gấp đôi ngưỡng tối thiểu.
+                               Thanh gần cạn nghĩa là sắp phải nhập. *@
+                            <td>
+                                @if (ing.MinStockLevel > 0)
+                                {
+                                    var pct = StockPercent(ing);
+                                    <div class="stack stack-1">
+                                        <div class="meter" role="img"
+                                             aria-label="@($"Tồn kho {pct}% so với mức an toàn")">
+                                            <div class="meter-fill"
+                                                 style="width: @pct%; --meter-color: @StockColor(ing);"></div>
+                                        </div>
+                                        <span class="xs @StockTextClass(ing)">@StockLabel(ing)</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="xs muted">Không đặt ngưỡng</span>
+                                }
+                            </td>
+
+                            <td class="num muted">
+                                @Money.Format(ing.AverageUnitCost)<span class="xs">/@ing.UnitLabel</span>
+                            </td>
+
+                            <td class="num" style="font-weight: 600;">
+                                @Money.Format(ing.StockValue)
+                            </td>
+
+                            <td class="num muted">@ing.ActiveLotCount</td>
+
+                            <td class="num">
+                                @if (ing.NearestExpiryDays is int days)
+                                {
+                                    <div class="stack stack-1" style="align-items: flex-end;">
+                                        <span class="@ExpiryTextClass(days)">còn @days ngày</span>
+                                        @if (ing.QuantityNearExpiry > 0)
+                                        {
+                                            <span class="xs text-warn">
+                                                @Qty.Format(ing.QuantityNearExpiry) @ing.UnitLabel
+                                            </span>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="xs muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<IngredientStockDto> _items = new();
+    private bool _loading = true;
+    private int? _activeCategory;
+    private string _search = "";
+
+    private int _totalValue, _belowMin, _belowReorder, _nearExpiry;
+
+    private record CategoryChip(int Key, string Label, int Count);
+    private List<CategoryChip> _categories = new();
+
+    /// <summary>
+    /// Lọc phía client. Số nguyên liệu của một quán chỉ vài chục nên lọc ở
+    /// client cho phản hồi tức thì, không cần gọi lại API mỗi lần gõ.
+    /// </summary>
+    private List<IngredientStockDto> Filtered
+    {
+        get
+        {
+            IEnumerable<IngredientStockDto> q = _items;
+
+            if (_activeCategory is int cat)
+                q = q.Where(i => i.Category == cat);
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var s = _search.Trim().ToLowerInvariant();
+                q = q.Where(i => i.Name.ToLowerInvariant().Contains(s)
+                              || i.Sku.ToLowerInvariant().Contains(s));
+            }
+
+            // Sắp: nguyên liệu có vấn đề lên đầu, rồi tới giá trị tồn lớn nhất
+            return q.OrderByDescending(i => i.IsBelowMinimum)
+                    .ThenByDescending(i => i.IsBelowReorderPoint)
+                    .ThenByDescending(i => i.StockValue)
+                    .ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var res = await Api.GetIngredientsAsync();
+        _items = res.Success && res.Data is not null ? res.Data : new();
+
+        _totalValue   = _items.Sum(i => i.StockValue);
+        _belowMin     = _items.Count(i => i.IsBelowMinimum);
+        _belowReorder = _items.Count(i => i.IsBelowReorderPoint && !i.IsBelowMinimum);
+        _nearExpiry   = _items.Count(i => i.QuantityNearExpiry > 0);
+
+        _categories = _items
+            .GroupBy(i => new { i.Category, i.CategoryLabel })
+            .Select(g => new CategoryChip(g.Key.Category, g.Key.CategoryLabel, g.Count()))
+            .OrderBy(c => c.Key)
+            .ToList();
+
+        _loading = false;
+    }
+
+    private void SetCategory(int? category) => _activeCategory = category;
+
+    // ── Trình bày ──────────────────────────────────────────────────────────
+
+    private static string RowClass(IngredientStockDto i)
+        => i.IsBelowMinimum ? "row-critical"
+         : i.IsBelowReorderPoint ? "row-warn"
+         : "";
+
+    /// <summary>
+    /// Phần trăm cho thanh đo. Mốc 100% đặt ở GẤP ĐÔI ngưỡng tối thiểu —
+    /// đó là mức tồn kho thoải mái. Chạm ngưỡng tối thiểu thì thanh còn 50%.
+    /// </summary>
+    private static int StockPercent(IngredientStockDto i)
+    {
+        if (i.MinStockLevel <= 0) return 100;
+        var safeLevel = i.MinStockLevel * 2;
+        return (int)Math.Clamp(i.TotalStock / safeLevel * 100, 2, 100);
+    }
+
+    private static string StockColor(IngredientStockDto i)
+        => i.IsBelowMinimum ? "var(--danger)"
+         : i.IsBelowReorderPoint ? "var(--warn)"
+         : "var(--ok)";
+
+    private static string StockTextClass(IngredientStockDto i)
+        => i.IsBelowMinimum ? "text-danger"
+         : i.IsBelowReorderPoint ? "text-warn"
+         : "muted";
+
+    private static string StockLabel(IngredientStockDto i)
+        => i.IsBelowMinimum ? "Dưới ngưỡng — cần nhập gấp"
+         : i.IsBelowReorderPoint ? "Tới điểm đặt hàng"
+         : "Đủ dùng";
+
+    private static string ExpiryTextClass(int days)
+        => days <= 2 ? "text-danger"
+         : days <= 7 ? "text-warn"
+         : "muted";
+}

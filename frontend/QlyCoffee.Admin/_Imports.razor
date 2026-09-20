@@ -1,25 +1,34 @@
 @* =============================================================================
-   IMPORT DÙNG CHUNG CHO TRANG BÁN HÀNG
+   IMPORT DÙNG CHUNG CHO APP QUẢN LÝ
    =============================================================================
-   Không có @using nào về xác thực ở đây, và đó là chủ ý: trang bán hàng không
-   có đăng nhập. Ai cần vào quản lý thì mở app quản lý (dự án QlyCoffee.Admin).
+   Hai nhóm namespace của dự án, cần phân biệt rõ:
+
+   • QlyCoffee.Client.*  — thư viện dùng chung QlyCoffee.Ui. Tên namespace giữ
+     nguyên từ thời hai trang còn chung một dự án, đổi đi thì hàng trăm file
+     phải sửa mà chẳng được thêm gì.
+   • QlyCoffee.Admin.*   — phần chỉ app này có.
    ============================================================================= *@
 
 @using System.Net.Http
 @using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
 
-@* --- Của dự án -------------------------------------------------------------- *@
+@* --- Dùng chung với trang bán hàng ------------------------------------------ *@
 @using QlyCoffee.Client
-@using QlyCoffee.Client.Layout
 @using QlyCoffee.Client.Services
 @using QlyCoffee.Client.Components.Visual
-@using QlyCoffee.Client.Components.Shop
 @using QlyCoffee.Client.Components.Common
+
+@* --- Riêng của app quản lý -------------------------------------------------- *@
+@using QlyCoffee.Admin
+@using QlyCoffee.Admin.Layout
+@using QlyCoffee.Admin.Components
 
 @* --- Hợp đồng dữ liệu dùng chung với backend -------------------------------- *@
 @using QlyCoffee.Shared

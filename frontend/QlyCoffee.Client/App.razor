@@ -1,72 +1,47 @@
 @*
     =============================================================================
-    APP — Gốc định tuyến của ứng dụng
+    APP — Gốc định tuyến của TRANG BÁN HÀNG
     =============================================================================
-    CascadingAuthenticationState bọc toàn bộ để mọi trang dùng được <AuthorizeView>
-    và thuộc tính [Authorize] mà không phải truyền trạng thái thủ công.
+    Không còn CascadingAuthenticationState và AuthorizeRouteView như bản cũ.
+    Trang bán hàng là khối công khai thuần túy: mọi đường dẫn ở đây ai cũng xem
+    được, nên một tầng phân quyền chỉ làm nặng gói tải về mà không bảo vệ gì.
+    Phần cần phân quyền đã chuyển hẳn sang app quản lý.
     =============================================================================
 *@
-<CascadingAuthenticationState>
-    <Router AppAssembly="@typeof(App).Assembly">
+<Router AppAssembly="@typeof(App).Assembly">
 
-        @* --- Đường dẫn khớp --- *@
-        <Found Context="routeData">
-            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(ShopLayout)">
+    @* --- Đường dẫn khớp --- *@
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(ShopLayout)" />
 
-                @* Chưa đăng nhập hoặc không đủ quyền *@
-                <NotAuthorized>
-                    @if (context.User.Identity?.IsAuthenticated != true)
-                    {
-                        <RedirectToLogin />
-                    }
-                    else
-                    {
-                        <div class="container section">
-                            <div class="empty">
-                                <WarnIcon Size="52" CssClass="empty-icon" />
-                                <span class="empty-title">Bạn không có quyền vào trang này</span>
-                                <span class="empty-text">
-                                    Trang này dành cho quản lý. Nếu bạn cần truy cập,
-                                    hãy liên hệ chủ quán để được cấp quyền.
-                                </span>
-                                <a href="/" class="btn btn-secondary">Về trang chủ</a>
-                            </div>
-                        </div>
-                    }
-                </NotAuthorized>
+        @* Sau mỗi lần chuyển trang, đưa con trỏ bàn phím về tiêu đề chính.
+           Người dùng bàn phím và trình đọc màn hình nhờ đó biết trang đã đổi —
+           không có dòng này thì họ vẫn đang đứng ở liên kết vừa bấm. *@
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
 
-                @* Đang xác định quyền — hiện khung xương thay vì nhấp nháy *@
-                <Authorizing>
-                    <div class="container section">
-                        <div class="stack stack-4">
-                            <div class="skeleton skeleton-title"></div>
-                            <div class="skeleton" style="height: 200px; border-radius: var(--radius-lg);"></div>
-                        </div>
-                    </div>
-                </Authorizing>
-            </AuthorizeRouteView>
-
-            <FocusOnNavigate RouteData="@routeData" Selector="h1, h2" />
-        </Found>
-
-        @* --- Không tìm thấy đường dẫn --- *@
-        <NotFound>
-            <PageTitle>Không tìm thấy trang — Một Chút Coffee</PageTitle>
-            <LayoutView Layout="@typeof(ShopLayout)">
-                <div class="container section">
-                    <div class="empty">
-                        <CupIcon Size="56" CssClass="empty-icon" />
-                        <span class="empty-title">Không tìm thấy trang này</span>
-                        <span class="empty-text">
-                            Đường dẫn có thể đã thay đổi hoặc bạn gõ nhầm địa chỉ.
-                        </span>
-                        <div class="row row-2">
-                            <a href="/" class="btn btn-primary">Về trang chủ</a>
-                            <a href="/menu" class="btn btn-secondary">Xem thực đơn</a>
-                        </div>
+    @* --- Không tìm thấy đường dẫn ---
+         NoIndex là bắt buộc: nếu không, Google sẽ lập chỉ mục mọi URL gõ sai
+         thành một trang "không tìm thấy" riêng biệt, và site bị đánh giá là
+         có hàng loạt nội dung mỏng trùng lặp. *@
+    <NotFound>
+        <LayoutView Layout="@typeof(ShopLayout)">
+            <SeoHead Title="Không tìm thấy trang"
+                     Description="Đường dẫn này không tồn tại trên Một Chút Coffee."
+                     NoIndex="true" />
+            <div class="container section">
+                <div class="empty">
+                    <CupIcon Size="56" CssClass="empty-icon" />
+                    <h1 class="empty-title">Không tìm thấy trang này</h1>
+                    <span class="empty-text">
+                        Đường dẫn có thể đã thay đổi hoặc bạn gõ nhầm địa chỉ.
+                    </span>
+                    <div class="row row-2">
+                        <a href="/" class="btn btn-primary">Về trang chủ</a>
+                        <a href="/menu" class="btn btn-secondary">Xem thực đơn</a>
                     </div>
                 </div>
-            </LayoutView>
-        </NotFound>
-    </Router>
-</CascadingAuthenticationState>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

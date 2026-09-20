@@ -1,0 +1,360 @@
+@*
+    =============================================================================
+    TRANG BÁO CÁO
+    =============================================================================
+    Archetype: dashboard dữ liệu dày.
+
+    Điểm khác biệt so với báo cáo doanh thu thông thường: có riêng khối
+    PHÂN TÍCH HAO HỤT, tách rõ phần do QUÁ HẠN. Đó chính là con số mà tính năng
+    kế hoạch xả hàng cận hạn được xây để kéo xuống — không đo thì không biết
+    tính năng có tác dụng hay không.
+    =============================================================================
+*@
+@page "/bao-cao"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Manager,Owner")]
+@inject ApiClient Api
+
+<PageTitle>Báo cáo — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    @* ── HÀNG TIÊU ĐỀ & CHỌN KHOẢNG NGÀY ─────────────────────────────────── *@
+    <div class="row row-between row-wrap" style="gap: var(--space-4);">
+        <div class="stack stack-1">
+            <h2>Doanh thu &amp; giá vốn</h2>
+            <span class="xs muted">
+                Số liệu đọc từ bảng tổng hợp cuối ngày — không quét sổ cái nên luôn nhanh
+            </span>
+        </div>
+
+        <div class="row row-2 row-wrap">
+            @foreach (var preset in Presets)
+            {
+                <button class="chip @(_activePreset == preset.Days ? "is-active" : "")"
+                        @onclick="() => ApplyPresetAsync(preset.Days)"
+                        aria-pressed="@(_activePreset == preset.Days)">
+                    @preset.Label
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="stack stack-6" aria-busy="true">
+            <div class="grid grid-stats">
+                @for (int i = 0; i < 4; i++)
+                {
+                    <div class="skeleton" style="height: 92px; border-radius: var(--radius);"></div>
+                }
+            </div>
+            <div class="skeleton" style="height: 220px; border-radius: var(--radius-lg);"></div>
+            <div class="skeleton" style="height: 300px; border-radius: var(--radius-lg);"></div>
+        </div>
+    }
+    else if (_data is null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <WarnIcon Size="20" />
+            <div class="stack stack-2">
+                <span class="alert-title">Không tải được báo cáo</span>
+                <button class="btn btn-secondary btn-sm" style="align-self: flex-start;"
+                        @onclick="LoadAsync">Thử lại</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="stack stack-8 fade-in">
+
+            @* ══ SỐ LIỆU CHÍNH ═════════════════════════════════════════════ *@
+            <div class="grid grid-stats">
+                <div class="stat">
+                    <span class="stat-label">Doanh thu</span>
+                    <span class="stat-value">@Money.Format(_data.Revenue)</span>
+                    <span class="stat-meta">@_data.OrderCount đơn</span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label">Lãi gộp</span>
+                    <span class="stat-value">@Money.Format(_data.GrossProfit)</span>
+                    <span class="stat-meta">
+                        biên @(_data.Revenue > 0
+                            ? (int)(_data.GrossProfit * 100.0 / _data.Revenue)
+                            : 0)%
+                    </span>
+                </div>
+
+                <div class="stat">
+                    <span class="stat-label">Trung bình mỗi đơn</span>
+                    <span class="stat-value">@Money.Format(_data.AverageOrderValue)</span>
+                    <span class="stat-meta">giá trị đơn trung bình</span>
+                </div>
+
+                @* Hao hụt có sọc màu theo ngưỡng ngành: dưới 3% là tốt *@
+                <div class="stat @WasteStatClass">
+                    <span class="stat-label">Hao hụt</span>
+                    <span class="stat-value">@Money.Format(_data.WasteValue)</span>
+                    <span class="stat-meta">
+                        @_data.WastePercent.ToString("0.##")% doanh thu
+                        @if (_data.WastePercent > 3)
+                        {
+                            <span class="text-warn"> · cao hơn mức 3% của ngành</span>
+                        }
+                    </span>
+                </div>
+            </div>
+
+            @* ══ BIỂU ĐỒ DOANH THU ═════════════════════════════════════════ *@
+            <section class="card">
+                <div class="card-header">
+                    <div class="stack stack-1">
+                        <h3 class="card-title">Doanh thu theo ngày</h3>
+                        <span class="xs muted">
+                            @FormatDate(_data.FromDate) – @FormatDate(_data.ToDate)
+                        </span>
+                    </div>
+                    <span class="small num" style="font-weight: 700;">
+                        TB @Money.Format(AverageDaily)/ngày
+                    </span>
+                </div>
+
+                @if (_data.RevenueTrend.Count == 0)
+                {
+                    <div class="empty" style="padding: var(--space-10) var(--space-4);">
+                        <ChartIcon Size="36" CssClass="empty-icon" />
+                        <span class="empty-text">Chưa có dữ liệu trong khoảng này.</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="trend-chart">
+                        @foreach (var point in _data.RevenueTrend)
+                        {
+                            var pct = _maxDaily > 0 ? point.Revenue * 100.0 / _maxDaily : 0;
+                            <div class="trend-col" title="@($"{FormatDate(point.BusinessDate)}: {Money.Format(point.Revenue)}")">
+                                <div class="trend-track">
+                                    <div class="trend-fill"
+                                         style="height: @pct.ToString("0.#")%;"
+                                         role="img"
+                                         aria-label="@($"{FormatDate(point.BusinessDate)}: {Money.Format(point.Revenue)}")"></div>
+                                </div>
+                                <span class="trend-label xs muted">@ShortDate(point.BusinessDate)</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </section>
+
+            <div class="grid-2">
+
+                @* ══ MÓN BÁN CHẠY ══════════════════════════════════════════ *@
+                <section class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Món bán chạy</h3>
+                        <span class="xs muted">theo doanh thu</span>
+                    </div>
+
+                    @if (_data.TopProducts.Count == 0)
+                    {
+                        <div class="empty" style="padding: var(--space-8) var(--space-4);">
+                            <CupIcon Size="32" CssClass="empty-icon" />
+                            <span class="empty-text">Chưa có dữ liệu bán hàng.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="stack stack-3">
+                            @foreach (var p in _data.TopProducts.Take(10))
+                            {
+                                var share = _topRevenue > 0 ? p.Revenue * 100.0 / _topRevenue : 0;
+                                <div class="top-product">
+                                    <img class="top-product-photo"
+                                         src="@DrinkPhoto.PhotoFor(p.ImageUrl, null, p.Name)"
+                                         alt="" loading="lazy" decoding="async"
+                                         width="30" height="30" />
+                                    <div class="stack stack-1 grow" style="min-width: 0;">
+                                        <div class="row row-between">
+                                            <span class="small truncate" style="font-weight: 600;">@p.Name</span>
+                                            <span class="xs num muted">@p.UnitsSold phần</span>
+                                        </div>
+                                        <div class="meter">
+                                            <div class="meter-fill"
+                                                 style="width: @share.ToString("0.#")%;
+                                                        --meter-color: @p.ColorPrimaryHex;"></div>
+                                        </div>
+                                    </div>
+                                    <span class="small num" style="font-weight: 600; min-width: 74px; text-align: right;">
+                                        @Money.FormatShort(p.Revenue)
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    }
+                </section>
+
+                @* ══ PHÂN TÍCH HAO HỤT ═════════════════════════════════════ *@
+                <section class="card">
+                    <div class="card-header">
+                        <div class="stack stack-1">
+                            <h3 class="card-title">Hao hụt theo nguyên liệu</h3>
+                            <span class="xs muted">
+                                Phần đỏ là hao hụt do QUÁ HẠN — con số mà kế hoạch AI cần kéo xuống
+                            </span>
+                        </div>
+                    </div>
+
+                    @if (_data.WasteBreakdown.Count == 0)
+                    {
+                        <div class="empty" style="padding: var(--space-8) var(--space-4);">
+                            <CheckIcon Size="32" CssClass="empty-icon" />
+                            <span class="empty-title" style="font-size: var(--text-base);">
+                                Không có hao hụt nào
+                            </span>
+                            <span class="empty-text">
+                                Không ghi nhận nguyên liệu bị đổ bỏ hay quá hạn trong khoảng này.
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="stack stack-3">
+                            @foreach (var w in _data.WasteBreakdown.Take(10))
+                            {
+                                var share = _maxWaste > 0 ? w.TotalCost * 100.0 / _maxWaste : 0;
+                                var expiredShare = w.TotalCost > 0
+                                    ? w.ExpiredCost * 100.0 / w.TotalCost : 0;
+
+                                <div class="waste-row">
+                                    <div class="ingredient-icon" style="--ing-color: @w.ColorHex">
+                                        <IngredientIcon IconKey="@w.IconKey" ColorHex="@w.ColorHex"
+                                                        Size="18" AriaLabel="@w.IngredientName" />
+                                    </div>
+
+                                    <div class="stack stack-1 grow" style="min-width: 0;">
+                                        <div class="row row-between">
+                                            <span class="small truncate">@w.IngredientName</span>
+                                            <span class="xs num muted">
+                                                @Qty.Format(w.Quantity)
+                                            </span>
+                                        </div>
+
+                                        @* Thanh hai lớp: phần đỏ là do quá hạn,
+                                           phần xám là hao hụt thông thường *@
+                                        <div class="meter">
+                                            <div class="meter-fill"
+                                                 style="width: @share.ToString("0.#")%;
+                                                        --meter-color: var(--muted);"></div>
+                                            @if (w.ExpiredCost > 0)
+                                            {
+                                                <div class="meter-fill meter-overlay"
+                                                     style="width: @((share * expiredShare / 100).ToString("0.#"))%;
+                                                            --meter-color: var(--danger);"></div>
+                                            }
+                                        </div>
+
+                                        @if (w.ExpiredCost > 0)
+                                        {
+                                            <span class="xs text-danger">
+                                                @Money.Format(w.ExpiredCost) do quá hạn
+                                            </span>
+                                        }
+                                    </div>
+
+                                    <span class="small num" style="font-weight: 600; min-width: 74px; text-align: right;">
+                                        @Money.FormatShort(w.TotalCost)
+                                    </span>
+                                </div>
+                            }
+                        </div>
+
+                        @if (_totalExpired > 0)
+                        {
+                            <div class="card-footer">
+                                <div class="alert alert-warn" style="border: none; padding: 0; background: transparent;">
+                                    <WarnIcon Size="16" />
+                                    <span class="xs">
+                                        <strong>@Money.Format(_totalExpired)</strong> bị bỏ do quá hạn
+                                        (@((int)(_totalExpired * 100.0 / Math.Max(_data.WasteValue, 1)))% tổng hao hụt).
+                                        Đây là phần có thể giảm bằng cách duyệt sớm các đề xuất
+                                        ở trang <a href="/admin/ke-hoach">Kế hoạch hằng ngày</a>.
+                                    </span>
+                                </div>
+                            </div>
+                        }
+                    }
+                </section>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ReportDto? _data;
+    private bool _loading = true;
+    private int _activePreset = 30;
+
+    private int _maxDaily, _topRevenue, _maxWaste, _totalExpired;
+
+    private record Preset(int Days, string Label);
+
+    private static readonly Preset[] Presets =
+    {
+        new(7,  "7 ngày"),
+        new(30, "30 ngày"),
+        new(90, "90 ngày")
+    };
+
+    private int AverageDaily => _data is null || _data.RevenueTrend.Count == 0
+        ? 0
+        : _data.Revenue / _data.RevenueTrend.Count;
+
+    /// <summary>Ngưỡng ngành: hao hụt dưới 3% doanh thu là tốt, trên 5% là báo động.</summary>
+    private string WasteStatClass => _data!.WastePercent switch
+    {
+        > 5 => "stat-critical",
+        > 3 => "stat-warn",
+        _   => "stat-ok"
+    };
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task ApplyPresetAsync(int days)
+    {
+        _activePreset = days;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var to = DateTime.Today;
+        var from = to.AddDays(-(_activePreset - 1));
+
+        var res = await Api.GetReportAsync(
+            from.ToString("yyyy-MM-dd"),
+            to.ToString("yyyy-MM-dd"));
+
+        _data = res.Success ? res.Data : null;
+
+        if (_data is not null)
+        {
+            _maxDaily     = _data.RevenueTrend.Count > 0 ? _data.RevenueTrend.Max(r => r.Revenue) : 0;
+            _topRevenue   = _data.TopProducts.Count > 0 ? _data.TopProducts.Max(p => p.Revenue) : 0;
+            _maxWaste     = _data.WasteBreakdown.Count > 0 ? _data.WasteBreakdown.Max(w => w.TotalCost) : 0;
+            _totalExpired = _data.WasteBreakdown.Sum(w => w.ExpiredCost);
+        }
+
+        _loading = false;
+    }
+
+    private static string FormatDate(string businessDate)
+        => DateTime.TryParse(businessDate, out var d) ? d.ToString("dd/MM/yyyy") : businessDate;
+
+    /// <summary>Nhãn trục ngang gọn: chỉ hiện ngày/tháng.</summary>
+    private static string ShortDate(string businessDate)
+        => DateTime.TryParse(businessDate, out var d) ? d.ToString("dd/MM") : businessDate;
+}

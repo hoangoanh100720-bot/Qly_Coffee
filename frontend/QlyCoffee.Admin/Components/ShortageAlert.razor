@@ -1,0 +1,88 @@
+@*
+    =============================================================================
+    SHORTAGE ALERT — Khung báo thiếu nguyên liệu khi nhận / hoàn tất đơn
+    =============================================================================
+
+    Bản cũ chỉ bật một dòng thông báo cho NGUYÊN LIỆU ĐẦU TIÊN bị thiếu. Nhân
+    viên nhập sữa xong bấm lại, lại báo thiếu trân châu, nhập tiếp, lại báo
+    thiếu đường… Khung này liệt kê ĐỦ trong một lần.
+
+    Nó không tự biến mất như thông báo nổi: đây là danh sách để đọc và làm
+    theo, tắt sau 5 giây thì nhân viên chưa kịp chép xong đã mất.
+
+    Hai loại dòng tách riêng vì dẫn tới hai việc khác nhau:
+      · Nguyên liệu thô      → đi nhập kho
+      · Bán thành phẩm       → vào bếp sơ chế mẻ mới
+    =============================================================================
+*@
+
+@if (Items.Count > 0)
+{
+    var raw = Items.Where(i => !i.IsPrepared).ToList();
+    var prep = Items.Where(i => i.IsPrepared).ToList();
+
+    <div class="alert alert-danger shortage-alert fade-in" role="alert">
+        <WarnIcon Size="20" />
+
+        <div class="stack stack-2 grow" style="min-width: 0;">
+            <span class="alert-title">
+                Thiếu @Items.Count nguyên liệu — @Title
+            </span>
+
+            <ul class="shortage-list">
+                @foreach (var s in raw.Concat(prep))
+                {
+                    <li class="shortage-row">
+                        <span class="shortage-name">
+                            @s.IngredientName
+                            @if (s.IsPrepared)
+                            {
+                                <span class="badge badge-warn">Cần sơ chế</span>
+                            }
+                        </span>
+                        <span class="shortage-nums xs muted num">
+                            cần @Qty.Format(s.Required) · còn @Qty.Format(s.Available)
+                        </span>
+                        <strong class="shortage-miss num">
+                            thiếu @Qty.Format(s.Missing) @s.UnitLabel
+                        </strong>
+                    </li>
+                }
+            </ul>
+
+            <span class="xs muted">
+                Đã ghi vào danh sách cần nhập hôm nay.
+            </span>
+
+            <div class="row row-2 row-wrap">
+                @if (raw.Count > 0)
+                {
+                    <a href="/admin/nhap-kho" class="btn btn-secondary btn-sm">
+                        <TruckIcon Size="14" /> Nhập kho theo danh sách
+                    </a>
+                }
+                @if (prep.Count > 0)
+                {
+                    <a href="/admin/so-che" class="btn btn-ghost btn-sm">
+                        <JarIcon Size="14" /> Sơ chế
+                    </a>
+                }
+            </div>
+        </div>
+
+        @if (OnDismiss.HasDelegate)
+        {
+            <button class="btn btn-ghost btn-icon btn-sm" @onclick="OnDismiss" aria-label="Đóng">×</button>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>Danh sách nguyên liệu thiếu, lấy bằng ApiClient.ReadIngredientShortages.</summary>
+    [Parameter] public IReadOnlyList<IngredientShortageDto> Items { get; set; } = Array.Empty<IngredientShortageDto>();
+
+    /// <summary>Vế sau của tiêu đề, VD "chưa nhận được đơn".</summary>
+    [Parameter] public string Title { get; set; } = "chưa nhận được đơn";
+
+    [Parameter] public EventCallback OnDismiss { get; set; }
+}

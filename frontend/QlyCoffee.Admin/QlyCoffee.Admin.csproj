@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!-- ============================================================================
+       APP QUẢN LÝ — Progressive Web App
+       ============================================================================
+       Cài được lên điện thoại và máy tính của quán: mở trong trình duyệt một lần,
+       bấm "Cài đặt", từ đó nó có icon riêng trên màn hình chính và chạy toàn màn
+       hình, không thanh địa chỉ. Bản chất vẫn là web nên cập nhật chỉ cần đẩy file
+       mới lên máy chủ — không phải gỡ ra cài lại, không qua kho ứng dụng.
+
+       Service worker (service-worker.published.js) giữ sẵn khung ứng dụng trong
+       máy. Nhờ đó mất mạng chớp nhoáng — chuyện thường ở quán dùng 4G — app vẫn
+       mở lên được và báo mất kết nối tử tế, thay vì hiện trang lỗi của trình duyệt.
+       ============================================================================ -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Bật PWA. File này liệt kê mọi tài nguyên kèm mã băm để service worker
+         biết bản trên máy chủ đã khác bản trong máy hay chưa. -->
+    <ServiceWorkerAssetsManifest>service-worker-assets.js</ServiceWorkerAssetsManifest>
+
+    <!-- Không đặt TrimMode=full — xem giải thích dài trong QlyCoffee.Client.csproj.
+         Tóm tắt: cắt ở mức đó làm hỏng dữ liệu một cách im lặng. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="8.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.11" PrivateAssets="all" />
+    <!-- Trang quản lý có đăng nhập và phân quyền theo vai trò -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="8.0.11" />
+    <!-- Bảng tỉ số bóng đá cập nhật tức thời trên màn hình pha chế -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QlyCoffee.Ui\QlyCoffee.Ui.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lúc chạy dev dùng bản rỗng để khỏi phải xóa bộ nhớ đệm sau mỗi lần sửa.
+         Lúc publish mới thay bằng bản thật có đệm tài nguyên. -->
+    <ServiceWorker Include="wwwroot\service-worker.js"
+                   PublishedContent="wwwroot\service-worker.published.js" />
+  </ItemGroup>
+
+</Project>

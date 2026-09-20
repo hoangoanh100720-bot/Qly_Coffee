@@ -10,6 +10,8 @@
    §3  Giỏ hàng             §8  Chọn ngày
    §4  Tiến trình đơn       §9  Đăng nhập
    §5  Bộ đếm số lượng      §10 Biểu đồ dashboard
+                            §11 Chi tiết nhỏ
+                            §12 Ảnh bay vào giỏ hàng
 ============================================================================= */
 
 /* =============================================================================
@@ -778,3 +780,53 @@
 
 /* Ô nhập tìm kiếm bên trong bảng lọc */
 .search-input::-webkit-search-cancel-button { cursor: pointer; }
+
+/* =============================================================================
+   §12  ẢNH BAY VÀO GIỎ HÀNG
+=============================================================================
+   Phần tử bay do JavaScript tạo ra lúc thêm món (xem window.qlyCart trong
+   index.html). Ở đây chỉ định nghĩa HÌNH DÁNG; còn quỹ đạo và nhịp đi do
+   Web Animations API lo, vì toạ độ điểm đến chỉ biết được lúc chạy.
+
+   pointer-events: none là bắt buộc — ảnh bay ngang qua thanh điều hướng, nếu
+   nó ăn được sự kiện chuột thì cú bấm tiếp theo của khách rơi vào khoảng không.
+============================================================================= */
+.fly-track {
+  position: fixed;
+  z-index: 60;          /* trên thanh điều hướng (z-index 30) và thông báo nổi */
+  pointer-events: none;
+  will-change: transform;
+}
+
+.fly-ball {
+  width: 100%; height: 100%;
+  border-radius: var(--radius-full);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-2);   /* ảnh chưa kịp tải thì vẫn là một khối tròn, không phải ô trống */
+  box-shadow: var(--shadow-lg);
+  border: 2px solid var(--surface);
+  will-change: transform, opacity;
+}
+
+/* Nút giỏ nảy một nhịp khi ảnh đáp xuống. Biên độ cố tình nhỏ: nút nằm ở thanh
+   điều hướng dính trên đầu, nảy mạnh sẽ kéo mắt ra khỏi món khách đang xem. */
+.cart-bump { animation: cart-bump .45s cubic-bezier(.2,1.4,.4,1); }
+@keyframes cart-bump {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(1.14); }
+  100% { transform: scale(1); }
+}
+
+/* Số trên nút giỏ nảy theo, trễ hơn một nhịp: con số mới là thứ khách cần đọc,
+   nên nó động sau cùng để mắt dừng lại ở đó. */
+.cart-bump .cart-count { animation: cart-count-pop .45s .06s cubic-bezier(.2,1.5,.4,1); }
+@keyframes cart-count-pop {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-bump, .cart-bump .cart-count { animation: none; }
+}

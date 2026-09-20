@@ -1,8 +1,8 @@
 @* =============================================================================
-   IMPORT DÙNG CHUNG CHO TRANG BÁN HÀNG
-   =============================================================================
-   Không có @using nào về xác thực ở đây, và đó là chủ ý: trang bán hàng không
-   có đăng nhập. Ai cần vào quản lý thì mở app quản lý (dự án QlyCoffee.Admin).
+   IMPORT DÙNG CHUNG CHO THƯ VIỆN GIAO DIỆN
+   Chỉ khai báo những gì bản thân thư viện cần. Hai ứng dụng con có file
+   _Imports.razor riêng và KHÔNG thừa hưởng file này — đó là quy tắc của Razor,
+   nên phần trùng lặp giữa ba file là cố ý chứ không phải sót.
    ============================================================================= *@
 
 @using System.Net.Http
@@ -15,10 +15,8 @@
 
 @* --- Của dự án -------------------------------------------------------------- *@
 @using QlyCoffee.Client
-@using QlyCoffee.Client.Layout
 @using QlyCoffee.Client.Services
 @using QlyCoffee.Client.Components.Visual
-@using QlyCoffee.Client.Components.Shop
 @using QlyCoffee.Client.Components.Common
 
 @* --- Hợp đồng dữ liệu dùng chung với backend -------------------------------- *@

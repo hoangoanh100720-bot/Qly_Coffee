@@ -1,0 +1,60 @@
+{
+  "name": "Quản lý Một Chút Coffee",
+  "short_name": "Quản lý",
+  "description": "Bán tại quầy, pha chế, kho nguyên liệu và kế hoạch ngày của Một Chút Coffee.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#FCF9F3",
+  "theme_color": "#CB3E0B",
+  "lang": "vi",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Bán tại quầy",
+      "short_name": "Bán hàng",
+      "description": "Mở màn hình bán tại quầy",
+      "url": "/ban-hang",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Hàng chờ pha chế",
+      "short_name": "Pha chế",
+      "description": "Xem các ly đang chờ làm",
+      "url": "/pha-che",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Kế hoạch ngày",
+      "short_name": "Kế hoạch",
+      "description": "Kế hoạch chuẩn bị cho hôm nay",
+      "url": "/ke-hoach",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

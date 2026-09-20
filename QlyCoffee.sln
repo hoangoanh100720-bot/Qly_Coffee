@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QlyCoffee.Domain", "backend\QlyCoffee.Domain\QlyCoffee.Domain.csproj", "{A1000001-0000-0000-0000-000000000001}"
 EndProject
@@ -11,6 +11,12 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QlyCoffee.Client", "frontend\QlyCoffee.Client\QlyCoffee.Client.csproj", "{A1000001-0000-0000-0000-000000000005}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QlyCoffee.Shared", "shared\QlyCoffee.Shared\QlyCoffee.Shared.csproj", "{A1000001-0000-0000-0000-000000000006}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "frontend", "frontend", "{CC6AC758-7CD3-4C6D-A16C-F1671A462430}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QlyCoffee.Ui", "frontend\QlyCoffee.Ui\QlyCoffee.Ui.csproj", "{D88D0284-9DB0-44E6-A8DC-99C62D88D962}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QlyCoffee.Admin", "frontend\QlyCoffee.Admin\QlyCoffee.Admin.csproj", "{E9EBD075-E850-4A1B-B433-26447B452310}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -42,5 +48,17 @@ Global
 		{A1000001-0000-0000-0000-000000000006}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1000001-0000-0000-0000-000000000006}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1000001-0000-0000-0000-000000000006}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D88D0284-9DB0-44E6-A8DC-99C62D88D962}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D88D0284-9DB0-44E6-A8DC-99C62D88D962}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D88D0284-9DB0-44E6-A8DC-99C62D88D962}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D88D0284-9DB0-44E6-A8DC-99C62D88D962}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E9EBD075-E850-4A1B-B433-26447B452310}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E9EBD075-E850-4A1B-B433-26447B452310}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E9EBD075-E850-4A1B-B433-26447B452310}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E9EBD075-E850-4A1B-B433-26447B452310}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D88D0284-9DB0-44E6-A8DC-99C62D88D962} = {CC6AC758-7CD3-4C6D-A16C-F1671A462430}
+		{E9EBD075-E850-4A1B-B433-26447B452310} = {CC6AC758-7CD3-4C6D-A16C-F1671A462430}
 	EndGlobalSection
 EndGlobal

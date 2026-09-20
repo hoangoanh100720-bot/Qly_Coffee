@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <!-- viewport-fit=cover để nền tràn ra vùng tai thỏ; KHÔNG khóa user-scalable,
+         vì khóa lại là chặn người cần phóng to để đọc — WCAG cấm việc đó. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <title>Quản lý — Một Chút Coffee</title>
+
+    <!-- =====================================================================
+         KHÔNG LẬP CHỈ MỤC
+         =====================================================================
+         Đối lập hoàn toàn với trang bán hàng: ở đó mọi thẻ SEO là để ĐƯỢC tìm
+         thấy, ở đây là để KHÔNG được tìm thấy.
+
+         noindex  — đã trót vào thì cũng không đưa lên kết quả tìm kiếm.
+         nofollow — không lần theo liên kết để mò tiếp vào trong.
+         noarchive, nosnippet — không giữ bản lưu, không trích đoạn nội dung.
+
+         Đi kèm robots.txt chặn toàn bộ. Hai lớp này lo hai tình huống khác
+         nhau: robots.txt ngăn bot GHÉ, còn noindex ngăn bot ĐÃ ghé rồi (qua
+         một liên kết ở đâu đó) đưa trang lên kết quả.
+         ===================================================================== -->
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+    <meta name="googlebot" content="noindex, nofollow" />
+    <meta name="referrer" content="same-origin" />
+
+    <!-- ---------------------------------------------------------------------
+         PWA — ỨNG DỤNG CÀI ĐƯỢC
+         ---------------------------------------------------------------------
+         Mở trang này trên Chrome/Edge (máy tính) hoặc Chrome/Safari (điện
+         thoại) sẽ có tuỳ chọn "Cài đặt" / "Thêm vào màn hình chính". Cài xong
+         nó có icon riêng, mở toàn màn hình, không thanh địa chỉ.
+
+         ⚠️ Trình duyệt CHỈ mời cài khi trang chạy qua HTTPS (localhost được
+         miễn). Chạy HTTP trên IP nội bộ thì app vẫn dùng được bình thường
+         nhưng nút cài sẽ không hiện ra.
+         --------------------------------------------------------------------- -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <meta name="theme-color" content="#CB3E0B" />
+
+    <!-- iOS không đọc manifest nên phải khai báo riêng bộ thẻ của Apple -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Quản lý" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+
+    <base href="/" />
+
+    <!-- ĐẶT SCRIPT NÀY TRƯỚC CSS ĐỂ TRÁNH NHẤP NHÁY MÀU.
+         Nhân viên ca tối để nền tối; chờ Blazor khởi động rồi mới áp dụng thì
+         mỗi lần mở app là một chớp trắng vào mắt giữa quán đang tắt đèn. -->
+    <script>
+        window.qlyTheme = {
+            apply: function (theme) {
+                if (theme === 'light' || theme === 'dark') {
+                    document.documentElement.setAttribute('data-theme', theme);
+                } else {
+                    document.documentElement.removeAttribute('data-theme');
+                }
+            },
+            isSystemDark: function () {
+                return window.matchMedia('(prefers-color-scheme: dark)').matches;
+            }
+        };
+
+        // Cuộn một phần tử vào tầm nhìn trong vùng cuộn của nó.
+        //
+        // Dùng ở màn hình bán tại quầy: giỏ hàng có vùng cuộn riêng, khay chọn
+        // topping mở ra thường dài hơn phần còn trống nên bị khuất một nửa dưới
+        // khối thời gian chờ. Nhân viên tưởng khay chỉ có bấy nhiêu và bỏ sót
+        // phần ghi chú.
+        //
+        // Nhận CHUỖI selector chứ không nhận ElementReference: Blazor dựng lại
+        // khay mỗi lần mở nên tham chiếu phần tử có thể đã cũ khi JS chạy tới.
+        // block = 'end' để MÉP DƯỚI của khay chạm mép dưới vùng cuộn. Dùng
+        // 'nearest' thì trình duyệt chỉ cần thấy phần đầu là dừng, mà phần đầu
+        // khay là hàng topping — đúng phần đã nhìn thấy sẵn, còn ô ghi chú bên
+        // dưới vẫn khuất.
+        window.qlyScroll = {
+            intoView: function (selector, block) {
+                var el = document.querySelector(selector);
+                if (!el) return;
+                el.scrollIntoView({ block: block || 'nearest', behavior: 'smooth' });
+            }
+        };
+
+        // Component SeoHead (dùng chung với trang bán hàng) gọi hàm này sau lần
+        // dựng đầu tiên để gỡ bộ thẻ SEO mặc định. App quản lý không có bộ thẻ
+        // nào để gỡ, nhưng vẫn khai báo cho đủ: thiếu thì mỗi lần mở màn hình
+        // đăng nhập lại ném một lỗi vào console, lâu dần che mất lỗi thật.
+        window.qlySeo = {
+            clearDefaults: function () { return 0; }
+        };
+
+        try {
+            var saved = localStorage.getItem('qly-theme');
+            if (saved) window.qlyTheme.apply(saved);
+        } catch (e) { /* chế độ riêng tư chặn localStorage — dùng theo hệ thống */ }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600..800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
+
+    <!-- design-system.css nằm trong thư viện dùng chung QlyCoffee.Ui nên có
+         tiền tố _content/ theo quy ước Razor Class Library.
+         admin.css là phần riêng của app này. -->
+    <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css" />
+    <link rel="stylesheet" href="css/admin.css" />
+</head>
+
+<body>
+    <a href="#main-content" class="skip-link">Bỏ qua, tới nội dung chính</a>
+
+    <div id="app">
+        <!-- Màn hình chờ trong lúc tải WebAssembly. Khung xương chứ không phải
+             vòng xoay: trang không nhảy khi nội dung thật xuất hiện. -->
+        <div class="boot-screen">
+            <div class="boot-mark">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                    <path d="M12 16h24l-3 22a4 4 0 0 1-4 3.5H19a4 4 0 0 1-4-3.5L12 16Z"
+                          stroke="#CB3E0B" stroke-width="2.5" stroke-linejoin="round"/>
+                    <path d="M36 20h4a5 5 0 0 1 0 10h-3" stroke="#CB3E0B" stroke-width="2.5"/>
+                    <path d="M20 10c2-3-2-5 0-8M28 10c2-3-2-5 0-8"
+                          stroke="#E8952A" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <p class="boot-text">Đang mở trang quản lý…</p>
+        </div>
+    </div>
+
+    <noscript>
+        <div class="noscript-content">
+            <h1>Cần bật JavaScript</h1>
+            <p>Trang quản lý Một Chút Coffee chạy hoàn toàn bằng JavaScript. Vui lòng bật lên rồi tải lại.</p>
+        </div>
+    </noscript>
+
+    <div id="blazor-error-ui">
+        <span>Đã có lỗi xảy ra. Ứng dụng có thể không hoạt động đúng cho tới khi tải lại.</span>
+        <a href="" class="reload">Tải lại</a>
+        <a class="dismiss" aria-label="Đóng thông báo">×</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+
+    <!-- Đăng ký service worker. Đặt SAU blazor.webassembly.js và bọc trong kiểm
+         tra khả dụng: trình duyệt cũ hoặc trang chạy qua HTTP thuần sẽ bỏ qua
+         đoạn này thay vì ném lỗi làm chết cả script. -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('service-worker.js')
+                    .catch(function (err) {
+                        // Không cài được service worker thì app vẫn chạy, chỉ là
+                        // không mở được lúc mất mạng. Không quấy người dùng vì việc đó.
+                        console.info('Khong dang ky duoc service worker:', err);
+                    });
+            });
+        }
+    </script>
+
+    <style>
+        /* Kiểu cho màn hình chờ — viết inline vì phải hiển thị được TRƯỚC khi
+           file CSS bên ngoài tải xong. Màu lấy đúng từ token --bg / --accent. */
+        .boot-screen {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 16px;
+            background: #FCF9F3;
+            font-family: system-ui, "Segoe UI", sans-serif;
+        }
+        @media (prefers-color-scheme: dark) {
+            .boot-screen { background: #181410; }
+            .boot-text { color: #A5998D !important; }
+        }
+        :root[data-theme="dark"] .boot-screen { background: #181410; }
+        :root[data-theme="dark"] .boot-text { color: #A5998D !important; }
+        .boot-mark { animation: boot-pulse 1.8s ease-in-out infinite; }
+        .boot-text { font-size: 15px; color: #806F60; margin: 0; }
+        @keyframes boot-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: .55; transform: scale(.94); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .boot-mark { animation: none; }
+        }
+        .noscript-content { max-width: 40rem; margin: 4rem auto; padding: 0 1rem;
+                            font-family: system-ui, "Segoe UI", sans-serif; }
+    </style>
+</body>
+</html>

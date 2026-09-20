@@ -1,0 +1,581 @@
+@*
+    =============================================================================
+    TRANG NHẬP KHO
+    =============================================================================
+    Archetype: form. Nhãn đặt trên ô nhập, ô nhập trong cột hẹp, validate hiện
+    ngay cạnh trường, nút gửi không bao giờ bị vô hiệu mà không nói lý do.
+
+    Điểm quan trọng: NGƯỜI DÙNG NHẬP THEO ĐƠN VỊ HỌ MUA (kg, lít, thùng),
+    hệ thống tự quy đổi sang đơn vị cơ sở trước khi lưu. Bắt nhân viên tự nhân
+    1000 trong đầu là cách chắc chắn để có dữ liệu sai.
+
+    Bảng xem trước ở cột phải hiện kết quả quy đổi và hạn dùng dự kiến ngay khi
+    gõ, để phát hiện nhầm lẫn trước khi lưu chứ không phải sau.
+    =============================================================================
+*@
+@page "/nhap-kho"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+
+<PageTitle>Nhập kho — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    <div class="stack stack-1">
+        <h2>Nhập kho</h2>
+        <span class="xs muted">
+            Mỗi lần nhập tạo một lô mới có hạn dùng và giá vốn riêng — đây là nền tảng của FEFO
+        </span>
+    </div>
+
+    @*  ══ DANH SÁCH CẦN NHẬP ════════════════════════════════════════════
+        Cùng bảng với trang Kế hoạch. Bấm "Nhập" trên một dòng là form bên
+        dưới được điền sẵn nguyên liệu, số lượng gợi ý và giá ước tính — nhân
+        viên chỉ còn sửa theo hóa đơn thật và điền hạn dùng. Nhập xong dòng
+        được đánh dấu và form tự chuyển sang dòng kế tiếp. *@
+    <RestockPanel @ref="_restock"
+                  Mode="RestockPanel.RestockMode.Receive"
+                  DoneIds="_doneIds"
+                  OnPick="PickFromListAsync" />
+
+    @if (_loading)
+    {
+        <div class="skeleton" style="height: 400px; border-radius: var(--radius-lg);"></div>
+    }
+    else
+    {
+        <div class="receive-layout" id="receive-form">
+
+            @* ══ CỘT TRÁI — FORM ═══════════════════════════════════════════ *@
+            <section class="card">
+                <h3 class="card-title">Thông tin lô hàng</h3>
+
+                <div class="stack stack-5">
+
+                    @* ── Chọn nguyên liệu ──────────────────────────────── *@
+                    <div class="field">
+                        <label class="field-label" for="ingredient">
+                            Nguyên liệu <span class="req" aria-hidden="true">*</span>
+                        </label>
+                        <select id="ingredient" class="select" @bind="_ingredientId"
+                                @bind:after="OnIngredientChanged">
+                            <option value="">— Chọn nguyên liệu —</option>
+                            @foreach (var g in _ingredients.GroupBy(i => i.CategoryLabel))
+                            {
+                                <optgroup label="@g.Key">
+                                    @foreach (var i in g.OrderBy(x => x.Name))
+                                    {
+                                        <option value="@i.Id">
+                                            @i.Name (còn @Qty.Format(i.TotalStock) @i.UnitLabel)
+                                        </option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                        @if (_touched && Selected is null)
+                        {
+                            <span class="field-error">
+                                <WarnIcon Size="12" /> Vui lòng chọn nguyên liệu.
+                            </span>
+                        }
+                    </div>
+
+                    @* ── Số lượng + đơn vị nhập ───────────────────────────── *@
+                    @if (Selected is not null)
+                    {
+                        <fieldset class="field">
+                            <legend class="field-label">
+                                Số lượng nhập <span class="req" aria-hidden="true">*</span>
+                            </legend>
+
+                            <div class="row row-3 row-wrap" style="align-items: flex-end;">
+                                <div style="flex: 1; min-width: 140px;">
+                                    <input type="number" class="input input-num"
+                                           min="0" step="0.01" placeholder="0"
+                                           @ref="_qtyInput"
+                                           aria-label="Số lượng"
+                                           aria-invalid="@(_touched && _quantity <= 0)"
+                                           @bind="_quantity" @bind:event="oninput" />
+                                </div>
+
+                                @* Đơn vị nhập khả dụng phụ thuộc đơn vị cơ sở:
+                                   nguyên liệu tính bằng gram thì cho nhập theo kg,
+                                   tính bằng ml thì cho nhập theo lít. *@
+                                <div class="choice-group">
+                                    @foreach (var u in AvailableUnits)
+                                    {
+                                        <button type="button"
+                                                class="choice @(_unitFactor == u.Factor ? "is-selected" : "")"
+                                                aria-pressed="@(_unitFactor == u.Factor)"
+                                                @onclick="() => _unitFactor = u.Factor">
+                                            @u.Label
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            @if (_touched && _quantity <= 0)
+                            {
+                                <span class="field-error">
+                                    <WarnIcon Size="12" /> Số lượng phải lớn hơn 0.
+                                </span>
+                            }
+                        </fieldset>
+
+                        @* ── Giá vốn ──────────────────────────────────────── *@
+                        <div class="field">
+                            <label class="field-label" for="cost">
+                                Tổng tiền của lô này <span class="req" aria-hidden="true">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input id="cost" type="number" class="input input-num"
+                                       min="0" step="1000" placeholder="0"
+                                       aria-invalid="@(_touched && _totalCost <= 0)"
+                                       @bind="_totalCost" @bind:event="oninput"
+                                       @bind:after="() => _costIsEstimate = false" />
+                                <span class="input-suffix">đ</span>
+                            </div>
+                            @if (_costIsEstimate)
+                            {
+                                @* Số điền sẵn là ước tính theo giá vốn bình quân. Nói rõ
+                                   để không ai lưu nhầm giá ước tính thay cho hóa đơn thật
+                                   — giá vốn sai thì mọi báo cáo lãi lỗ phía sau sai theo. *@
+                                <span class="field-hint text-warn">
+                                    Đang điền sẵn giá ƯỚC TÍNH theo giá vốn bình quân — sửa theo hóa đơn thật.
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="field-hint">
+                                    Nhập tổng tiền trên hóa đơn. Hệ thống tự chia ra đơn giá.
+                                </span>
+                            }
+                            @if (_touched && _totalCost <= 0)
+                            {
+                                <span class="field-error">
+                                    <WarnIcon Size="12" /> Vui lòng nhập tổng tiền.
+                                </span>
+                            }
+                        </div>
+
+                        @* ── Hạn sử dụng ──────────────────────────────────── *@
+                        <div class="field">
+                            <label class="field-label" for="expiry">Hạn sử dụng</label>
+                            <input id="expiry" type="date" class="input"
+                                   min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                   @bind="_expiryDate" />
+                            <span class="field-hint">
+                                @if (Selected.Category != 8 && DefaultShelfLife is int d)
+                                {
+                                    <span>
+                                        Để trống thì hệ thống lấy @d ngày kể từ hôm nay
+                                        (mặc định của nguyên liệu này).
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span>Nguyên liệu này không có hạn sử dụng — có thể để trống.</span>
+                                }
+                            </span>
+                        </div>
+
+                        @* ── Mã lô & ghi chú ──────────────────────────────── *@
+                        <div class="field">
+                            <label class="field-label" for="lotcode">Mã lô</label>
+                            <input id="lotcode" type="text" class="input mono" maxlength="80"
+                                   placeholder="Để trống để hệ thống tự sinh"
+                                   @bind="_lotCode" />
+                            <span class="field-hint">
+                                Nhập mã in trên bao bì nếu có, để đối chiếu khi nhà cung cấp thu hồi.
+                            </span>
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label" for="note">Ghi chú</label>
+                            <input id="note" type="text" class="input" maxlength="300"
+                                   placeholder="VD: hàng khuyến mãi, cận hạn, giao thiếu 2 hộp"
+                                   @bind="_note" />
+                        </div>
+                    }
+                </div>
+
+                <div class="card-footer">
+                    <button class="btn btn-primary btn-lg btn-block"
+                            disabled="@(!CanSubmit)"
+                            @onclick="SubmitAsync">
+                        @if (_submitting)
+                        {
+                            <SpinnerIcon Size="18" />
+                            <span>Đang lưu…</span>
+                        }
+                        else
+                        {
+                            <TruckIcon Size="18" />
+                            <span>Nhập kho</span>
+                        }
+                    </button>
+
+                    @if (!CanSubmit && _touched && !_submitting)
+                    {
+                        <span class="xs text-warn" style="display: block; text-align: center; margin-top: var(--space-2);">
+                            @BlockReason
+                        </span>
+                    }
+                </div>
+            </section>
+
+            @* ══ CỘT PHẢI — XEM TRƯỚC ══════════════════════════════════════ *@
+            <aside class="stack stack-4 receive-preview">
+
+                @if (Selected is null)
+                {
+                    <div class="card">
+                        <div class="empty" style="padding: var(--space-8) var(--space-4);">
+                            <JarIcon Size="40" CssClass="empty-icon" />
+                            <span class="empty-text">
+                                Chọn nguyên liệu để xem trước kết quả quy đổi.
+                            </span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    @* ── Nguyên liệu đang chọn ───────────────────────────── *@
+                    <div class="card">
+                        <div class="row row-3">
+                            <div class="ingredient-icon" style="--ing-color: @Selected.ColorHex; width: 44px; height: 44px;">
+                                <IngredientIcon IconKey="@Selected.IconKey"
+                                                ColorHex="@Selected.ColorHex"
+                                                Size="26"
+                                                AriaLabel="@Selected.Name" />
+                            </div>
+                            <div class="stack stack-1 grow">
+                                <span style="font-weight: 700;">@Selected.Name</span>
+                                <span class="ingredient-sku">@Selected.Sku</span>
+                            </div>
+                        </div>
+
+                        <div class="pl-table" style="margin-top: var(--space-3);">
+                            <div class="pl-row">
+                                <span class="pl-label">Tồn hiện tại</span>
+                                <span class="pl-value num">
+                                    @Qty.Format(Selected.TotalStock) @Selected.UnitLabel
+                                </span>
+                            </div>
+                            <div class="pl-row">
+                                <span class="pl-label">Giá vốn trung bình</span>
+                                <span class="pl-value num">
+                                    @Money.Format(Selected.AverageUnitCost)/@Selected.UnitLabel
+                                </span>
+                            </div>
+                            @if (Selected.MinStockLevel > 0)
+                            {
+                                <div class="pl-row">
+                                    <span class="pl-label">Ngưỡng tối thiểu</span>
+                                    <span class="pl-value num">
+                                        @Qty.Format(Selected.MinStockLevel) @Selected.UnitLabel
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    @* ── Kết quả quy đổi ─────────────────────────────────── *@
+                    @if (_quantity > 0)
+                    {
+                        <div class="card" style="border-color: var(--accent-border);">
+                            <div class="stack stack-1">
+                                <span class="label">Sau khi nhập</span>
+                                <span class="xs muted">Kiểm tra kỹ trước khi lưu</span>
+                            </div>
+
+                            <div class="pl-table" style="background: var(--accent-soft);">
+                                <div class="pl-row">
+                                    <span class="pl-label">Quy đổi thành</span>
+                                    <span class="pl-value num" style="font-weight: 700;">
+                                        @Qty.Format(BaseQuantity) @Selected.UnitLabel
+                                    </span>
+                                </div>
+                                <div class="pl-row">
+                                    <span class="pl-label">Đơn giá</span>
+                                    <span class="pl-value num">
+                                        @Money.Format(UnitCost)/@Selected.UnitLabel
+                                    </span>
+                                </div>
+                                <div class="pl-row pl-total">
+                                    <span class="pl-label">Tồn kho mới</span>
+                                    <span class="pl-value num pl-positive">
+                                        @Qty.Format(Selected.TotalStock + BaseQuantity) @Selected.UnitLabel
+                                    </span>
+                                </div>
+                            </div>
+
+                            @* Cảnh báo khi đơn giá lệch nhiều so với giá vốn hiện tại —
+                               thường là do nhập nhầm đơn vị hoặc gõ thừa số 0 *@
+                            @if (Selected.AverageUnitCost > 0 && PriceDeviation > 40)
+                            {
+                                <div class="alert alert-warn">
+                                    <WarnIcon Size="18" />
+                                    <div class="stack stack-1">
+                                        <span class="alert-title">Đơn giá lệch @PriceDeviation% so với trước</span>
+                                        <span class="xs">
+                                            Kiểm tra lại đơn vị và số tiền. Lệch lớn thường do nhập
+                                            nhầm kg thành gram hoặc gõ thừa số 0.
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+
+                            <div class="stack stack-1">
+                                <span class="label">Hạn sử dụng của lô</span>
+                                <span class="small">
+                                    @if (EffectiveExpiry is DateTime exp)
+                                    {
+                                        <span class="@ExpiryClass(exp)">
+                                            @exp.ToString("dd/MM/yyyy")
+                                            (còn @((int)(exp - DateTime.Today).TotalDays) ngày)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="muted">Không có hạn sử dụng</span>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                    }
+
+                    @* ── Nhắc nhở nghiệp vụ ──────────────────────────────── *@
+                    <div class="alert alert-info">
+                        <InfoIcon Size="18" />
+                        <span class="xs">
+                            Nhập kho sẽ cập nhật lại giá vốn bình quân của nguyên liệu,
+                            kéo theo giá vốn của mọi món dùng nguyên liệu này.
+                        </span>
+                    </div>
+                }
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    private List<IngredientStockDto> _ingredients = new();
+    private bool _loading = true;
+    private bool _submitting;
+    private bool _touched;
+
+    // Dữ liệu form
+    private string _ingredientId = "";
+    private double _quantity;
+    private double _unitFactor = 1;      // hệ số quy đổi sang đơn vị cơ sở
+    private int _totalCost;
+    private DateTime? _expiryDate;
+    private string _lotCode = "";
+    private string _note = "";
+
+    // Danh sách cần nhập
+    private RestockPanel? _restock;
+    private readonly HashSet<Guid> _doneIds = new();
+    private bool _costIsEstimate;
+    private bool _fromList;        // dòng đang nhập được chọn từ danh sách
+    private bool _focusQty;        // cần đưa con trỏ vào ô số lượng sau lần vẽ tới
+    private ElementReference _qtyInput;
+
+    private record UnitOption(string Label, double Factor);
+
+    private IngredientStockDto? Selected =>
+        Guid.TryParse(_ingredientId, out var id)
+            ? _ingredients.FirstOrDefault(i => i.Id == id)
+            : null;
+
+    /// <summary>
+    /// Đơn vị nhập khả dụng theo đơn vị cơ sở của nguyên liệu.
+    /// Gram thì cho nhập kg; mililit thì cho nhập lít; cái thì chỉ có cái.
+    /// </summary>
+    private List<UnitOption> AvailableUnits => Selected?.BaseUnit switch
+    {
+        0 => new() { new("gram", 1), new("kg", 1000) },
+        1 => new() { new("ml", 1), new("lít", 1000) },
+        _ => new() { new("cái", 1) }
+    };
+
+    /// <summary>Số lượng đã quy về đơn vị cơ sở.</summary>
+    private double BaseQuantity => Math.Round(_quantity * _unitFactor, 4);
+
+    /// <summary>Đơn giá cho một đơn vị cơ sở, tính từ tổng tiền.</summary>
+    private int UnitCost => BaseQuantity > 0
+        ? (int)Math.Round(_totalCost / BaseQuantity)
+        : 0;
+
+    /// <summary>Phần trăm lệch giữa đơn giá mới và giá vốn trung bình hiện tại.</summary>
+    private int PriceDeviation
+    {
+        get
+        {
+            if (Selected is null || Selected.AverageUnitCost <= 0 || UnitCost <= 0) return 0;
+            var diff = Math.Abs(UnitCost - Selected.AverageUnitCost);
+            return (int)Math.Round(diff * 100.0 / Selected.AverageUnitCost);
+        }
+    }
+
+    /// <summary>Số ngày hạn dùng mặc định của nguyên liệu (suy từ dữ liệu nếu có).</summary>
+    private int? DefaultShelfLife => Selected?.NearestExpiryDays;
+
+    private DateTime? EffectiveExpiry => _expiryDate;
+
+    private bool CanSubmit =>
+        !_submitting && Selected is not null && _quantity > 0 && _totalCost > 0;
+
+    private string BlockReason =>
+        Selected is null ? "Chưa chọn nguyên liệu."
+        : _quantity <= 0 ? "Số lượng phải lớn hơn 0."
+        : _totalCost <= 0 ? "Chưa nhập tổng tiền."
+        : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var res = await Api.GetIngredientsAsync();
+        _ingredients = res.Success && res.Data is not null ? res.Data : new();
+        _loading = false;
+    }
+
+    /// <summary>Đổi nguyên liệu thì đặt lại đơn vị về đơn vị cơ sở để tránh nhầm.</summary>
+    private void OnIngredientChanged()
+    {
+        _unitFactor = 1;
+        _fromList = false;
+        _costIsEstimate = false;
+    }
+
+    /// <summary>
+    /// Điền sẵn form từ một dòng của danh sách cần nhập.
+    /// Số lượng lớn thì đổi sang kg / lít cho dễ đối chiếu với hóa đơn.
+    /// </summary>
+    private async Task PickFromListAsync(RestockItemDto item)
+    {
+        // Danh sách nguyên liệu của form có thể cũ hơn danh sách cần nhập
+        if (_ingredients.All(i => i.Id != item.IngredientId))
+            await ReloadIngredientsAsync();
+
+        _ingredientId = item.IngredientId.ToString();
+        _touched = false;
+        _fromList = true;
+
+        var big = item.BaseUnit is 0 or 1 && item.SuggestedQuantity >= 1000;
+        _unitFactor = big ? 1000 : 1;
+        _quantity = item.SuggestedQuantity > 0
+            ? Math.Round(item.SuggestedQuantity / _unitFactor, 2)
+            : 0;
+
+        _totalCost = item.EstimatedCost;
+        _costIsEstimate = item.EstimatedCost > 0;
+        _expiryDate = null;
+        _lotCode = "";
+        _note = "Nhập theo danh sách cần nhập";
+
+        _focusQty = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusQty) return;
+        _focusQty = false;
+
+        // Đưa con trỏ vào ô số lượng: trình duyệt tự cuộn tới form, nhân viên
+        // sửa số theo hóa đơn luôn mà không phải tìm ô.
+        try { await _qtyInput.FocusAsync(); }
+        catch (InvalidOperationException) { /* ô chưa kịp vẽ — bỏ qua */ }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _touched = true;
+        if (!CanSubmit) return;
+
+        _submitting = true;
+
+        var res = await Api.ReceiveStockAsync(new ReceiveStockRequest
+        {
+            IngredientId = Selected!.Id,
+            // Gửi số lượng ĐÃ quy đổi và không kèm PurchaseUnitId —
+            // việc quy đổi đã làm xong ở giao diện, backend chỉ việc lưu.
+            Quantity     = BaseQuantity,
+            UnitCost     = UnitCost,
+            ExpiryDate   = _expiryDate,
+            LotCode      = string.IsNullOrWhiteSpace(_lotCode) ? null : _lotCode.Trim(),
+            Note         = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim()
+        });
+
+        _submitting = false;
+
+        if (res.Success)
+        {
+            Alerts.Success(
+                $"Đã nhập {Qty.Format(BaseQuantity)} {Selected.UnitLabel} {Selected.Name}.");
+
+            var justDone = Selected.Id;
+            var wasFromList = _fromList;
+            _doneIds.Add(justDone);
+
+            ResetForm();
+            await ReloadIngredientsAsync();
+
+            if (_restock is not null)
+            {
+                await _restock.ReloadAsync();
+
+                // Đang đi theo danh sách thì tự chuyển sang dòng kế tiếp chưa nhập
+                var next = _restock.Data?.Items.FirstOrDefault(i => !_doneIds.Contains(i.IngredientId));
+                if (wasFromList && next is not null)
+                {
+                    await PickFromListAsync(next);
+                }
+                else if (_restock.Data is { Items.Count: 0 })
+                {
+                    // Báo dù có đi theo danh sách hay không: nhân viên chọn tay
+                    // đúng thứ cuối cùng còn thiếu thì vẫn là xong việc, và câu
+                    // này là thứ duy nhất nói cho họ biết không phải nhập nữa.
+                    Alerts.Success("Hoàn tất công việc — không còn nguyên liệu nào cần nhập.");
+                }
+                else if (wasFromList)
+                {
+                    Alerts.Success("Đã nhập xong các dòng đã chọn.");
+                }
+            }
+        }
+        else
+        {
+            Alerts.Error(res.Error?.Message ?? "Không nhập kho được.");
+        }
+    }
+
+    private void ResetForm()
+    {
+        _quantity = 0;
+        _totalCost = 0;
+        _expiryDate = null;
+        _lotCode = "";
+        _note = "";
+        _touched = false;
+        _costIsEstimate = false;
+        _fromList = false;
+        // Giữ nguyên nguyên liệu đang chọn — nhân viên thường nhập nhiều lô liên tiếp
+    }
+
+    private async Task ReloadIngredientsAsync()
+    {
+        var res = await Api.GetIngredientsAsync();
+        if (res.Success && res.Data is not null) _ingredients = res.Data;
+    }
+
+    private static string ExpiryClass(DateTime expiry)
+    {
+        var days = (int)(expiry - DateTime.Today).TotalDays;
+        return days <= 2 ? "text-danger"
+             : days <= 7 ? "text-warn"
+             : "";
+    }
+}
