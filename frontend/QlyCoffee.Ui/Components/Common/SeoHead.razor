@@ -8,7 +8,12 @@
         <SeoHead Title="Thực đơn"
                  Description="Hơn 40 món cà phê, trà trái cây và đá xay..."
                  Path="/menu"
-                 Image="img/drink-tra-sua.webp" />
+                 Image="@DrinkPhoto.TraSua" />
+
+    Truyền Image qua hằng số trong DrinkPhoto chứ đừng gõ tay đường dẫn: ảnh dự
+    phòng cho món nằm trong thư viện dùng chung nên đường dẫn thật có tiền tố
+    _content/QlyCoffee.Ui/, gõ tay rất dễ ra một đường dẫn 404 mà không ai thấy
+    — thẻ og:image hỏng chỉ lộ ra lúc có người dán link lên Facebook.
 
     Component này ghi vào <head> thông qua <HeadContent>, hoạt động được là nhờ
     Program.cs đã đăng ký:  builder.RootComponents.Add<HeadOutlet>("head::after");

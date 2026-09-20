@@ -34,8 +34,40 @@ namespace QlyCoffee.Client.Services;
 
 public static class DrinkPhoto
 {
-    /// <summary>Thư mục chứa ảnh tĩnh, tính từ gốc site (base href = "/").</summary>
-    private const string Dir = "img/";
+    // --------------------------------------------------------------------------
+    //  HAI THƯ MỤC ẢNH, VÌ CÓ HAI LOẠI ẢNH KHÁC NHAU
+    // --------------------------------------------------------------------------
+    //  Từ khi trang bán hàng và app quản lý tách thành hai ứng dụng, chỗ đặt ảnh
+    //  phải trả lời được câu hỏi: ứng dụng nào thật sự hiển thị ảnh này?
+    //
+    //  Ảnh dự phòng cho món thì CẢ HAI đều dùng — màn hình bán tại quầy, hàng
+    //  chờ pha chế, danh sách món và báo cáo bên quản lý đều vẽ thẻ món. Vì vậy
+    //  chúng nằm trong thư viện dùng chung QlyCoffee.Ui, và đường dẫn có tiền tố
+    //  _content/ theo quy ước tài nguyên tĩnh của Razor Class Library.
+    //
+    //  Ảnh trang trí thì chỉ trang bán hàng dùng, nên ở lại đó.
+    // --------------------------------------------------------------------------
+
+    /// <summary>
+    /// Ảnh dự phòng cho món — dùng chung ở cả hai ứng dụng nên nằm trong thư viện.
+    /// </summary>
+    private const string Dir = "_content/QlyCoffee.Ui/img/";
+
+    /// <summary>
+    /// Ảnh trang trí, chỉ có trong wwwroot của trang bán hàng.
+    ///
+    /// og-cover.jpg BẮT BUỘC phải ở đây chứ không chuyển vào thư viện được:
+    /// index.html có một thẻ og:image tĩnh trỏ tới nó bằng URL tuyệt đối
+    /// (https://…/img/og-cover.jpg), và đó chính là thẻ mà các bot mạng xã hội
+    /// đọc — chúng không chạy JavaScript nên không bao giờ thấy thẻ do SeoHead
+    /// sinh ra. Đổi chỗ file là hỏng khung xem trước khi dán link lên Facebook
+    /// hay Zalo, mà lỗi đó không hiện ra ở bất kỳ đâu trong ứng dụng.
+    ///
+    /// Hệ quả: app quản lý tham chiếu OgCover (qua giá trị mặc định của SeoHead)
+    /// sẽ trỏ vào một file không tồn tại. Chấp nhận được — app quản lý đặt
+    /// noindex và không bao giờ được chia sẻ lên mạng xã hội.
+    /// </summary>
+    private const string ShopDir = "img/";
 
     // --- Bộ ảnh theo nhóm món -------------------------------------------------
     // Mỗi hằng số là MỘT vai trò, không phải một bức ảnh cụ thể. Muốn đổi ảnh
@@ -66,14 +98,14 @@ public static class DrinkPhoto
     // bố cục ba ảnh, nhưng hai món đó đã xuất hiện ở dải danh mục và lưới món
     // ngay bên dưới — bày lại trong hero là lặp lại chính mình và kéo dài trang.
     // Hai file ảnh đó đã được xóa khỏi wwwroot/img/.
-    public const string HeroCaPhe   = Dir + "hero-ca-phe-da.webp";
-    public const string KhongGian   = Dir + "khong-gian-quan.webp";
-    public const string PhaChe      = Dir + "pha-che-thu-cong.webp";
-    public const string HatCaPhe    = Dir + "hat-ca-phe-rang.webp";
-    public const string BanBe       = Dir + "ban-be-ca-phe.webp";
+    public const string HeroCaPhe   = ShopDir + "hero-ca-phe-da.webp";
+    public const string KhongGian   = ShopDir + "khong-gian-quan.webp";
+    public const string PhaChe      = ShopDir + "pha-che-thu-cong.webp";
+    public const string HatCaPhe    = ShopDir + "hat-ca-phe-rang.webp";
+    public const string BanBe       = ShopDir + "ban-be-ca-phe.webp";
 
     /// <summary>Ảnh dùng cho thẻ og:image khi chia sẻ trang chủ lên mạng xã hội.</summary>
-    public const string OgCover = Dir + "og-cover.jpg";
+    public const string OgCover = ShopDir + "og-cover.jpg";
 
     /// <summary>
     /// Trả về đường dẫn ảnh SẼ HIỂN THỊ cho một món.
