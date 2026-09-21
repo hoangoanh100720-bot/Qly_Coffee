@@ -104,9 +104,14 @@
                 <CheckIcon Size="20" />
                 <div class="stack stack-1">
                     <span class="alert-title">
-                        @if (AllDone)
+                        @if (AllDone && _data.IsToday)
                         {
                             <span>Hoàn tất công việc — đã nhập đủ @_data.DoneItems.Count nguyên liệu vừa báo thiếu</span>
+                        }
+                        else if (AllDone)
+                        {
+                            @* Ngày cũ: "vừa" là chuyện của hôm nay, nói vậy cho ngày đã qua là sai. *@
+                            <span>Ngày này có @_data.DoneItems.Count nguyên liệu bị chặn đơn, và đều đã nhập bù xong</span>
                         }
                         else if (_data.IsToday)
                         {
@@ -119,7 +124,7 @@
                     </span>
                     @if (AllDone)
                     {
-                        <span class="small">Không còn nguyên liệu nào đang chờ nhập.</span>
+                        <span class="small">@DoneSummary</span>
                     }
                     else if (_data.IsToday)
                     {

@@ -1007,8 +1007,10 @@
 .restock-table td { vertical-align: top; }
 .restock-table .ingredient-name { display: inline-flex; align-items: center; gap: 4px; }
 
-/* Đã nhập trong phiên này (trang Nhập kho): mờ đi và có dấu tích, nhưng VẪN
-   để lại trong bảng — biến mất thì nhân viên không biết mình đã nhập thứ gì. */
+/* Đã nhập trong phiên này (trang Nhập kho) nhưng CHƯA đủ để đóng việc: nhập
+   một ít mà vẫn dưới mức tối thiểu thì dòng ở lại, chỉ mờ đi và có dấu tích —
+   để nhân viên nhớ mình đã động tới nó rồi mà vẫn thấy là còn phải nhập thêm.
+   Nhập đủ rồi thì server bỏ hẳn dòng khỏi bảng và đưa xuống khối "đã xong". */
 .restock-table tr.is-done { opacity: .55; }
 .restock-table tr.is-done .ingredient-name { color: var(--ok); }
 

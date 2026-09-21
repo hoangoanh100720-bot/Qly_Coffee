@@ -99,6 +99,58 @@ function Invoke-Publish {
     }
 }
 
+
+# -----------------------------------------------------------------------------
+#  KIEM TRA web.config TRUOC KHI GIAO GOI
+# -----------------------------------------------------------------------------
+#  Mot web.config sai cu phap khong lam publish that bai — no chi la file duoc
+#  chep nguyen si. Loi chi lo ra khi IIS doc no, va luc do trieu chung la 500.19
+#  cho TOAN BO site, khong phai chi phan cau hinh sai.
+#
+#  Cai bay da dinh that: dac ta XML cam hai dau gach ngang lien nhau ben trong
+#  mot comment. Dung mot dai gach ngang lam duong ke trong comment — thoi quen
+#  rat thuong — la file thanh XML khong hop le. Trinh soan thao khong canh bao
+#  vi nhin van giong mot comment binh thuong.
+#
+#  Ba giay kiem tra o day doi lay viec khong phai do loi 500.19 tren may chu.
+# -----------------------------------------------------------------------------
+function Test-WebConfig {
+    # -Static: chi ap dung cho hai goi frontend. Backend khong can MIME hay
+    # rewrite — no la ung dung .NET, moi request deu di thang vao ung dung.
+    param([string]$Path, [string]$Label, [switch]$Static)
+
+    if (-not (Test-Path $Path)) {
+        throw "$Label thieu web.config. Thieu file nay thi IIS tra 404 cho moi duong dan phu (/menu, /ban-hang...) va khong biet kieu file .wasm."
+    }
+
+    try {
+        $xml = [xml](Get-Content $Path -Raw)
+    } catch {
+        throw "$Label co web.config SAI CU PHAP XML. IIS se tra 500.19 cho ca site.`n  $Path`n  $($_.Exception.Message)"
+    }
+
+    if ($Static) {
+        # Ba thu duoi day thieu thi hong theo kieu IM LANG - khong loi, khong
+        # canh bao, chi la mot thu ngung hoat dong.
+        $mimes = @($xml.SelectNodes("//mimeMap") | ForEach-Object { $_.fileExtension })
+        $hau = @{
+            ".wasm"        = "app khong khoi dong duoc, trang trang tron"
+            ".webp"        = "mat sach anh mon"
+            ".webmanifest" = "nut Cai dat bien mat, khong cai duoc app"
+        }
+        foreach ($need in $hau.Keys) {
+            if ($mimes -notcontains $need) {
+                Say ("  CANH BAO: {0} chua khai MIME {1} -> {2}" -f $Label, $need, $hau[$need]) Yellow
+            }
+        }
+        if (-not $xml.SelectSingleNode("//rewrite/rules/rule")) {
+            Say "  CANH BAO: $Label khong co quy tac rewrite - tai lai trang o duong dan phu se ra 404." Yellow
+        }
+    }
+
+    Say "  web.config cua $Label : hop le"
+}
+
 # -----------------------------------------------------------------------------
 #  4. Backend
 # -----------------------------------------------------------------------------
@@ -115,6 +167,11 @@ if (-not $SkipApi) {
     # Thu muc anh tai len. Publish khong tao san vi no rong.
     $uploads = Join-Path $apiOut "wwwroot\uploads\products"
     New-Item -ItemType Directory -Path $uploads -Force | Out-Null
+
+    # web.config cua backend do SDK tron voi ban goc trong backend/QlyCoffee.Api/.
+    # Kiem tra ban KET QUA chu khong phai ban goc, vi buoc tron moi la buoc co
+    # the sinh ra file hong.
+    Test-WebConfig (Join-Path $apiOut "web.config") "backend API"
 
     Say ""
     Say "  LUU Y VE .env TRONG deploy\api\" Yellow
@@ -146,10 +203,9 @@ function Copy-BlazorOutput {
     New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
     Copy-Item (Join-Path $src "*") $TargetDir -Recurse -Force
 
-    if (-not (Test-Path (Join-Path $TargetDir "web.config"))) {
-        Say "  CANH BAO: $Label thieu web.config - IIS se tra 404 cho moi duong dan phu." Yellow
-    }
+    Test-WebConfig (Join-Path $TargetDir "web.config") $Label -Static
 }
+
 
 $tmp = Join-Path $env:TEMP "qly-deploy-$(Get-Random)"
 
