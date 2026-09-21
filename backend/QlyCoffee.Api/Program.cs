@@ -373,21 +373,62 @@ await app.RunAsync();
 /// </summary>
 static void LoadEnvFile()
 {
-    var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-
-    for (int i = 0; i < 5 && dir is not null; i++)
+    // Tìm từ HAI điểm xuất phát, theo đúng thứ tự này.
+    //
+    // 1. Thư mục chứa file .dll (AppContext.BaseDirectory)
+    //    Đây là nơi deploy/api/.env nằm khi chạy trên máy chủ. Điểm mạnh: giá
+    //    trị này KHÔNG phụ thuộc vào ai khởi động ứng dụng hay khởi động kiểu
+    //    gì — nó luôn là thư mục ứng dụng.
+    //
+    // 2. Thư mục làm việc (Directory.GetCurrentDirectory)
+    //    Đây là nơi tìm ra .env ở gốc repo khi chạy `dotnet run` lúc phát triển.
+    //
+    //  ⚠️ VÌ SAO PHẢI CÓ ĐIỂM XUẤT PHÁT THỨ NHẤT
+    //  Bản trước chỉ dùng thư mục làm việc. Chạy `dotnet run` thì đúng, nhưng
+    //  dưới IIS thì thư mục làm việc do máy chủ đặt chứ không phải do ứng dụng,
+    //  và tuỳ phiên bản Windows lẫn chế độ chạy (in-process hay out-of-process)
+    //  nó có thể là thư mục của tiến trình IIS chứ không phải thư mục ứng dụng.
+    //  Rơi vào trường hợp đó thì không tìm thấy .env, và ứng dụng chết lúc khởi
+    //  động với thông báo về JWT_SECRET — một thông báo không hề gợi ý rằng
+    //  nguyên nhân thật là "không đọc được file cấu hình".
+    //
+    //  Dò cả hai nơi thì không còn phải đoán máy chủ đang đặt thư mục làm việc
+    //  ở đâu nữa.
+    var roots = new[]
     {
-        var path = Path.Combine(dir.FullName, ".env");
-        if (File.Exists(path))
+        AppContext.BaseDirectory,
+        Directory.GetCurrentDirectory()
+    };
+
+    var daTim = new List<string>();
+
+    foreach (var root in roots)
+    {
+        var dir = new DirectoryInfo(root);
+
+        // Đi ngược lên tối đa 5 cấp: lúc phát triển, thư mục làm việc là
+        // backend/QlyCoffee.Api còn .env nằm ở gốc repo, cách đó hai cấp.
+        for (int i = 0; i < 5 && dir is not null; i++)
         {
-            Env.Load(path);
-            Console.WriteLine($"[cấu hình] Đã nạp {path}");
-            return;
+            var path = Path.Combine(dir.FullName, ".env");
+            if (File.Exists(path))
+            {
+                Env.Load(path);
+                Console.WriteLine($"[cấu hình] Đã nạp {path}");
+                return;
+            }
+            daTim.Add(dir.FullName);
+            dir = dir.Parent;
         }
-        dir = dir.Parent;
     }
 
-    Console.WriteLine("[cấu hình] CẢNH BÁO: không tìm thấy file .env, dùng giá trị mặc định");
+    // Không tìm thấy thì nói rõ ĐÃ TÌM Ở ĐÂU. Người deploy cần đúng thông tin
+    // này để biết phải đặt file vào chỗ nào; một dòng "không tìm thấy .env"
+    // trống không thì chẳng giúp được gì.
+    Console.WriteLine("[cấu hình] CẢNH BÁO: không tìm thấy file .env. Đã tìm ở:");
+    foreach (var d in daTim.Distinct())
+        Console.WriteLine($"[cấu hình]   {d}");
+    Console.WriteLine("[cấu hình] Ứng dụng sẽ dừng ngay sau đây vì thiếu JWT_SECRET.");
 }
 
 static string Cfg(string key, string fallback = "")

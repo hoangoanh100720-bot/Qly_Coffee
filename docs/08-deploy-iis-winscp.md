@@ -418,6 +418,7 @@ quản lý đã cài, service worker phát hiện bản mới rồi tự cập n
 | `500.19` khi mở site | Thiếu module URL Rewrite, hoặc `web.config` sai cú pháp |
 | `500.21` / `500.30` ở API | Thiếu .NET 8 **Hosting Bundle** (cài nhầm Runtime thường) |
 | `502.5` ở API | Ứng dụng khởi động rồi chết — gần như luôn là sai chuỗi kết nối database. Xem `logs\stdout_*.log` |
+| API chết, log báo `JWT_SECRET phải có ít nhất 32 ký tự` | Thường **không** phải lỗi khóa: đó là triệu chứng của việc **không đọc được `.env`**. Xem mục 10.1 |
 | Trang trắng, F12 báo 404 file `.wasm` | Thiếu MIME `.wasm` → `web.config` chưa upload |
 | Trang trắng, báo lỗi integrity | Upload ở chế độ Text làm hỏng file nhị phân → bật **Binary** rồi upload lại |
 | Trang chủ chạy, `/menu` lỗi 404 | Chưa cài URL Rewrite (mục 2.3) |
@@ -426,6 +427,41 @@ quản lý đã cài, service worker phát hiện bản mới rồi tự cập n
 | Không tải được ảnh lên | Thiếu quyền ghi `wwwroot\uploads` (mục 6) |
 | App quản lý không có nút cài | Đang chạy HTTP, hoặc thiếu MIME `.webmanifest` |
 | Upload xong vẫn thấy bản cũ | Ctrl+F5 một lần. Còn nữa thì kiểm tra `web.config` đã lên chưa |
+
+### 10.1. Khi API báo thiếu `JWT_SECRET`
+
+Thông báo này gây hiểu nhầm. Nó nói về khóa, nhưng nguyên nhân gần như luôn là
+**ứng dụng không đọc được file `.env`** — không có file thì mọi biến đều rỗng,
+và `JWT_SECRET` tình cờ là biến đầu tiên được kiểm tra nên nó lên tiếng trước.
+
+Mở `logs\stdout_*.log` (bật `stdoutLogEnabled="true"` trong `web.config` nếu
+chưa có) và tìm dòng bắt đầu bằng `[cấu hình]`:
+
+```
+[cấu hình] Đã nạp C:\inetpub\qly\api\.env          <- đọc được, lỗi nằm ở chỗ khác
+[cấu hình] CẢNH BÁO: không tìm thấy file .env      <- đây mới là nguyên nhân
+[cấu hình]   C:\inetpub\qly\api
+[cấu hình]   C:\inetpub\qly
+...
+```
+
+Khi không tìm thấy, ứng dụng in ra **đúng danh sách thư mục nó đã tìm**. Đặt
+`.env` vào thư mục đầu tiên trong danh sách đó là xong.
+
+Ba nguyên nhân thường gặp, theo thứ tự hay gặp:
+
+1. **Quên upload `.env`.** WinSCP theo mặc định **ẩn file bắt đầu bằng dấu
+   chấm**, nên rất dễ kéo cả thư mục mà vẫn sót đúng file này. Bật hiện file
+   ẩn: `Options → Preferences → Panels → Show hidden files`.
+2. **Windows tự thêm đuôi.** Sửa file bằng Notepad rồi lưu có thể ra
+   `.env.txt`. Bật hiện phần mở rộng trong File Explorer để kiểm tra.
+3. **Đặt sai thư mục.** File phải nằm cùng cấp với `QlyCoffee.Api.dll`.
+
+> Ứng dụng tìm `.env` từ **hai** điểm: thư mục chứa file `.dll` và thư mục làm
+> việc, mỗi bên đi ngược lên tối đa 5 cấp. Điểm thứ nhất là điểm quan trọng
+> trên máy chủ, vì thư mục làm việc dưới IIS do máy chủ đặt chứ không phải ứng
+> dụng — tuỳ phiên bản Windows và chế độ chạy, nó có thể là thư mục của tiến
+> trình IIS chứ không phải thư mục ứng dụng.
 
 ### Chỗ cần nhìn đầu tiên khi bí
 
