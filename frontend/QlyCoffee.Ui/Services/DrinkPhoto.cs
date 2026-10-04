@@ -83,7 +83,14 @@ public static class DrinkPhoto
     public const string Soda       = Dir + "drink-soda.webp";
     public const string SuaChua    = Dir + "drink-sua-chua.webp";
     public const string DaXay      = Dir + "drink-da-xay.webp";
+    /// <summary>Sinh tố quả mọng (dâu, việt quất) — ảnh mẫu chung của nhóm sinh tố.</summary>
     public const string SinhTo     = Dir + "drink-sinh-to.webp";
+
+    /// <summary>Sinh tố xoài. Tách riêng vì ảnh nhóm màu đỏ tím, sai hẳn với ly xoài vàng.</summary>
+    public const string SinhToXoai = Dir + "drink-sinh-to-xoai.webp";
+
+    /// <summary>Sinh tố bơ — ly xanh nhạt phủ kem, cũng không dùng chung được với ảnh quả mọng.</summary>
+    public const string SinhToBo   = Dir + "drink-sinh-to-bo.webp";
     public const string NuocEp     = Dir + "drink-nuoc-ep.webp";
     public const string MacDinh    = Dir + "drink-mac-dinh.webp";
 
@@ -103,6 +110,18 @@ public static class DrinkPhoto
     public const string PhaChe      = ShopDir + "pha-che-thu-cong.webp";
     public const string HatCaPhe    = ShopDir + "hat-ca-phe-rang.webp";
     public const string BanBe       = ShopDir + "ban-be-ca-phe.webp";
+
+    /// <summary>Ảnh hero của trang câu chuyện workshop (/cau-chuyen/workshop-pha-che).</summary>
+    public const string LatteArt    = ShopDir + "story-latte-art.webp";
+
+    // --- Dải ảnh không gian (/cau-chuyen/khong-gian-quan) ---------------------
+    // Ba khu chỗ ngồi nói trong bài, mỗi khu một tấm. Khách đọc "khu riêng có ổ
+    // cắm" thì nhìn thấy đúng cái góc đó, chứ không phải tự hình dung.
+    // Ảnh ngang 1200×800, ảnh dọc 800×1066 — tỉ lệ đã khớp lưới, trình duyệt
+    // không phải co kéo.
+    public const string KhongGianBanDai    = ShopDir + "khong-gian-ban-dai.webp";
+    public const string KhongGianGocYen    = ShopDir + "khong-gian-goc-yen.webp";
+    public const string KhongGianNgoaiTroi = ShopDir + "khong-gian-ngoai-troi.webp";
 
     /// <summary>Ảnh dùng cho thẻ og:image khi chia sẻ trang chủ lên mạng xã hội.</summary>
     public const string OgCover = ShopDir + "og-cover.jpg";
@@ -167,13 +186,35 @@ public static class DrinkPhoto
             return SuaChua;
 
         // ---- 4. Đá xay & sinh tố: đứng trước bánh vì "cookies & cream đá xay" -
-        if (s.Contains("sinh tố") || s.Contains("smoothie"))
-            return SinhTo;
+        //
+        //  SINH TỐ PHẢI TÁCH THEO TRÁI CÂY, không được gom một ảnh cho cả nhóm.
+        //  Ảnh mẫu của nhóm là sinh tố dâu — việt quất, tức MÀU ĐỎ TÍM. Dùng nó
+        //  cho sinh tố xoài và sinh tố bơ thì khách nhìn thấy ly màu đỏ dưới chữ
+        //  "Sinh tố xoài": sai màu, sai trái cây, và làm cả thực đơn mất tin cậy.
+        //  Với đồ uống thì ảnh KHÔNG phải trang trí — nó là lời hứa về ly nước.
+        //  XÉT THEO TÊN MÓN, KHÔNG THEO TÊN NHÓM, cho hai nhánh dưới đây.
+        //  Nhóm tên là "Đá xay & Sinh tố" nên chuỗi gộp của MỌI món trong nhóm
+        //  đều chứa cả "đá xay" lẫn "sinh tố". Xét theo chuỗi gộp thì "Cacao đá
+        //  xay" trúng nhánh sinh tố và nhận ảnh ly quả mọng màu đỏ.
+        var ten = (productName ?? "").ToLowerInvariant();
 
-        if (s.Contains("đá xay") || s.Contains("da xay")
-         || s.Contains("frappe") || s.Contains("frappuccino")
-         || s.Contains("milkshake"))
+        if (ten.Contains("đá xay") || ten.Contains("da xay")
+         || ten.Contains("frappe") || ten.Contains("frappuccino")
+         || ten.Contains("milkshake"))
             return DaXay;
+
+        if (ten.Contains("sinh tố") || ten.Contains("smoothie"))
+        {
+            if (s.Contains("xoài") || s.Contains("xoai") || s.Contains("mango"))
+                return SinhToXoai;
+
+            if (s.Contains("bơ ") || s.EndsWith("bơ") || s.Contains("avocado"))
+                return SinhToBo;
+
+            // Dâu, việt quất, và mọi vị quả mọng khác đúng với ảnh mẫu sẵn có.
+            return SinhTo;
+        }
+
 
         // ---- 5. Đồ ăn kèm -----------------------------------------------------
         //
@@ -260,7 +301,29 @@ public static class DrinkPhoto
     /// là câu vô nghĩa với người dùng trình đọc màn hình.
     /// </summary>
     public static string AltFor(string? imageUrl, string productName)
-        => Media.HasPhoto(imageUrl)
-            ? $"{productName} tại Một Chút Coffee"
-            : $"Ảnh minh họa món {productName}";
+        => AltFor(imageUrl, productName, null);
+
+    /// <summary>
+    /// Bản đầy đủ, có thêm tên nhóm món.
+    /// <para>
+    /// Nhóm món là từ khóa khách thật sự gõ: người ta tìm "sinh tố xoài" nhưng
+    /// cũng tìm "quán sinh tố quận 1". Tên món đứng một mình không nói được món
+    /// đó thuộc loại gì, mà đó lại là thứ Google Images dùng để xếp ảnh vào
+    /// đúng chủ đề. Giữ dưới ~125 ký tự — dài hơn thì trình đọc màn hình đọc
+    /// lê thê và Google cũng cắt bớt.
+    /// </para>
+    /// </summary>
+    public static string AltFor(string? imageUrl, string productName, string? categoryName)
+    {
+        var nhom = string.IsNullOrWhiteSpace(categoryName)
+            ? ""
+            : $" — {categoryName.Trim().ToLowerInvariant()}";
+
+        // Nói rõ "ảnh minh họa" khi chưa có ảnh thật: khách không thắc mắc vì sao
+        // ly bưng ra khác ảnh, và Google không bị hiểu nhầm đây là ảnh sản phẩm
+        // gốc của quán.
+        return Media.HasPhoto(imageUrl)
+            ? $"{productName}{nhom} tại Một Chút Coffee"
+            : $"Ảnh minh họa {productName}{nhom} tại Một Chút Coffee";
+    }
 }

@@ -13,7 +13,8 @@
       3. BANNER KHUYẾN MÃI do AI đề xuất xả hàng cận hạn — đặt ngay sau dải
                           danh mục vì đây là chỗ mắt dừng lần thứ hai.
       4. MÓN NỔI BẬT      lưới sản phẩm. Trả lời "gọi gì bây giờ".
-      5. CAM KẾT          ba lý do tin quán, mỗi lý do một ẢNH CHỤP THẬT.
+      5. CAM KẾT          ba lý do tin quán, mỗi lý do một ẢNH CHỤP THẬT và
+                          bấm vào đọc thêm được.
       6. KHÔNG GIAN QUÁN  ảnh quán + địa chỉ. Trả lời "ngồi lại được không".
       7. DẢI CHỐT         nhắc lại nút đặt món cho người đã cuộn hết trang.
 
@@ -33,9 +34,9 @@
          ImageAlt="Ly cà phê sữa đá pha phin của Một Chút Coffee" />
 
 @* ═══ 1. HERO ══════════════════════════════════════════════════════════════
-     Hai cột: chữ bên trái, LƯỚI BA ẢNH THẲNG HÀNG bên phải.
-     Lưới ảnh cố tình không xoay, không chồng lớp — xem lý do trong pages.css §1
-     ở khối .hero-photos.                                                       *@
+     Hai cột: chữ bên trái, ảnh cắt hình vòm bên phải.
+     Ranh giới giữa hai cột cố tình bị phá bằng quầng sáng và một chip gác lên
+     mép vòm — xem lý do trong pages.css §1 ở khối .hero-visual.              *@
 <section class="hero-band">
     <div class="container hero">
 
@@ -59,16 +60,29 @@
             </span>
 
             @*  h1 là tiêu đề DUY NHẤT cấp 1 của trang — quy tắc SEO cơ bản.
-                Cụm "cực đã" tô gradient để mắt bám vào, phần còn lại giữ màu
-                chữ gốc nên tương phản không bị hy sinh vì trang trí.            *@
+
+                Câu cũ ("Cà phê pha phin, trà trái cây cực đã") là một danh sách
+                món đọc như bảng hiệu. Câu này chơi chữ với chính tên quán và
+                bán thứ khách thật sự nhớ: mùi rang gặp ngay ở cửa.
+
+                Đánh đổi đã cân nhắc: h1 không còn chứa cụm "cà phê pha phin"
+                nên mất một phần tín hiệu SEO. Bù lại, đoạn lead ngay dưới giữ
+                đủ cụm từ khách hay gõ, và thẻ mô tả trong SeoHead vẫn nguyên.
+
+                Cụm "một chút" tô MỘT màu đặc, không còn gradient cam-đỏ.
+                Chữ đổ gradient hai màu là mốt của quảng cáo phần mềm quanh năm
+                2020; đặt cạnh ảnh chụp thật nó lập tức làm cả khối rẻ đi. Một
+                sắc cam cháy đặc vừa đậm vừa điềm, và trên trang chỉ còn ĐÚNG
+                một chỗ đổ gradient là nút "Xem thực đơn" — nên mắt biết ngay
+                phải bấm vào đâu.                                               *@
             <h1 class="hero-title">
-                Cà phê pha phin,<br />
-                trà trái cây <span class="text-grad">cực đã</span>.
+                Ghé <span class="hero-em">một chút</span>,<br />
+                thơm cả ngày.
             </h1>
 
             <p class="lead hero-lead">
-                Mỗi ly làm theo công thức định lượng chuẩn — đong bằng cân,
-                không ước lượng bằng mắt. Đặt trước, tới lấy là có.
+                Cà phê rang mộc xay theo từng ly, trà trái cây pha khi bạn gọi.
+                Quầy mở ngay trước mặt — đặt trước trên web, tới lấy là có.
             </p>
 
             @* Hai nút: một chính (gradient), một phụ (viền). Không bao giờ để
@@ -87,36 +101,71 @@
 
                 Hai con số còn lại là hai con số khách thật sự quan tâm trước khi
                 bấm "Xem thực đơn": có bao nhiêu món để chọn, và chờ bao lâu.
-                Dùng .num để chữ số thẳng hàng.                                 *@
+
+                CỐ Ý KHÔNG DÙNG .num ở đây. Class đó ép font-feature-settings
+                "tnum" — mọi chữ số rộng bằng nhau, để các cột số trong bảng
+                thẳng hàng. Đúng cho bảng tồn kho, sai cho chỗ này: hai con số
+                đứng một mình chẳng phải thẳng hàng với ai, mà bề rộng ép đều
+                làm số "1" hở ra hai bên và cả cụm đọc như mặt đồng hồ điện tử.
+                Bỏ .num thì chữ số lấy lại bề rộng tự nhiên của phông.          *@
             <dl class="hero-stats">
                 <div>
                     <dt>Món trong thực đơn</dt>
-                    <dd class="num">@(_totalProducts > 0 ? $"{_totalProducts}+" : "40+")</dd>
+                    <dd>@(_totalProducts > 0 ? $"{_totalProducts}+" : "40+")</dd>
                 </div>
                 <div>
                     <dt>Phút chuẩn bị</dt>
-                    <dd class="num">5–8</dd>
+                    <dd>5–8</dd>
                 </div>
             </dl>
         </div>
 
-        @*  MỘT ẢNH DUY NHẤT.
+        @*  MỘT ẢNH DUY NHẤT, CẮT HÌNH VÒM.
 
             Bản trước đặt ba ảnh ở đây (lúc đầu xếp nghiêng chồng lớp, sau đó là
             lưới mosaic). Cả hai đều làm hero cao lên và chia sự chú ý ra ba chỗ.
             Hero chỉ có một việc: nói quán bán gì và mời bấm "Xem thực đơn".
-            Một ảnh làm việc đó tốt hơn ba ảnh — hai ảnh kia đã xuất hiện ở dải
-            danh mục và lưới món ngay bên dưới, để lại đây là thừa.
+
+            Còn một ảnh, nhưng thôi nhốt trong khung chữ nhật bo góc. Hai cột
+            chữ–ảnh cùng là hai hình chữ nhật đặt cạnh nhau thì bố cục cứng đơ,
+            đọc ra ngay là "cột trái, cột phải" chứ không phải một bức hình.
+            Ba thứ phá cái cứng đó, xem chi tiết trong pages.css §1:
+
+              · VÒM — mái vòm là hình của ô cửa quán, và vừa khít một ly cao.
+              · QUẦNG SÁNG — vệt sáng ấm loang ra sau vòm, ăn sang cả cột chữ,
+                             nên ảnh nằm trong ánh sáng chứ không nằm trong hộp.
+              · CHÚ THÍCH CHÌM TRONG ẢNH — xem ngay dưới đây.
+
+            BẢN TRƯỚC CÓ MỘT CHIP TRẮNG BAY LƠ LỬNG Ở MÉP VÒM, ĐÃ BỎ.
+            Ý đồ là "một chi tiết vượt tuyến để nối hai cột", nhưng cái pill
+            trắng đổ bóng đậu ở rìa ảnh chẳng dính vào đâu — nó không thuộc về
+            ảnh, cũng không thuộc về cột chữ, nhìn ra đúng một miếng sticker
+            dán lên. Chi tiết trang trí mà không có chỗ đứng thì bỏ, đừng cố
+            đặt lại cho khéo hơn.
+
+            Thay bằng chú thích NẰM TRONG ảnh, trên một lớp tối chuyển dần —
+            cách bìa tạp chí ẩm thực vẫn chú thích hình. Vừa hết lơ lửng, vừa
+            làm được việc mà chip cũ không làm: nói cho khách biết ly trong ảnh
+            là món gì. Dùng <figcaption> thật trong <figure> nên đây là nội dung
+            có nghĩa, không phải nhãn trang trí — trình đọc màn hình gắn được
+            nó vào đúng tấm ảnh.
 
             fetchpriority="high" vì đây là phần tử LCP — chỉ số Google dùng để
             chấm tốc độ hiển thị. Không đặt loading="lazy": ảnh nằm ngay trong
             màn hình đầu tiên, hoãn tải nó chỉ làm trang chậm hơn.              *@
-        <figure class="hero-photo">
-            <img src="@DrinkPhoto.HeroCaPhe"
-                 alt="Ly cà phê sữa đá pha phin tại Một Chút Coffee"
-                 fetchpriority="high" decoding="async"
-                 width="900" height="675" />
-        </figure>
+        <div class="hero-visual">
+            <figure class="hero-photo">
+                <img src="@DrinkPhoto.HeroCaPhe"
+                     alt="Ly cà phê sữa đá pha phin tại Một Chút Coffee"
+                     fetchpriority="high" decoding="async"
+                     width="900" height="675" />
+
+                <figcaption class="hero-caption">
+                    <span class="hero-caption-name">Cà phê sữa đá</span>
+                    <span class="hero-caption-note">Rang mộc mỗi sáng</span>
+                </figcaption>
+            </figure>
+        </div>
     </div>
 </section>
 
@@ -155,7 +204,7 @@
                 <div class="promo-banner" style="--drink: @p.ColorPrimaryHex">
                     <img class="promo-photo"
                          src="@DrinkPhoto.PhotoFor(p.ImageUrl, p.CategoryName, p.Name)"
-                         alt="@DrinkPhoto.AltFor(p.ImageUrl, p.Name)"
+                         alt="@DrinkPhoto.AltFor(p.ImageUrl, p.Name, p.CategoryName)"
                          loading="lazy" decoding="async" width="176" height="176" />
 
                     <div class="stack stack-1 grow">
@@ -216,51 +265,70 @@
     </section>
 
     @* ═══ 5. CAM KẾT ════════════════════════════════════════════════════════
-         Ba lý do tin quán. Bản trước dùng biểu tượng nét mảnh; giờ mỗi thẻ có
-         một ẢNH CHỤP THẬT ở trên — ảnh nói được điều mà icon không nói nổi:
-         quán này pha thủ công, hạt rang thật, và có người ngồi lại uống.      *@
+         Ba lý do tin quán. Mỗi thẻ có một ẢNH CHỤP THẬT ở trên — ảnh nói được
+         điều mà icon không nói nổi: quán này pha thủ công, hạt rang thật, và
+         có người ngồi lại uống.
+
+         MỖI THẺ DẪN SANG MỘT TRANG RIÊNG (/cau-chuyen/...).
+
+         Bản trước dùng <details>: bấm vào thì thẻ giãn ra ngay tại chỗ, đẩy
+         cả hàng lệch và để hai thẻ bên cạnh trống một khoảng dài. Nội dung
+         dài đọc trong ô hẹp cũng khó theo. Trang riêng cho nội dung đủ chỗ
+         thở, có ảnh lớn, và có địa chỉ riêng để chia sẻ hay cho Google lập
+         chỉ mục — thứ mà một khối gập mở không bao giờ có.
+
+         Nội dung ba trang nằm trong Pages/Shop/Story.razor, kể cả các số liệu
+         còn phải thay trước khi đăng. *@
     <section class="section">
         <div class="stack stack-2 section-head">
-            <span class="label">Vì sao chọn Qly</span>
+            <span class="label">Vì sao chọn Một Chút</span>
             <h2>Không phải ly nào cũng giống nhau</h2>
         </div>
 
         <div class="grid grid-3">
-            <article class="feature-card">
-                <img src="@DrinkPhoto.PhaChe" alt="Nhân viên pha cà phê thủ công bằng phễu lọc"
-                     loading="lazy" decoding="async" width="800" height="600" />
-                <div class="feature-body">
-                    <h3 class="card-title">Định lượng chuẩn</h3>
-                    <p class="text-2">
-                        Mỗi món có công thức cân đong cụ thể tới từng gram.
-                        Ly hôm nay giống hệt ly hôm qua.
-                    </p>
-                </div>
-            </article>
 
-            <article class="feature-card">
+            @* ── Thẻ 1: workshop — thứ đối thủ sao chép chậm nhất ───────── *@
+            <a href="/cau-chuyen/workshop-pha-che" class="feature-card">
+                <img src="@DrinkPhoto.LatteArt"
+                     alt="Người pha rót sữa tạo hình latte art trên ly cà phê tại quầy"
+                     loading="lazy" decoding="async" width="800" height="500" />
+                <div class="feature-body">
+                    <h3 class="card-title">Workshop pha chế cuối tuần</h3>
+                    <p class="text-2">
+                        Tự tay đánh matcha, tự tay canh dòng chảy phin.
+                        Nhóm nhỏ, mỗi người một bộ dụng cụ riêng.
+                    </p>
+                    <span class="feature-more">Xem chi tiết</span>
+                </div>
+            </a>
+
+            @* ── Thẻ 2: hạt và nguyên liệu — chỗ vị giác kiểm chứng được ── *@
+            <a href="/cau-chuyen/hat-rang-moc" class="feature-card">
                 <img src="@DrinkPhoto.HatCaPhe" alt="Hạt cà phê rang mộc còn nguyên hạt"
-                     loading="lazy" decoding="async" width="800" height="400" />
+                     loading="lazy" decoding="async" width="800" height="500" />
                 <div class="feature-body">
-                    <h3 class="card-title">Nguyên liệu tươi</h3>
+                    <h3 class="card-title">Hạt rang mộc, xay theo từng ly</h3>
                     <p class="text-2">
-                        Hệ thống theo dõi hạn dùng từng lô hàng.
-                        Nguyên liệu quá hạn không thể xuất ra quầy.
+                        Rang mẻ nhỏ, xay ngay trước khi pha. Vị rõ, hậu ngọt,
+                        không lẫn mùi khét của hạt rang quá tay.
                     </p>
+                    <span class="feature-more">Xem chi tiết</span>
                 </div>
-            </article>
+            </a>
 
-            <article class="feature-card">
-                <img src="@DrinkPhoto.BanBe" alt="Nhóm bạn cụng ly cà phê tại quán"
-                     loading="lazy" decoding="async" width="800" height="600" />
+            @* ── Thẻ 3: không gian — lý do người ta ngồi lại thay vì mang đi *@
+            <a href="/cau-chuyen/khong-gian-quan" class="feature-card">
+                <img src="@DrinkPhoto.KhongGian" alt="Không gian quán với bàn gỗ và nhiều cây xanh"
+                     loading="lazy" decoding="async" width="800" height="500" />
                 <div class="feature-body">
-                    <h3 class="card-title">Biết trước còn hay hết</h3>
+                    <h3 class="card-title">Không gian mở, thơm mùi rang</h3>
                     <p class="text-2">
-                        Thực đơn chỉ hiện món còn làm được — không để bạn đặt
-                        rồi mới báo hết.
+                        Quầy pha hướng thẳng ra ngoài, đứng ngoài cũng nhìn
+                        được từng bước. Mùi cà phê rang đón bạn ngay từ cửa.
                     </p>
+                    <span class="feature-more">Xem chi tiết</span>
                 </div>
-            </article>
+            </a>
         </div>
     </section>
 
@@ -268,7 +336,7 @@
          Bố cục hai cột: ảnh và chữ. Trên điện thoại ảnh xuống dưới chữ (xem
          media query trong pages.css) — vì trên màn hẹp, chữ đọc trước có ích
          hơn là phải cuộn qua một tấm ảnh cao mới tới nội dung.                *@
-    <section class="section split-section">
+    <section class="section split-section" id="ghe-quan">
         <figure class="split-photo">
             <img src="@DrinkPhoto.KhongGian"
                  alt="Không gian quán Một Chút Coffee với bàn gỗ và nhiều cây xanh"

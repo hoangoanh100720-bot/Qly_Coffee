@@ -49,9 +49,13 @@
   position: relative; z-index: 1;
   display: grid;
   /* Cột chữ rộng hơn cột ảnh: tiêu đề hero cần đủ chỗ để mỗi câu nằm gọn một
-     dòng, còn lưới ảnh thì co giãn theo cột nên nhường phần rộng cho chữ. */
+     dòng, còn khối ảnh thì co giãn theo cột nên nhường phần rộng cho chữ. */
   grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr);
-  gap: clamp(var(--space-8), 4vw, var(--space-12));
+  /* Khe hẹp hơn bản trước (12 → 8) vì chip "Rang mộc mỗi sáng" gác lên mép
+     trái vòm phải chạm được tới khe này thì mới nối hai cột lại với nhau.
+     Khe rộng quá thì chip treo lơ lửng giữa hai cột, thành ra chi tiết thứ ba
+     chẳng thuộc về bên nào.                                                 */
+  gap: clamp(var(--space-6), 3vw, var(--space-8));
   align-items: center;
   padding-block: clamp(var(--space-12), 7vw, var(--space-20));
 }
@@ -59,11 +63,35 @@
 .hero-text { display: flex; flex-direction: column; gap: var(--space-6); }
 
 .hero-title {
-  font-size: var(--text-3xl);
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.04;
+  /* Thang riêng, trần 60px thay vì 68px của --text-3xl.
+     Chữ to là quyền của trang bán hàng, nhưng to hết cỡ thì thành hét. Ở 60px
+     tiêu đề vẫn áp đảo mọi thứ quanh nó mà còn chỗ cho ảnh cùng lên tiếng —
+     hai bên nói chuyện với nhau thay vì chữ át ảnh. */
+  font-size: clamp(2.25rem, 1.55rem + 2.9vw, 3.75rem);
+  /* 700 chứ không 800: Playfair ở nét 800 nặng như poster giảm giá. Cỡ chữ ở
+     đây đã đủ lớn, riêng cỡ chữ là đủ để tiêu đề dẫn dắt cả trang rồi. */
+  font-weight: 700;
+  /* Serif ở cỡ lớn chỉ cần siết rất nhẹ. Bản Baloo dùng -0.03em — chừng đó
+     với Playfair thì chân chữ dính vào nhau, nhất là cặp "ch" và "th". */
+  letter-spacing: -0.015em;
+  /* 1.16 chứ không 1.04 như bản Baloo. Dòng "Ghé một chút," có dấu sắc trên
+     chữ hoa G-h-é, dòng dưới là "thơm cả ngày" — dấu của Playfair cao hơn hẳn
+     Baloo 2 (vốn được vẽ với dấu nén sát thân chữ), để 1.04 thì dấu dòng dưới
+     đội vào đáy dòng trên. Lỗi này chỉ lộ ra ở tiếng Việt. */
+  line-height: 1.16;
+  /* Tắt text-wrap: balance thừa hưởng từ h1 chung: câu này đã tự xuống dòng
+     bằng thẻ <br> đặt tay, để trình duyệt cân lại sẽ phá đúng chỗ ngắt đã
+     chọn. Dùng `wrap` chứ không `nowrap` — nowrap cũng tắt được balance nhưng
+     cấm luôn việc xuống dòng, và ở khổ 600–900px dòng "thơm cả ngày" với cỡ
+     chữ 60px sẽ tràn ngang ra khỏi màn hình. */
+  text-wrap: wrap;
 }
+
+/* Cụm chữ được nhấn trong tiêu đề. MỘT sắc đặc, không gradient.
+   Cam cháy --accent (không phải --accent-bright) vì đây là chữ: bản rực rỡ
+   chỉ đạt tương phản cho mảng lớn, đặt lên nền kem ở cỡ chữ này sẽ chói mà
+   vẫn khó đọc. --accent trên --bg đạt 4.9:1. */
+.hero-em { color: var(--accent); }
 
 .hero-lead   { max-width: 46ch; }
 .hero-actions { margin-top: var(--space-2); }
@@ -115,17 +143,63 @@
   animation: none;
 }
 
-/* --- Ba con số tạo lòng tin ------------------------------------------------ */
+/* --- Hai con số tạo lòng tin -----------------------------------------------
+   Bản trước đặt số ở nét 800, nhãn ở cỡ thường, hai cụm cách nhau bằng một
+   khe rộng trên một đường kẻ đặc. Đọc ra là một hàng chỉ số của bảng điều
+   khiển: to, đậm, khô. Trang bán hàng không cần số hét lên — con số ở đây chỉ
+   là chi tiết khẳng định, không phải nhân vật chính.
+
+   Ba việc làm nó mềm lại:
+
+     · NÉT MỎNG. 800 → 500. Nghịch lý của chữ tiêu đề: giảm nét lại làm con số
+       sang hơn, vì nét mảnh để lộ dáng chữ. Nét đậm chỉ còn thấy khối mực.
+       Bù lại bằng cỡ chữ lớn hơn (--text-xl → tới 36px) nên vẫn đủ nổi.
+
+     · NHÃN THÀNH CHỮ IN GIÃN. Chữ nhỏ, in hoa, giãn 0.14em, màu nhạt. Nhãn
+       lúc này đọc như dòng chú giải trong sách ảnh chứ không như tên cột.
+
+     · KẺ DỌC MẢNH THAY CHO KHE RỘNG. Hai cụm được một nét mảnh ngăn ra, nên
+       chúng thành một cặp có nhịp, thay vì hai vật thể rời nhau.
+
+   Đường kẻ trên cũng pha loãng 60%: nó chỉ cần gợi ra chỗ ngắt, không cần
+   vạch ra một cái hộp.                                                       */
 .hero-stats {
-  display: flex; flex-wrap: wrap; gap: var(--space-8);
-  margin: var(--space-2) 0 0;
+  display: flex; flex-wrap: wrap;
+  gap: 0;
+  margin: var(--space-4) 0 0;
   padding-top: var(--space-6);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
 }
-.hero-stats div  { display: flex; flex-direction: column-reverse; gap: 2px; }
-.hero-stats dt   { font-size: var(--text-xs); color: var(--muted); }
-.hero-stats dd   { margin: 0; font-family: var(--font-display);
-                   font-size: var(--text-xl); font-weight: 800; line-height: 1.1; }
+.hero-stats div {
+  display: flex; flex-direction: column-reverse;
+  gap: var(--space-2);
+  padding-inline: clamp(var(--space-5), 2.5vw, var(--space-8));
+}
+.hero-stats div:first-child { padding-inline-start: 0; }
+.hero-stats div + div {
+  border-inline-start: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.hero-stats dt {
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.hero-stats dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 1.35rem + 1.4vw, 2.25rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  /* Chữ số kiểu cổ điển (oldstyle) nếu phông có, để "56" và "5–8" có nhịp lên
+     xuống như chữ thường thay vì đều tăm tắp như số trên hoá đơn. Phông không
+     có bộ này thì trình duyệt lặng lẽ bỏ qua, không hỏng gì. */
+  font-variant-numeric: oldstyle-nums proportional-nums;
+}
 
 /* --- Ảnh hero --------------------------------------------------------------
    MỘT ẢNH DUY NHẤT, KHÔNG XOAY, KHÔNG CHỒNG LỚP.
@@ -138,29 +212,146 @@
    Hai ảnh còn lại vốn đã xuất hiện ở dải danh mục và lưới món ngay bên dưới,
    để thêm ở đây là lặp lại chính mình.
 
-   aspect-ratio 4/3 chứ không phải ảnh cao: khối ảnh phải cao xấp xỉ cột chữ
-   bên trái để hai cột kết thúc cùng một đường ngang. Ảnh cao hơn sẽ kéo dài
-   hero ra vô cớ — đúng cái "dài" cần tránh.                                  */
+   aspect-ratio 4/5 chứ không phải 4/3: mái vòm cần chiều cao mới ra dáng vòm,
+   và một ly cao đặt trong khung ngang thì hai bên thừa ra toàn nền mờ. Vẫn giữ
+   ở 4/5 chứ không cao hơn, để khối ảnh kết thúc xấp xỉ cùng đường ngang với
+   cột chữ bên trái — ảnh cao hơn nữa sẽ kéo dài hero ra vô cớ.                */
+.hero-visual {
+  position: relative;
+  /* Đẩy vòm sát mép phải của lưới thay vì thả giữa cột. Mép phải của ảnh lúc
+     này thẳng hàng với mép phải của container — cùng một đường dọc với mọi
+     khối bên dưới trang. Thả giữa cột thì ảnh lơ lửng, không ăn vào đâu cả. */
+  display: flex; justify-content: flex-end;
+}
+
+/* QUẦNG SÁNG — lớp duy nhất làm ảnh "hòa" vào nền thay vì dán lên nền.
+   Vệt sáng ấm toả rộng hơn vòm và loang ngược về phía cột chữ, nên chỗ giáp
+   ranh hai cột không còn một đường thẳng đứng. Đặt ở ::before của khung chứa
+   chứ không phải bóng đổ của ảnh: bóng đổ bám sát mép và càng tô đậm cái mép,
+   đúng thứ đang cần xoá.                                                     */
+.hero-visual::before {
+  content: "";
+  position: absolute; z-index: 0;
+  inset: -12% -8% -6% -22%;
+  /* Pha loãng còn 55% (bản trước 85%). Vòm giờ đã có lớp tối ở đáy và bóng đổ
+     hai lớp — thêm một quầng cam đậm nữa là ba lớp hiệu ứng chồng lên cùng một
+     tấm ảnh, và vùng giáp cột chữ bị ám cam thấy rõ. Quầng sáng chỉ nên cảm
+     thấy được chứ không nên nhìn thấy được. */
+  background: radial-gradient(62% 58% at 44% 46%,
+                color-mix(in srgb, var(--accent-soft) 55%, transparent) 0%,
+                transparent 74%);
+  /* Không nhận sự kiện chuột: nó tràn sang cột chữ, để bắt chuột thì sẽ che
+     mất nút "Tra cứu đơn" nằm gần mép. */
+  pointer-events: none;
+}
+
 .hero-photo {
+  position: relative; z-index: 1;
   margin: 0;
-  aspect-ratio: 4 / 3;
-  border-radius: var(--radius-lg);
+  width: 100%;
+  /* Hãm bề ngang lại. Không có trần này thì vòm nuốt trọn cột phải và át cả
+     tiêu đề — ảnh to hơn không có nghĩa là ảnh mạnh hơn, chỉ có nghĩa là
+     không còn khoảng thở nào quanh nó. */
+  max-width: 420px;
+  aspect-ratio: 4 / 5;
+  /* MÁI VÒM: hai góc trên bo tròn hết cỡ, hai góc dưới bo nhẹ như mọi khối
+     khác trên trang. Bo theo phần trăm chứ không theo px để vòm giữ đúng dáng
+     ở mọi bề ngang — bo 999px sẽ thành nửa hình tròn bẹp khi cột hẹp lại. */
+  border-radius: 50% 50% var(--radius-lg) var(--radius-lg) / 40% 40% var(--radius-lg) var(--radius-lg);
   overflow: hidden;
   background: var(--surface-2);
-  box-shadow: var(--shadow);
+  /* Hai lớp bóng: một lớp sát mép cho ảnh có gờ, một lớp toả rộng và rất nhạt
+     cho nó đứng trên nền. Một bóng lớn mờ tịt là dấu hiệu của bản mẫu dựng vội. */
+  box-shadow: 0 1px 2px hsl(22 45% 12% / .08),
+              0 24px 48px -24px hsl(22 45% 12% / .28);
 }
-.hero-photo img { width: 100%; height: 100%; object-fit: cover; }
+/* KHUNG CẮT ĐƯỢC TÍNH, KHÔNG PHẢI ƯỚM.
+
+   Ảnh gốc 900×600, ly cà phê nằm ở khoảng x = 240–430 px, tức tâm ly ở 37%
+   chiều ngang chứ không phải 50%. Vòm tỉ lệ 4/5 chỉ lấy được 53% bề ngang ảnh,
+   nên với object-position mặc định (50%) cửa sổ cắt rơi vào quãng 210–690 px
+   và cái ly bị đẩy lệch hẳn sang mép trái, chừa một mảng bokeh trống bên phải.
+
+   23% là con số đưa tâm ly về đúng giữa vòm: cửa sổ cắt dịch về quãng 95–575.
+   52% theo chiều dọc hạ khung xuống một chút cho thân ly dài ra, thay vì chừa
+   thêm hậu cảnh mờ phía trên.
+
+   scale(1.06) siết thêm 6%: đủ để mép bàn bê tông lởm chởm ở đáy ra khỏi
+   khung, chưa tới mức làm ảnh 900px vỡ hạt.                                  */
+.hero-photo img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: 23% 52%;
+  transform: scale(1.06);
+}
+
+/* LỚP TỐI CHUYỂN DẦN Ở ĐÁY ẢNH.
+   Hai việc cùng lúc: cho chú thích một nền chắc chắn đọc được bất kể tấm ảnh
+   sau này đổi thành ảnh sáng hay tối, và dìm phần đáy ảnh xuống để mắt không
+   bị mặt bàn gỗ lấm tấm kéo đi.
+
+   Đây là lý do dùng lớp phủ chứ không phải nền đặc sau chữ: nền đặc thì lại
+   thành một cái hộp thứ hai nằm trong hộp thứ nhất — đúng cái bệnh của chip
+   trắng vừa bỏ đi.                                                           */
+.hero-photo::after {
+  content: "";
+  position: absolute; inset: auto 0 0 0; z-index: 1;
+  height: 46%;
+  background: linear-gradient(to top,
+                hsl(22 45% 8% / .80) 0%,
+                hsl(22 45% 8% / .45) 42%,
+                hsl(22 45% 8% / 0)   100%);
+  pointer-events: none;
+}
+
+/* CHÚ THÍCH — tên món ở trên, câu khẳng định ở dưới.
+   Tên món đặt bằng phông tiêu đề để nối với giọng của cả trang; dòng dưới là
+   chữ in hoa giãn rộng, cùng một thủ pháp với nhãn của hai con số bên trái.
+   Hai chỗ xa nhau dùng chung một kiểu chữ nhỏ thì cả khối mới nghe như một
+   người nói, chứ không phải ba người mỗi người một giọng.                    */
+.hero-caption {
+  position: absolute; z-index: 2;
+  left: clamp(var(--space-5), 6%, var(--space-8));
+  right: var(--space-5);
+  bottom: clamp(var(--space-5), 6%, var(--space-8));
+  display: flex; flex-direction: column; gap: var(--space-1);
+}
+.hero-caption-name {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.2;
+  /* Kem chứ không trắng thuần — trắng 100% trên ảnh ấm nhìn ra ngay là chữ
+     dán lên, còn kem thì cùng họ màu với cả trang. */
+  color: hsl(40 60% 97%);
+}
+.hero-caption-note {
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  /* 78% độ sáng trên lớp phủ tối đạt hơn 4.5:1 — vẫn là chữ đọc được, không
+     phải chữ trang trí mờ tịt. */
+  color: hsl(38 30% 78%);
+}
 
 @media (max-width: 900px) {
   /* Máy tính bảng: ảnh xuống dưới chữ và giới hạn bề ngang, không kéo dài
-     hết màn hình — một tấm ảnh rộng 900px trông như banner quảng cáo. */
+     hết màn hình — một tấm ảnh rộng 900px trông như banner quảng cáo.
+     Vòm cũng thấp lại (4/5 → 1/1) vì lúc này nó nằm một mình giữa cột, không
+     còn phải cao bằng cột chữ nữa. */
   .hero { grid-template-columns: 1fr; gap: var(--space-8); }
-  .hero-photo { max-width: 560px; }
+  .hero-visual { justify-content: center; }
+  .hero-photo { max-width: 480px; aspect-ratio: 1 / 1; }
 }
 @media (max-width: 560px) {
-  /* Điện thoại: ảnh thấp lại (3/2) để phần chữ và nút vẫn nằm trong màn hình
-     đầu tiên, không phải cuộn mới thấy nút đặt món. */
-  .hero-photo { aspect-ratio: 3 / 2; }
+  /* Điện thoại: vòm thấp nữa để phần chữ và nút vẫn nằm trong màn hình đầu
+     tiên, không phải cuộn mới thấy nút đặt món. */
+  .hero-photo { aspect-ratio: 5 / 4; }
+
+  /* Quầng sáng thu gọn: trên màn hẹp nó phủ gần hết khung nhìn, cả trang ngả
+     cam và chữ mất nền sạch để đọc. */
+  .hero-visual::before { inset: -6%; }
 
   /* Hai nút kéo full chiều ngang và xếp chồng.
      Ở 390px chúng gần vừa một hàng nhưng không đủ, nên tự xuống dòng với hai
@@ -169,12 +360,16 @@
   .hero-actions { flex-direction: column; align-items: stretch; }
   .hero-actions .btn { width: 100%; }
 
-  /* Ba con số chuyển từ flex-wrap sang lưới đều cột. Flex-wrap để lại một số
-     lẻ nằm một mình ở dòng dưới, lưới thì luôn cân. */
+  /* Hai con số chuyển từ flex sang hai cột đều nhau. Ở flex, bề rộng mỗi cụm
+     chạy theo độ dài chữ, nên "Món trong thực đơn" đẩy cụm bên phải lệch hẳn
+     sang mép — hai cột bằng nhau thì nét kẻ dọc rơi đúng giữa.
+
+     gap giữ 0 và vẫn dùng padding của luật gốc: khoảng cách phải nằm hai bên
+     nét kẻ, chứ gap sẽ đẩy nét kẻ dính vào chữ của cụm bên phải. */
   .hero-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-    gap: var(--space-4);
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
   }
 }
 
@@ -205,13 +400,21 @@
   border-radius: 50%;
   object-fit: cover;
   /* Vòng màu lấy từ --cat (màu danh mục trong database) — mỗi nhóm một sắc,
-     nhờ vậy dải danh mục có nhịp màu thật thay vì một dãy tròn giống hệt nhau. */
-  border: 3px solid color-mix(in srgb, var(--cat, var(--accent)) 65%, var(--surface));
+     nhờ vậy dải danh mục có nhịp màu thật thay vì một dãy tròn giống hệt nhau.
+
+     2px và pha 45% thay cho 3px pha 65%. Tám danh mục là tám sắc khác nhau
+     nằm cạnh nhau; viền càng dày và càng gắt thì hàng này càng đọc ra một dải
+     cầu vồng, kéo mắt khỏi chính mấy tấm ảnh món. Viền mảnh vẫn đủ phân nhóm
+     mà không tranh phần với ảnh. */
+  border: 2px solid color-mix(in srgb, var(--cat, var(--accent)) 45%, var(--surface));
   box-shadow: var(--shadow);
-  transition: transform var(--dur-slow) var(--ease-bounce);
+  transition: transform var(--dur) var(--ease-out);
 }
+/* Chỉ phóng to, KHÔNG xoay. Cú xoay -3deg là kiểu đùa hợp với phông bo tròn
+   của bản cũ; cạnh tiêu đề serif bây giờ nó thành ra lạc quẻ. Chuyển động
+   trên trang này nên được cảm thấy chứ không nên được chú ý. */
 .cat-item:hover img,
-.cat-item:focus-visible img { transform: scale(1.07) rotate(-3deg); }
+.cat-item:focus-visible img { transform: scale(1.05); }
 
 .cat-name  { font-weight: 700; font-size: var(--text-sm); text-align: center; line-height: 1.25; }
 .cat-count { font-size: var(--text-xs); color: var(--muted); }
@@ -248,22 +451,68 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: transform var(--dur-slow) var(--ease-bounce),
+  /* ease-out chứ không ease-bounce. Nhịp nảy hợp với giao diện vui; ở đây thẻ
+     nảy lên rồi rơi xuống một chút mỗi lần con trỏ đi ngang, và khi có ba thẻ
+     cạnh nhau thì cả hàng cứ giật liên tục lúc rê chuột qua. */
+  transition: transform var(--dur) var(--ease-out),
               box-shadow var(--dur) var(--ease-out),
               border-color var(--dur) var(--ease-out);
 }
 .feature-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-lg);
   border-color: var(--accent-border);
 }
+
+/* Thẻ là một thẻ <a> bọc cả ảnh lẫn chữ, không phải khối gập mở.
+   Vùng bấm bằng cả thẻ — mục tiêu bấm lớn nhất có thể, quan trọng trên
+   điện thoại. text-decoration bỏ đi vì gạch chân dưới cả khối chữ dài
+   trông như lỗi; dấu hiệu bấm được là con trỏ, hiệu ứng nhấc thẻ, và
+   dòng "Xem chi tiết" màu accent bên dưới. */
+.feature-card { color: inherit; text-decoration: none; }
+
+/* Viền bàn phím bọc cả thẻ, vì cả thẻ mới là vùng bấm. Không dùng
+   outline: none ở bất kỳ đâu — người dùng bàn phím phải thấy mình đang ở ô nào. */
+.feature-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* aspect-ratio cố định 16:10 để ba thẻ luôn cao bằng nhau dù ba tấm ảnh gốc
    có tỉ lệ khác nhau — không có nó thì hàng thẻ sẽ so le. */
-.feature-card img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; }
+.feature-card img {
+  width: 100%; aspect-ratio: 16 / 10; object-fit: cover;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+/* Ảnh phóng rất nhẹ khi rê chuột. Ảnh nằm trong khung overflow:hidden nên
+   phóng KHÔNG làm đổi kích thước thẻ — không đẩy bố cục, chỉ báo "bấm được". */
+.feature-card:hover img { transform: scale(1.04); }
+
 .feature-body {
   padding: var(--space-5);
   display: flex; flex-direction: column; gap: var(--space-2);
+  flex: 1;                  /* đẩy dòng "Xem chi tiết" xuống đáy thẻ */
 }
+
+.feature-more {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  margin-top: auto; padding-top: var(--space-2);
+  font-size: var(--text-sm); font-weight: 700;
+  color: var(--accent);
+}
+/* Mũi tên vẽ bằng hai cạnh viền xoay 45° — không tốn thêm một file ảnh nào,
+   và tự đổi màu theo chữ bên cạnh nhờ currentColor. */
+.feature-more::after {
+  content: "";
+  width: 7px; height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--dur) var(--ease-out);
+}
+/* Mũi tên trượt sang phải khi rê chuột: hướng chuyển động nói đúng thứ sắp
+   xảy ra — sang một trang khác, chứ không phải mở ra tại chỗ. */
+.feature-card:hover .feature-more::after { transform: rotate(-45deg) translate(3px, 3px); }
 
 /* --- Khối hai cột ảnh + chữ ------------------------------------------------ */
 .split-section {
@@ -345,6 +594,8 @@
   .cat-item:hover img,
   .cat-item:focus-visible img { transform: none; }
   .card-hover:hover, .product-card:hover, .feature-card:hover { transform: none; }
+  .feature-card:hover img { transform: none; }
+  .feature-card:hover .feature-more::after { transform: rotate(-45deg); }
 }
 
 /* =============================================================================
@@ -607,4 +858,641 @@
 
 @media (prefers-reduced-motion: reduce) {
   .cart-bump, .cart-bump .cart-count { animation: none; }
+}
+
+/* =============================================================================
+   §13  TRANG CÂU CHUYỆN  (/cau-chuyen/{slug})
+   =============================================================================
+   Archetype: trang thương mại. Ba quyết định nền tảng:
+
+   1. HERO LÀ ẢNH THẬT + LỚP PHỦ TỐI, không phải khối màu gradient.
+      Ba câu chuyện đều nói về thứ nhìn được (người pha, hạt rang, chỗ ngồi),
+      nên ảnh làm việc đó tốt hơn mọi khối màu. Lớp phủ tối là thứ BẮT BUỘC:
+      chữ trắng đặt thẳng lên ảnh thì độ tương phản đổi theo từng vùng ảnh,
+      chỗ sáng sẽ tụt dưới 4.5:1 và không đọc nổi.
+
+   2. CỘT CHỮ HẸP 62ch. Thân bài trải hết bề ngang 1200px là mắt phải quét
+      quá xa mỗi khi xuống dòng — đó là lỗi làm người ta bỏ đọc giữa chừng.
+
+   3. CỘT PHỤ DÍNH THEO CUỘN. Giờ mở cửa và nút hành động luôn trong tầm mắt;
+      người đọc tới đoạn thấy thích là bấm được ngay.
+============================================================================= */
+
+.story { display: flex; flex-direction: column; }
+
+/* --- Hero ------------------------------------------------------------------ */
+.story-hero {
+  position: relative;
+  display: grid;
+  align-items: end;
+  min-height: clamp(360px, 52vw, 560px);
+  margin-bottom: clamp(var(--space-8), 5vw, var(--space-12));
+  overflow: hidden;
+  background: var(--bg-sunken);   /* màu đỡ trong lúc ảnh chưa tải xong */
+}
+
+.story-hero-photo {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+/* Lớp phủ: đậm ở đáy nơi có chữ, nhạt dần lên trên để ảnh vẫn còn là ảnh.
+   Dùng màu chữ của hệ thống (nâu cà phê rất đậm) thay vì đen thuần — đen
+   thuần trên nền ảnh ấm trông như một mảng xám chết. */
+.story-hero::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg,
+    hsl(22 45% 12% / .15) 0%,
+    hsl(22 45% 12% / .55) 55%,
+    hsl(22 45% 12% / .88) 100%);
+}
+
+.story-hero-inner {
+  position: relative; z-index: 1;   /* nằm trên lớp phủ */
+  padding-block: clamp(var(--space-8), 5vw, var(--space-12));
+  display: flex; flex-direction: column; gap: var(--space-4);
+  align-items: flex-start;
+  color: hsl(40 60% 99%);
+}
+
+.story-crumb {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: hsl(40 40% 88%);
+}
+.story-crumb a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.story-crumb a:hover { color: hsl(40 60% 99%); }
+
+.story-title {
+  font-size: var(--text-2xl);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  max-width: 18ch;        /* tiêu đề bẻ dòng sớm, không kéo ngang hết ảnh */
+  color: inherit;
+}
+
+.story-lead {
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  max-width: 54ch;
+  color: hsl(40 44% 92%);
+}
+
+/* Nút phụ trên nền ảnh: viền sáng + nền kính mờ. Nút ghost mặc định có chữ
+   màu nâu đậm, đặt lên ảnh tối là mất hút. */
+.story-hero-ghost {
+  color: hsl(40 60% 99%);
+  border: 1px solid hsl(40 60% 99% / .55);
+  background: hsl(22 45% 12% / .28);
+  backdrop-filter: blur(4px);
+}
+.story-hero-ghost:hover {
+  background: hsl(40 60% 99% / .16);
+  border-color: hsl(40 60% 99%);
+  color: hsl(40 60% 99%);
+}
+
+/* --- Dải ý chính ----------------------------------------------------------- */
+.story-facts {
+  list-style: none; margin: 0 0 clamp(var(--space-8), 5vw, var(--space-12)); padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1px;                              /* khe 1px để nền lộ ra thành đường kẻ */
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.story-facts li {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface);
+}
+.story-fact-label {
+  font-size: var(--text-2xs); font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.story-fact-value { font-size: var(--text-base); color: var(--text); font-weight: 600; }
+
+/* --- Lưới thân bài + cột phụ ------------------------------------------------ */
+.story-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: clamp(var(--space-8), 4vw, var(--space-12));
+  align-items: start;
+  padding-bottom: clamp(var(--space-12), 6vw, var(--space-16));
+}
+
+.story-main { display: flex; flex-direction: column; gap: var(--space-6); max-width: 62ch; }
+
+.story-para {
+  font-size: var(--text-base);
+  line-height: 1.7;
+  color: var(--text-2);
+}
+
+.story-h2 {
+  font-size: var(--text-xl);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--space-4);
+}
+
+/* Khoảng cách GIỮA các khối gấp đôi khoảng cách bên trong một khối — đó là
+   thứ cho người đọc biết chỗ nào là một ý trọn vẹn. */
+.story-block { margin-top: var(--space-6); }
+
+/* --- Các bước, đánh số ----------------------------------------------------- */
+.story-steps {
+  list-style: none; margin: 0; padding: 0;
+  counter-reset: story-step;
+  display: flex; flex-direction: column; gap: var(--space-5);
+}
+.story-steps li {
+  counter-increment: story-step;
+  position: relative;
+  padding-left: calc(var(--space-12) + var(--space-2));
+}
+/* Số vẽ bằng counter chứ không gõ tay: chèn thêm một bước ở giữa thì các số
+   sau tự dồn lại, không phải sửa tay và không bao giờ lệch. */
+.story-steps li::before {
+  content: counter(story-step);
+  position: absolute; left: 0; top: -2px;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: var(--text-base); font-weight: 800;
+}
+.story-step-title { font-size: var(--text-base); font-weight: 700; margin-bottom: 2px; }
+.story-step-text  { color: var(--text-2); line-height: 1.6; }
+
+/* --- Ảnh trong bài ---------------------------------------------------------- */
+.story-figure { margin: var(--space-4) 0 0; }
+.story-figure img {
+  width: 100%; aspect-ratio: 3 / 2; object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+.story-figure figcaption {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm); color: var(--muted);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--accent-border);
+}
+
+/* --- Cột phụ dính theo cuộn ------------------------------------------------- */
+/* 72px là chiều cao thật của .topnav (design-system.css §11) — thanh đó dính
+   trên đỉnh, neo thấp hơn thì thẻ chui xuống dưới nó khi cuộn. */
+.story-aside { position: sticky; top: calc(72px + var(--space-4)); }
+
+.story-card {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.story-card-line { font-size: var(--text-sm); color: var(--text-2); line-height: 1.55; }
+.story-card-line strong { color: var(--text); }
+.story-card-phone {
+  text-align: center;
+  font-size: var(--text-sm); font-weight: 700;
+  color: var(--accent);
+}
+
+/* --- Dải ảnh không gian ------------------------------------------------------
+   Khảm 3 ô: một tấm ngang chiếm trọn hàng trên, hai tấm dọc chia hàng dưới.
+   Không dùng masonry: masonry cần chiều cao đo được sau khi ảnh tải xong, mà
+   ảnh ở đây tải lười (lazy) nên lưới sẽ nhảy ngay trước mắt người đang đọc.
+   Tỉ lệ khóa cứng bằng aspect-ratio, chỗ được chừa sẵn từ lúc trang vẽ.
+
+   Chú thích nằm TRONG khung chứ không đè lên ảnh: chữ trắng trên ảnh phụ thuộc
+   vào chỗ tối chỗ sáng của từng tấm, đổi ảnh một cái là mất đọc được.         */
+.story-gallery-wrap {
+  padding-top: clamp(var(--space-8), 4vw, var(--space-12));
+  padding-bottom: clamp(var(--space-8), 4vw, var(--space-12));
+}
+.story-gallery-lead {
+  max-width: 56ch;
+  margin-top: var(--space-2);
+  color: var(--text-2); line-height: 1.6;
+}
+
+.story-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.story-shot {
+  display: flex; flex-direction: column;
+  margin: 0;
+  overflow: hidden;                    /* cắt phần ảnh phóng ra khi rê chuột */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.story-shot.shot-wide { grid-column: 1 / -1; }
+
+.story-shot img {
+  width: 100%; height: auto;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+.shot-wide img { aspect-ratio: 3 / 2; }
+.shot-tall img { aspect-ratio: 3 / 4; }
+
+.story-shot:hover img { transform: scale(1.04); }
+
+.story-shot figcaption {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+/* Tên khu là nhãn nhỏ chữ hoa, không phải tiêu đề: nó nhắc lại mục đã đọc ở
+   "Ba khu chỗ ngồi" bên trên, đứng ngang hàng h2 sẽ phá mất thứ bậc của bài. */
+.story-shot-label {
+  font-size: var(--text-xs); font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.story-shot-text { font-size: var(--text-sm); color: var(--text-2); line-height: 1.6; }
+
+/* --- Đọc tiếp --------------------------------------------------------------- */
+.story-next {
+  padding-top: clamp(var(--space-8), 4vw, var(--space-12));
+  padding-bottom: clamp(var(--space-12), 6vw, var(--space-16));
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 960px) {
+  /* Cột phụ xuống dưới thân bài và thôi dính: trên màn hẹp không có chỗ
+     cho hai cột, mà một thẻ dính giữa dòng chữ thì che mất nội dung. */
+  .story-grid { grid-template-columns: 1fr; }
+  .story-aside { position: static; }
+  .story-card { max-width: 420px; }
+}
+
+@media (max-width: 640px) {
+  /* Một cột. Hai ảnh dọc cạnh nhau trên màn 6 inch thì mỗi tấm rộng chừng
+     150px — nhìn không ra chỗ ngồi, tức là mất sạch việc của dải ảnh này. */
+  .story-gallery { grid-template-columns: 1fr; }
+  .shot-tall img { aspect-ratio: 4 / 5; }   /* bớt cao, khỏi phải cuộn cả màn */
+  .story-shot figcaption { padding: var(--space-4); }
+}
+
+@media (max-width: 560px) {
+  .story-title { max-width: none; }
+  .story-hero-inner .btn { width: 100%; }
+  .story-hero-inner .row { width: 100%; flex-direction: column; align-items: stretch; }
+  .story-facts li { padding: var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-shot img,
+  .story-shot:hover img { transition: none; transform: none; }
+}
+
+/* ==============================================================================
+   §14  TRANG ĐẶT LỊCH WORKSHOP  (/dat-lich-workshop)
+
+   Archetype: PHỄU CHUYỂN ĐỔI. Đầu trang theo luật trang thương mại (chữ lớn,
+   nhịp rộng); từ bước 1 trở xuống theo luật FORM (viền focus rõ, lỗi cạnh ô).
+
+   Hai cột: các bước bên trái, thẻ tóm tắt DÍNH bên phải. Tiền đổi mỗi lần khách
+   bấm tăng giảm, nên con số phải luôn trong tầm mắt — bắt cuộn xuống cuối trang
+   mới thấy tổng tiền là cách chắc chắn để khách bấm sai rồi bỏ đi.
+   ============================================================================== */
+
+.book-head { max-width: 62ch; padding-bottom: var(--space-8); }
+
+.book-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+  margin: var(--space-3) 0 var(--space-3);
+}
+.book-lead { font-size: var(--text-lg); color: var(--text-2); line-height: 1.6; }
+
+/* --- Dải ưu đãi đầu trang ---------------------------------------------------
+   Con số % là thứ khách nhìn thấy trước tiên, nên nó to và mang màu nhấn; tên
+   ưu đãi nhỏ và xám bên dưới. Ngược lại thì mắt phải đọc hết dòng chữ mới biết
+   có đáng quan tâm không.                                                     */
+.book-perks {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+  margin-top: var(--space-6);
+  list-style: none; padding: 0;
+}
+.book-perks li {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+}
+.book-perk-num {
+  font-family: var(--font-display);
+  font-size: var(--text-lg); font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.book-perk-name { font-size: var(--text-xs); color: var(--text-2); }
+
+/* --- Khung hai cột ---------------------------------------------------------- */
+.book-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: clamp(var(--space-6), 4vw, var(--space-12));
+  align-items: start;
+}
+.book-main { display: flex; flex-direction: column; gap: var(--space-12); min-width: 0; }
+
+/* --- Một bước --------------------------------------------------------------- */
+.book-step-title {
+  display: flex; align-items: center; gap: var(--space-3);
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-5);
+}
+.book-step-num {
+  flex: none;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-fg);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm); font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+/* Bước chưa tới lượt mờ đi chứ KHÔNG ẩn: ẩn thì khách không biết còn mấy bước
+   nữa, mà đó là câu hỏi đầu tiên người ta hỏi khi thấy một cái form. */
+.book-step.is-waiting { opacity: .55; }
+.book-step.is-waiting .book-step-num { background: var(--border-strong); color: var(--text-2); }
+.book-waiting {
+  padding: var(--space-6);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--muted); font-size: var(--text-sm);
+}
+
+/* --- Lịch tháng ------------------------------------------------------------- */
+.book-cal {
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.book-cal-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.book-cal-month { font-family: var(--font-display); font-size: var(--text-lg); }
+
+.book-cal-dows, .book-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+.book-cal-dows {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs); font-weight: 700;
+  color: var(--muted); text-align: center;
+  letter-spacing: .04em; text-transform: uppercase;
+}
+
+.book-day {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--space-2) 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out),
+              color var(--dur) var(--ease-out);
+}
+.book-day.is-blank { cursor: default; }
+
+/* Ngày KHÔNG có buổi vẫn hiện số, chỉ mờ đi. Bỏ trắng ô đó thì lịch thủng lỗ
+   chỗ và khách mất mốc để đếm ngày. */
+.book-day.is-closed { color: var(--muted); opacity: .45; cursor: not-allowed; }
+
+.book-day.is-open {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--text);
+  font-weight: 600;
+}
+.book-day.is-open:hover { border-color: var(--accent); }
+
+.book-day.is-selected {
+  background: var(--accent); border-color: var(--accent); color: var(--accent-fg);
+}
+.book-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.book-day-num { font-size: var(--text-base); }
+.book-day-price { font-size: 10px; opacity: .85; }
+
+.book-cal-legend {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-4);
+  font-size: var(--text-xs); color: var(--muted);
+}
+.book-legend-dot {
+  flex: none; width: 12px; height: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 3px;
+}
+
+/* --- Khung giờ -------------------------------------------------------------- */
+.book-slots { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.book-slot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out),
+              background-color var(--dur) var(--ease-out);
+}
+.book-slot:hover:not(.is-blocked) { border-color: var(--accent-border); background: var(--accent-soft); }
+.book-slot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Đã chọn: viền dày 2px CHỨ KHÔNG đổi nền sang màu nhấn đậm. Nền đậm sẽ nuốt
+   mất chữ mô tả và badge số chỗ bên trong — mà đó chính là thông tin khách cần
+   đọc lại để yên tâm mình chọn đúng. */
+.book-slot.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+}
+.book-slot.is-blocked { opacity: .5; cursor: not-allowed; }
+
+.book-slot-time {
+  font-family: var(--font-display);
+  font-size: var(--text-lg); font-weight: 700;
+  white-space: nowrap;
+}
+.book-slot-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.book-slot-topic { font-weight: 600; }
+.book-slot-sum { font-size: var(--text-sm); color: var(--text-2); line-height: 1.5; }
+
+.book-slot-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1);
+  white-space: nowrap;
+}
+.book-slot-price { font-weight: 700; }
+.book-slot-seats { font-size: var(--text-xs); color: var(--muted); }
+
+/* --- Diện giá --------------------------------------------------------------- */
+.book-tiers {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.book-tier {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.book-tier:last-child { border-bottom: none; }
+/* Dòng đang chọn có vạch màu bên trái, không đổi nền: bảng này có thể dài bốn
+   năm dòng, tô nền nhiều dòng cùng lúc thì mất hết thứ bậc. */
+.book-tier.is-active { box-shadow: inset 3px 0 0 var(--accent); }
+
+.book-tier-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.book-tier-name {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  font-weight: 600;
+}
+.book-tier-desc { font-size: var(--text-sm); color: var(--text-2); line-height: 1.5; }
+.book-tier-proof { font-size: var(--text-xs); color: var(--muted); font-style: italic; }
+
+.book-tier-right {
+  display: flex; align-items: center; gap: var(--space-4);
+  flex: none;
+}
+.book-tier-price { font-weight: 700; white-space: nowrap; }
+
+/* --- Ô nhập liên hệ --------------------------------------------------------- */
+.book-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+/* Ghi chú chiếm cả hàng: nó là ô duy nhất khách có thể gõ một câu dài. */
+.book-fields .field:last-child { grid-column: 1 / -1; }
+
+/* --- Thẻ tóm tắt ------------------------------------------------------------ */
+.book-aside { position: sticky; top: calc(72px + var(--space-4)); }
+
+.book-summary { display: flex; flex-direction: column; gap: var(--space-4); }
+.book-summary-empty { font-size: var(--text-sm); color: var(--muted); }
+.book-summary-slot { display: flex; flex-direction: column; gap: var(--space-1); }
+.book-summary-slot .text-2 { font-size: var(--text-sm); line-height: 1.5; }
+.book-summary-note { font-size: var(--text-xs); color: var(--muted); text-align: center; }
+
+.book-nudge {
+  padding: var(--space-3);
+  background: var(--accent-soft);
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm); color: var(--text-2);
+}
+
+/* --- Màn hình xác nhận ------------------------------------------------------ */
+.book-done {
+  display: flex; flex-direction: column; gap: var(--space-5);
+  max-width: 640px;
+  padding: clamp(var(--space-6), 4vw, var(--space-10));
+}
+.book-done-title { font-family: var(--font-display); font-size: var(--text-2xl); line-height: 1.15; }
+.book-done-code { display: flex; flex-direction: column; gap: var(--space-1); }
+.book-done-code strong {
+  font-size: var(--text-xl); letter-spacing: .12em;
+  color: var(--accent);
+}
+.book-done-list {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+.book-done-list dt {
+  font-size: var(--text-xs); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.book-done-list dd { margin: 2px 0 0; font-weight: 600; }
+.book-done-note { font-size: var(--text-sm); color: var(--text-2); line-height: 1.6; }
+
+/* --- Tra cứu ---------------------------------------------------------------- */
+.book-lookup {
+  margin-top: clamp(var(--space-12), 6vw, var(--space-16));
+  padding-top: clamp(var(--space-8), 4vw, var(--space-12));
+  padding-bottom: clamp(var(--space-12), 6vw, var(--space-16));
+  border-top: 1px solid var(--border);
+}
+.book-lookup-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: end;
+  max-width: 720px;
+}
+.book-lookup-result {
+  display: flex; flex-direction: column; gap: var(--space-3);
+  margin-top: var(--space-4);
+  max-width: 720px;
+}
+.book-lookup-result .text-2 { display: block; margin-top: 2px; }
+
+/* --- Màn hẹp ---------------------------------------------------------------- */
+@media (max-width: 1000px) {
+  /* Thẻ tóm tắt xuống dưới và THÔI DÍNH: trên màn hẹp nó chiếm gần nửa chiều
+     cao màn hình, dính lại thì che mất chính cái form đang điền. */
+  .book-grid { grid-template-columns: 1fr; }
+  .book-aside { position: static; }
+  .book-summary { max-width: 420px; }
+}
+
+@media (max-width: 680px) {
+  .book-fields { grid-template-columns: 1fr; }
+  .book-lookup-form { grid-template-columns: 1fr; }
+  .book-done-list { grid-template-columns: 1fr; }
+
+  /* Khung giờ xếp dọc: ba cột trên màn 6 inch thì cột giữa còn chừng 80px,
+     tên chủ đề vỡ thành từng chữ một dòng. */
+  .book-slot { grid-template-columns: 1fr; gap: var(--space-2); }
+  .book-slot-right { align-items: flex-start; flex-direction: row; gap: var(--space-3); }
+
+  .book-tier { flex-direction: column; align-items: stretch; }
+  .book-tier-right { justify-content: space-between; }
+
+  .book-day { min-height: 48px; }
+  .book-day-price { display: none; }   /* 10px trên màn nhỏ là không đọc được */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-day, .book-slot { transition: none; }
 }

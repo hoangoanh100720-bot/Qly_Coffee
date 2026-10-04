@@ -29,7 +29,8 @@
              Description="@BuildSeoDescription()"
              Path="@($"/menu/{_product.Slug}")"
              Image="@DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name)"
-             ImageAlt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name)"
+             ImageAlt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name, _product.CategoryName)"
+             JsonLd="@BuildProductJsonLd()"
              OgType="product" />
 }
 else
@@ -79,7 +80,7 @@ else
             <div class="detail-visual"
                  style="--drink: @_product.ColorPrimaryHex; --foam: @_product.ColorAccentHex;">
                 <img src="@DrinkPhoto.PhotoFor(_product.ImageUrl, _product.CategoryName, _product.Name)"
-                     alt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name)"
+                     alt="@DrinkPhoto.AltFor(_product.ImageUrl, _product.Name, _product.CategoryName)"
                      fetchpriority="high" decoding="async"
                      width="900" height="900" />
             </div>
@@ -558,6 +559,35 @@ else
             : p.Description.Trim().TrimEnd('.');
 
         return $"{than}. Giá từ {gia}. Đặt online tại Một Chút Coffee, tới lấy là có.";
+    }
+
+    /// <summary>
+    /// Lược đồ Product cho Google. Nhờ nó ảnh món mới hiện kèm tên và giá trong
+    /// Google Images, chứ không chỉ là một tấm ảnh không rõ của cái gì.
+    /// <para>
+    /// Giá và tình trạng còn hàng lấy ĐÚNG giá trị đang hiển thị trên trang.
+    /// Khai một đằng hiện một nẻo là lý do Google gỡ kết quả nâng cao của cả
+    /// site, chứ không riêng trang này.
+    /// </para>
+    /// </summary>
+    private string BuildProductJsonLd()
+    {
+        var p = _product!;
+        var goc = Nav.BaseUri.TrimEnd('/');
+
+        var anh = DrinkPhoto.PhotoFor(p.ImageUrl, p.CategoryName, p.Name);
+        var anhTuyetDoi = anh.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+            ? anh
+            : $"{goc}/{anh.TrimStart('/')}";
+
+        return SeoJson.Product(
+            name:             p.Name,
+            description:      BuildSeoDescription(),
+            absoluteImageUrl: anhTuyetDoi,
+            absolutePageUrl:  $"{goc}/menu/{p.Slug}",
+            priceVnd:         p.EffectivePrice,
+            inStock:          p.IsAvailable,
+            categoryName:     p.CategoryName);
     }
 
     private static string TagLabel(string tag) => tag switch

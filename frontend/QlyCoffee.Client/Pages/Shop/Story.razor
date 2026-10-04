@@ -1,0 +1,593 @@
+@*
+    =============================================================================
+    TRANG CÂU CHUYỆN — /cau-chuyen/{slug}
+    =============================================================================
+    Archetype: TRANG THƯƠNG MẠI (marketing). Chữ lớn được phép, nhịp dọc rộng,
+    ảnh chiếm diện tích lớn, MỖI MÀN HÌNH MỘT lời kêu gọi hành động nổi bật.
+
+    VÌ SAO CÓ TRANG NÀY
+    Ba thẻ "vì sao chọn quán" ở trang chủ trước đây là <details>: bấm vào thì
+    thẻ giãn ra, đẩy cả hàng lệch, còn hai thẻ bên cạnh trống hoác một khoảng
+    dài. Nội dung dài đọc trong một ô hẹp cũng khó theo. Giờ mỗi thẻ dẫn sang
+    một trang riêng — nơi nội dung có đủ chỗ thở, có ảnh lớn, và có địa chỉ
+    riêng để chia sẻ hoặc cho Google lập chỉ mục.
+
+    BỐ CỤC, THEO ĐÚNG THỨ TỰ CÂU HỎI CỦA KHÁCH
+      1. HERO ảnh lớn   — "chỗ này là chỗ gì" trong một màn hình
+      2. DẢI Ý CHÍNH    — ba ý chốt, đọc lướt 5 giây là nắm
+      3. THÂN BÀI       — kể chi tiết, cột chữ hẹp 62ch cho dễ đọc
+      4. CÁC BƯỚC       — chuyện diễn ra thế nào, đánh số
+      5. CỘT PHỤ DÍNH   — giờ mở cửa, địa chỉ, nút hành động, luôn trong tầm mắt
+      6. ĐỌC TIẾP       — hai câu chuyện còn lại
+
+    MỘT TRANG CHO BA CÂU CHUYỆN, KHÔNG PHẢI BA FILE
+    Ba trang chỉ khác nhau ở NỘI DUNG, giống hệt nhau ở bố cục. Tách ba file
+    thì sửa bố cục phải sửa ba chỗ và chúng sẽ trôi khác nhau dần. Nội dung nằm
+    trong Stories bên dưới, thêm một câu chuyện mới = thêm một mục.
+
+    ⚠️ BỐN CHỖ PHẢI THAY BẰNG SỐ LIỆU THẬT CỦA QUÁN TRƯỚC KHI ĐĂNG:
+       · lịch, sĩ số, giá và mức ưu đãi workshop — GIỜ NẰM TRONG DATABASE,
+         sinh ra từ WorkshopSync.cs. Sửa ở bảng workshop_sessions và
+         workshop_discounts, KHÔNG sửa trang này.
+       · vùng trồng và giống hạt — đang tạm để "Arabica Cầu Đất"
+       · số điện thoại đặt lịch — đang dùng số mẫu 0901 234 567
+       · tên các khu chỗ ngồi
+    Viết hay mà sai sự thật thì tới lúc khách đến nơi mới vỡ, tệ hơn không viết.
+    =============================================================================
+*@
+@page "/cau-chuyen/{Slug}"
+@layout ShopLayout
+@inject ApiClient Api
+
+@*  Đường dẫn lạ KHÔNG được lặng lẽ trả về một câu chuyện bất kỳ: như vậy cùng
+    một nội dung nằm ở vô số địa chỉ, Google coi là nội dung trùng lặp. Báo
+    không tìm thấy và chặn lập chỉ mục trang đó. *@
+@if (_story is null)
+{
+    <SeoHead Title="Không tìm thấy trang" NoIndex="true"
+             Description="Đường dẫn này không còn tồn tại trên Một Chút Coffee." />
+
+    <div class="container section">
+        <div class="empty">
+            <CupIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">Không tìm thấy trang này</span>
+            <span class="empty-text">
+                Có thể đường dẫn đã cũ. Ba mục bên dưới là những gì đang có.
+            </span>
+            <div class="row row-3 row-wrap" style="justify-content: center;">
+                @foreach (var s in Stories.Values)
+                {
+                    <a href="/cau-chuyen/@s.Slug" class="btn btn-secondary btn-sm">@s.Title</a>
+                }
+            </div>
+            <a href="/" class="btn btn-primary">Về trang chủ</a>
+        </div>
+    </div>
+}
+else
+{
+    <SeoHead Title="@_story.Title"
+             Description="@_story.SeoDescription"
+             Path="@($"/cau-chuyen/{_story.Slug}")"
+             Image="@_story.HeroImage"
+             ImageAlt="@_story.HeroAlt"
+             OgType="article" />
+    <article class="story">
+
+        @* ═══ 1. HERO ══════════════════════════════════════════════════════
+             Ảnh là thẻ <img> thật chứ không phải background-image: ảnh nền
+             không có alt, không vào được Google Images, và đây lại chính là
+             tấm ảnh đại diện của trang.                                     *@
+        <header class="story-hero">
+            <img class="story-hero-photo" src="@_story.HeroImage" alt="@_story.HeroAlt"
+                 fetchpriority="high" decoding="async" width="1200" height="800" />
+
+            <div class="container story-hero-inner">
+                <nav class="story-crumb" aria-label="Đường dẫn">
+                    <a href="/">Trang chủ</a>
+                    <span aria-hidden="true">›</span>
+                    <span>@_story.Eyebrow</span>
+                </nav>
+
+                <h1 class="story-title">@_story.Title</h1>
+                <p class="story-lead">@_story.Lead</p>
+
+                <div class="row row-3 row-wrap">
+                    <a href="@_story.CtaHref" class="btn btn-hot btn-lg">@_story.CtaLabel</a>
+                    <a href="/menu" class="btn btn-ghost btn-lg story-hero-ghost">Xem thực đơn</a>
+                </div>
+            </div>
+        </header>
+
+        <div class="container">
+
+            @* ═══ 2. DẢI Ý CHÍNH ═══════════════════════════════════════════
+                 Ba ý chốt, mỗi ý một dòng ngắn. Khách lướt nhanh đọc đúng ba
+                 dòng này rồi quyết định có đọc tiếp hay không.               *@
+            <ul class="story-facts">
+                @foreach (var f in _story.Facts)
+                {
+                    <li>
+                        <span class="story-fact-label">@f.Label</span>
+                        <span class="story-fact-value">@f.Value</span>
+                    </li>
+                }
+            </ul>
+
+            <div class="story-grid">
+
+                @* ── Cột chữ ──────────────────────────────────────────── *@
+                <div class="story-main">
+
+                    @foreach (var p in _story.Body)
+                    {
+                        <p class="story-para">@p</p>
+                    }
+
+                    <section class="story-block">
+                        <h2 class="story-h2">@_story.HighlightTitle</h2>
+                        <ul class="tick-list">
+                            @foreach (var h in _story.Highlights)
+                            {
+                                <li>@h</li>
+                            }
+                        </ul>
+                    </section>
+
+                    <section class="story-block">
+                        <h2 class="story-h2">@_story.StepTitle</h2>
+                        @*  Danh sách CÓ SỐ THỨ TỰ thật (<ol>) chứ không phải
+                            số vẽ bằng CSS: trình đọc màn hình phải đọc được
+                            "bước 1 trên 3", và thứ tự ở đây có nghĩa.        *@
+                        <ol class="story-steps">
+                            @foreach (var s in _story.Steps)
+                            {
+                                <li>
+                                    <h3 class="story-step-title">@s.Title</h3>
+                                    <p class="story-step-text">@s.Text</p>
+                                </li>
+                            }
+                        </ol>
+                    </section>
+
+                    <figure class="story-figure">
+                        <img src="@_story.PhotoImage" alt="@_story.PhotoAlt"
+                             loading="lazy" decoding="async" width="1200" height="800" />
+                        <figcaption>@_story.PhotoCaption</figcaption>
+                    </figure>
+                </div>
+
+                @* ── Cột phụ: dính theo cuộn ───────────────────────────
+                     Giờ mở cửa và nút hành động phải luôn trong tầm mắt.
+                     Người đọc tới đoạn thấy thích thì bấm được ngay, không
+                     phải cuộn ngược lên đầu trang tìm nút.                 *@
+                <aside class="story-aside">
+                    <div class="story-card">
+                        <span class="label">Ghé quán</span>
+
+                        <p class="story-card-line">
+                            <strong>@StoreAddress</strong>
+                        </p>
+
+                        <p class="story-card-line">
+                            Mở cửa
+                            <span class="num">@StoreHours.OpenLabel – @StoreHours.CloseLabel</span>
+                            tất cả các ngày
+                        </p>
+
+                        @*  HỌC PHÍ LẤY TỪ API, KHÔNG GÕ CỨNG.
+
+                            Giá buổi workshop nằm trong cơ sở dữ liệu và chủ quán
+                            sửa được ở trang quản lý (/gia-workshop). Gõ một con
+                            số vào đây thì ngay lần đổi giá đầu tiên, trang giới
+                            thiệu bắt đầu nói sai — mà không ai nhớ ra là phải
+                            vào sửa, vì nó nằm ở tận file khác.
+
+                            Chỉ hiện khi ĐÃ đọc được giá. API hỏng thì khối này
+                            im lặng biến mất, phần còn lại của trang vẫn nguyên:
+                            không có giá còn hơn có một con số bịa.              *@
+                        @if (_priceFrom > 0)
+                        {
+                            <p class="story-card-line">
+                                <span class="label">Học phí</span><br />
+                                <strong class="num">@Money.Format(_priceFrom)</strong>
+                                @if (_priceTo > _priceFrom)
+                                {
+                                    <span> – <strong class="num">@Money.Format(_priceTo)</strong></span>
+                                }
+                                <span class="xs muted"> / người, tùy khung giờ</span>
+                            </p>
+
+                            @if (_bestPercent > 0)
+                            {
+                                @*  Nói "tới X%" chứ không nói giá đã giảm: diện giảm
+                                    cao nhất là HSSV, phải trình thẻ mới được. Quảng
+                                    cáo giá đó như giá ai cũng mua được là hứa sai. *@
+                                <p class="xs muted">
+                                    Có diện giảm tới @_bestPercent% — điều kiện ghi rõ ở trang đặt lịch.
+                                </p>
+                            }
+                        }
+
+                        <a href="@_story.CtaHref" class="btn btn-primary" style="width: 100%;">
+                            @_story.CtaLabel
+                        </a>
+
+                        <a href="tel:@StorePhoneRaw" class="story-card-phone">
+                            Gọi @StorePhone
+                        </a>
+                    </div>
+                </aside>
+            </div>
+
+            @* ═══ 5b. DẢI ẢNH KHÔNG GIAN ═══════════════════════════════════
+                 Nằm NGOÀI cột chữ 62ch, chiếm trọn bề ngang container: đây là
+                 phần khách quyết định "chỗ này có đáng rủ bạn tới không", mà
+                 quyết định đó nhìn bằng mắt chứ không đọc bằng chữ. Nhét ảnh
+                 vào cột chữ hẹp thì mỗi tấm chỉ còn hơn nửa màn hình.
+
+                 Mỗi tấm gắn với ĐÚNG MỘT khu đã liệt kê ở "Ba khu chỗ ngồi"
+                 bên trên — chú thích lặp lại tên khu để mắt nối được ảnh với
+                 đoạn vừa đọc. Không có chuyện bày ảnh đẹp chung chung.
+
+                 Chỉ câu chuyện nào KHAI BÁO Gallery mới hiện khối này.        *@
+            @if (_story.Gallery is { Length: > 0 } gallery)
+            {
+                <section class="story-gallery-wrap">
+                    <h2 class="story-h2">@_story.GalleryTitle</h2>
+                    <p class="story-gallery-lead">@_story.GalleryLead</p>
+
+                    <div class="story-gallery">
+                        @foreach (var shot in gallery)
+                        {
+                            <figure class="story-shot @shot.Shape">
+                                <img src="@shot.Image" alt="@shot.Alt"
+                                     loading="lazy" decoding="async"
+                                     width="@shot.Width" height="@shot.Height" />
+                                <figcaption>
+                                    <span class="story-shot-label">@shot.Label</span>
+                                    <span class="story-shot-text">@shot.Caption</span>
+                                </figcaption>
+                            </figure>
+                        }
+                    </div>
+                </section>
+            }
+
+            @* ═══ 6. ĐỌC TIẾP ═════════════════════════════════════════════ *@
+            <section class="story-next">
+                <h2 class="story-h2">Đọc tiếp</h2>
+                <div class="grid grid-3">
+                    @foreach (var other in Stories.Values.Where(s => s.Slug != _story.Slug))
+                    {
+                        <a href="/cau-chuyen/@other.Slug" class="feature-card">
+                            <img src="@other.HeroImage" alt="@other.HeroAlt"
+                                 loading="lazy" decoding="async" width="800" height="500" />
+                            <div class="feature-body">
+                                <h3 class="card-title">@other.Title</h3>
+                                <p class="text-2">@other.Lead</p>
+                                <span class="feature-more">Xem chi tiết</span>
+                            </div>
+                        </a>
+                    }
+                </div>
+            </section>
+        </div>
+    </article>
+}
+
+@code {
+    [Parameter] public string? Slug { get; set; }
+
+    private StoryContent? _story;
+
+    // --- Học phí workshop, đọc từ API ----------------------------------------
+    // 0 = chưa đọc được (hoặc trang này không phải trang workshop). Giao diện
+    // dựa vào đúng con số 0 để quyết định ẩn khối giá, nên đừng đổi sang -1.
+    private int _priceFrom;
+    private int _priceTo;
+    private int _bestPercent;
+
+    /// <summary>Slug của trang workshop — trang DUY NHẤT cần gọi API lấy giá.</summary>
+    private const string WorkshopSlug = "workshop-pha-che";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _story = Stories.GetValueOrDefault(Slug ?? "");
+
+        // Hai trang câu chuyện còn lại là nội dung tĩnh thuần. Gọi API ở đó chỉ
+        // tốn một vòng mạng cho thứ không ai dùng tới.
+        if (_story?.Slug != WorkshopSlug) { ResetPrice(); return; }
+
+        await LoadWorkshopPriceAsync();
+    }
+
+    private void ResetPrice() => (_priceFrom, _priceTo, _bestPercent) = (0, 0, 0);
+
+    /// <summary>
+    /// Khoảng học phí của các buổi SẮP TỚI, cộng mức giảm theo chỗ cao nhất.
+    /// <para>
+    /// Lấy BasePrice (giá thường) chứ không lấy BestPrice: BestPrice đã trừ diện
+    /// giảm tốt nhất, mà diện đó là học sinh – sinh viên, phải trình thẻ. Đem giá
+    /// ấy ra làm giá niêm yết là hứa với mọi người một mức chỉ một nhóm mua được.
+    /// </para>
+    /// </summary>
+    private async Task LoadWorkshopPriceAsync()
+    {
+        // Truyền chuỗi rỗng cho cả hai mốc ngày là CÓ CHỦ ĐÍCH: máy chủ đọc
+        // không ra ngày thì tự lấy "hôm nay theo giờ quán" tới tám tuần sau.
+        // Tự tính ngày ở đây nghĩa là tin vào đồng hồ máy khách — máy lệch múi
+        // giờ hoặc lệch ngày sẽ hỏi sai khoảng và trang báo sai giá.
+        var res = await Api.GetWorkshopCalendarAsync("", "");
+
+        // Hỏng thì im lặng. Trang giới thiệu không được chết vì một khối phụ,
+        // và khối giá tự ẩn khi _priceFrom còn 0.
+        if (!res.Success || res.Data is null) { ResetPrice(); return; }
+
+        var prices = res.Data.Days
+            .SelectMany(d => d.Slots)
+            .Select(s => s.BasePrice)
+            .Where(p => p > 0)
+            .ToList();
+
+        if (prices.Count == 0) { ResetPrice(); return; }
+
+        _priceFrom   = prices.Min();
+        _priceTo     = prices.Max();
+        _bestPercent = res.Data.SeatDiscounts.Count == 0
+            ? 0
+            : res.Data.SeatDiscounts.Max(d => d.Percent);
+    }
+
+    // --- Thông tin quán, lặp lại từ ShopLayout --------------------------------
+    // ⚠️ Sửa ở đây thì nhớ sửa cả ShopLayout và khối JSON-LD trong index.html.
+    private const string StoreAddress  = "123 Nguyễn Huệ, Bến Nghé, Quận 1, TP.HCM";
+    private const string StorePhone    = "0901 234 567";
+    private const string StorePhoneRaw = "0901234567";
+
+    /// <summary>Một ý chốt trên dải đầu trang.</summary>
+    private record Fact(string Label, string Value);
+
+    /// <summary>Một bước trong phần "chuyện diễn ra thế nào".</summary>
+    private record Step(string Title, string Text);
+
+    /// <summary>
+    /// Một tấm trong dải ảnh không gian.
+    ///
+    /// Width/Height là kích thước THẬT của file, khai ra để trình duyệt chừa
+    /// sẵn đúng chỗ — thiếu hai số này thì ảnh tải xong đẩy cả trang nhảy xuống.
+    /// Shape là "shot-wide" (ngang, chiếm cả hàng) hoặc "shot-tall" (dọc, hai
+    /// tấm một hàng); dùng lớp CSS thay vì suy ra từ tỉ lệ để bố cục do người
+    /// thiết kế quyết định, không do file ảnh quyết định.
+    /// </summary>
+    private record Shot(
+        string Image, string Alt, string Label, string Caption,
+        int Width, int Height, string Shape);
+
+    /// <summary>Toàn bộ nội dung của một câu chuyện.</summary>
+    private record StoryContent(
+        string Slug,
+        string Eyebrow,
+        string Title,
+        string Lead,
+        string SeoDescription,
+        string HeroImage,
+        string HeroAlt,
+        Fact[] Facts,
+        string[] Body,
+        string HighlightTitle,
+        string[] Highlights,
+        string StepTitle,
+        Step[] Steps,
+        string PhotoImage,
+        string PhotoAlt,
+        string PhotoCaption,
+        string CtaLabel,
+        string CtaHref,
+        // Dải ảnh không gian — tùy chọn. Câu chuyện nào không có ảnh thật của
+        // đúng chỗ mình nói thì bỏ trống, khối đó tự ẩn. Bày ảnh mượn cho đủ
+        // ba ô còn hại hơn để trống.
+        Shot[]? Gallery = null,
+        string GalleryTitle = "",
+        string GalleryLead = "");
+
+    private static readonly Dictionary<string, StoryContent> Stories = new(StringComparer.Ordinal)
+    {
+        // ══════════════════════════════════════════════════════════════════
+        ["workshop-pha-che"] = new(
+            Slug:    "workshop-pha-che",
+            Eyebrow: "Workshop pha chế",
+            Title:   "Workshop pha chế cuối tuần",
+            Lead:    "Tự tay đánh matcha, tự tay canh dòng chảy phin. Nhóm nhỏ, "
+                   + "mỗi người một bộ dụng cụ riêng và tự pha từ đầu tới cuối.",
+            SeoDescription:
+                "Workshop pha chế cuối tuần tại Một Chút Coffee: matcha đánh tay, cold brew ủ lạnh "
+              + "và latte art. Nhóm nhỏ, mỗi người một bộ dụng cụ, ly mình pha thì mình mang về.",
+            HeroImage: DrinkPhoto.LatteArt,
+            HeroAlt:   "Người pha rót sữa tạo hình latte art trên ly cà phê tại quầy",
+            Facts: new[]
+            {
+                new Fact("Lịch",       "Mỗi cuối tuần, đổi chủ đề theo mùa"),
+                new Fact("Quy mô",     "Nhóm nhỏ, mỗi người một bộ dụng cụ"),
+                new Fact("Mang về",    "Ly mình pha thì mình mang về")
+            },
+            Body: new[]
+            {
+                "Mỗi cuối tuần một chủ đề, đổi theo mùa: matcha đánh tay, cold brew ủ lạnh "
+              + "qua đêm, latte art từ nét cơ bản. Người pha đứng cùng bàn chỉ từng thao tác, "
+              + "không phải kiểu đứng xem người khác làm rồi đi về.",
+
+                "Buổi học đi từ nguyên liệu thô: bạn cân trà, canh nhiệt nước, tự thấy cùng một "
+              + "loại bột mà đánh khác tay thì ra hai vị khác nhau. Mẻ đầu hỏng cũng không sao — "
+              + "đó là phần ai cũng phải đi qua, và là lý do mỗi người cần một bộ dụng cụ riêng "
+              + "thay vì chia nhau một bộ."
+            },
+            HighlightTitle: "Buổi học gồm những gì",
+            Highlights: new[]
+            {
+                "Nhóm nhỏ, mỗi người một bộ dụng cụ và tự pha từ đầu tới cuối",
+                "Ly mình pha thì mình mang về, kể cả mẻ đầu chưa ra hình",
+                "Giảm 30% cho học sinh – sinh viên, 20% cho bạn dưới 22 tuổi",
+                "Đi từ 4 người hoặc đặt trước 7 ngày thì được giảm thêm"
+            },
+            StepTitle: "Một buổi diễn ra thế nào",
+            Steps: new[]
+            {
+                new Step("Nếm trước, học sau",
+                    "Bắt đầu bằng việc uống thử hai ly pha sai khác nhau, để biết mình đang "
+                  + "hướng tới vị nào trước khi cầm dụng cụ."),
+                new Step("Làm theo từng thao tác",
+                    "Người pha làm chậm một lượt, sau đó đứng cạnh sửa tay cho từng người. "
+                  + "Sai ở đâu sửa ngay ở đó."),
+                new Step("Pha lại bằng tay mình",
+                    "Lượt cuối bạn tự làm trọn vẹn một ly, từ cân nguyên liệu tới rót ra ly "
+                  + "mang về.")
+            },
+            PhotoImage:   DrinkPhoto.PhaChe,
+            PhotoAlt:     "Người pha cà phê thủ công bằng phễu lọc tại quầy",
+            PhotoCaption: "Phễu lọc và cân — hai thứ đầu tiên bạn cầm trong buổi học.",
+            CtaLabel:     "Chọn buổi và giữ chỗ",
+            CtaHref:      "/dat-lich-workshop"),
+
+        // ══════════════════════════════════════════════════════════════════
+        ["hat-rang-moc"] = new(
+            Slug:    "hat-rang-moc",
+            Eyebrow: "Hạt và nguyên liệu",
+            Title:   "Hạt rang mộc, xay theo từng ly",
+            Lead:    "Rang mẻ nhỏ, xay ngay trước khi pha. Vị rõ, hậu ngọt, "
+                   + "không lẫn mùi khét của hạt rang quá tay.",
+            SeoDescription:
+                "Một Chút Coffee dùng Arabica Cầu Đất rang mộc, không tẩm bơ, không độn đậu rang. "
+              + "Hạt chỉ xay khi có người gọi món; mỗi lô nguyên liệu có ngày nhập và hạn dùng riêng.",
+            HeroImage: DrinkPhoto.HatCaPhe,
+            HeroAlt:   "Hạt cà phê rang mộc còn nguyên hạt",
+            Facts: new[]
+            {
+                new Fact("Hạt",        "Arabica Cầu Đất rang mộc"),
+                new Fact("Cách xay",   "Xay khi có người gọi món"),
+                new Fact("Nguyên liệu", "Nhập theo ngày, hết lô nào làm lô đó")
+            },
+            Body: new[]
+            {
+                "Arabica Cầu Đất rang mộc — không tẩm bơ, không độn đậu rang. Cà phê xay sẵn "
+              + "để cả tuần là thứ bay mùi nhanh nhất, nên ở đây hạt chỉ xay khi có người "
+              + "gọi món.",
+
+                "Phần còn lại của thực đơn theo cùng một nguyên tắc: trái cây, sữa và trà nhập "
+              + "theo ngày. Mỗi lô vào kho mang theo ngày nhập và hạn dùng của chính nó, và hệ "
+              + "thống khóa lô quá hạn lại — nhân viên không xuất ra quầy được kể cả khi muốn."
+            },
+            HighlightTitle: "Những gì quán cam kết về nguyên liệu",
+            Highlights: new[]
+            {
+                "Rang theo mẻ nhỏ, mỗi lô có ngày rang và hạn dùng riêng",
+                "Trái cây, sữa và trà nhập theo ngày, hết lô nào làm lô đó",
+                "Lô quá hạn bị hệ thống khóa, không xuất ra quầy được"
+            },
+            StepTitle: "Từ hạt tới ly",
+            Steps: new[]
+            {
+                new Step("Nhập theo mẻ nhỏ",
+                    "Mỗi mẻ vào kho được ghi ngày rang. Mẻ cũ dùng trước, không có chuyện "
+                  + "bao mới chồng lên bao cũ rồi quên."),
+                new Step("Xay đúng lúc gọi món",
+                    "Cối xay chỉ chạy khi đơn đã vào. Khoảng cách từ lúc xay tới lúc rót "
+                  + "chỉ tính bằng phút."),
+                new Step("Cân, không ước lượng",
+                    "Mỗi ly theo công thức định lượng chuẩn, đong bằng cân — ly hôm nay và "
+                  + "ly tuần sau giống nhau.")
+            },
+            PhotoImage:   DrinkPhoto.HeroCaPhe,
+            PhotoAlt:     "Ly cà phê sữa đá pha phin tại Một Chút Coffee",
+            PhotoCaption: "Đích đến của cả quy trình: một ly pha đúng công thức.",
+            CtaLabel:     "Xem thực đơn",
+            CtaHref:      "/menu"),
+
+        // ══════════════════════════════════════════════════════════════════
+        ["khong-gian-quan"] = new(
+            Slug:    "khong-gian-quan",
+            Eyebrow: "Không gian quán",
+            Title:   "Không gian mở, thơm mùi rang",
+            Lead:    "Quầy pha hướng thẳng ra ngoài, đứng ngoài cũng nhìn được từng bước. "
+                   + "Mùi cà phê rang đón bạn ngay từ cửa.",
+            SeoDescription:
+                "Không gian Một Chút Coffee: quầy pha mở nhìn thẳng ra ngoài, khu bàn dài cho nhóm bạn, "
+              + "góc yên có ổ cắm cho người ngồi làm việc, và mảng ngoài trời thoáng gió.",
+            HeroImage: DrinkPhoto.KhongGian,
+            HeroAlt:   "Không gian Một Chút Coffee: tường đất nung, đèn mây, cây xanh "
+                     + "và quầy pha mở chạy dọc lối đi",
+            Facts: new[]
+            {
+                new Fact("Quầy pha",   "Mở, nhìn thẳng ra ngoài"),
+                new Fact("Chỗ ngồi",   "Bàn dài cho nhóm, góc yên có ổ cắm"),
+                new Fact("Ngoài trời", "Mảng thoáng gió cho ai thích ngồi ngoài")
+            },
+            Body: new[]
+            {
+                "Không có bức tường nào ngăn giữa người pha và người uống. Chờ ly của mình cũng "
+              + "là lúc xem nó được làm ra, thấy gì thắc mắc thì hỏi thẳng người đứng quầy.",
+
+                "Ba khu chỗ ngồi phục vụ ba kiểu khách khác nhau, và cố ý không trộn vào nhau: "
+              + "nhóm bạn nói chuyện to không làm phiền người đang làm việc, và ngược lại."
+            },
+            HighlightTitle: "Ba khu chỗ ngồi",
+            Highlights: new[]
+            {
+                "Khu chung: bàn dài, ghế kê sát — chỗ của nhóm bạn và những buổi nói chuyện dài",
+                "Khu riêng: góc yên, ổ cắm từng bàn — chỗ của người ngồi làm việc và học bài",
+                "Mảng ngoài trời thoáng gió cho ai muốn ngồi giữa mùi rang"
+            },
+            StepTitle: "Ghé lần đầu nên biết",
+            Steps: new[]
+            {
+                new Step("Đặt trước rồi tới lấy",
+                    "Đặt online trước thì tới nơi là có ly sẵn, không phải đứng chờ trong "
+                  + "giờ cao điểm."),
+                new Step("Biết trước món còn hay hết",
+                    "Thực đơn online hiện đúng tình trạng từng món, nên không có cảnh gọi rồi "
+                  + "mới nghe báo hết."),
+                new Step("Ngồi lại bao lâu cũng được",
+                    "Không giới hạn giờ ngồi. Chọn khu phù hợp với việc bạn định làm là đủ.")
+            },
+            PhotoImage:   DrinkPhoto.BanBe,
+            PhotoAlt:     "Nhóm bạn cụng ly cà phê tại Một Chút Coffee",
+            PhotoCaption: "Phần lớn khách cuối tuần đi theo nhóm — và quán được "
+                        + "xếp cho vừa với điều đó.",
+            CtaLabel:     "Xem địa chỉ và chỉ đường",
+            CtaHref:      "/#ghe-quan",
+
+            GalleryTitle: "Nhìn trước ba khu, chọn chỗ trước khi tới",
+            GalleryLead:  "Rủ bạn đi đâu thì câu hỏi đầu tiên luôn là “chỗ đó ngồi "
+                        + "thế nào”. Đây là câu trả lời, khỏi phải tả.",
+            Gallery: new[]
+            {
+                new Shot(
+                    Image:   DrinkPhoto.KhongGianBanDai,
+                    Alt:     "Khu bàn dài tại Một Chút Coffee với ghế mây kê sát nhau "
+                           + "trước kệ sách gỗ sáng",
+                    Label:   "Khu chung",
+                    Caption: "Một bàn dài, ghế kê sát. Nhóm sáu bảy người vẫn ngồi "
+                           + "chung một bàn, không phải tách ra hai bàn rồi nói với "
+                           + "qua đầu nhau.",
+                    Width: 1200, Height: 800, Shape: "shot-wide"),
+
+                new Shot(
+                    Image:   DrinkPhoto.KhongGianGocYen,
+                    Alt:     "Góc yên tại Một Chút Coffee với bàn gỗ, ghế gỗ và đèn "
+                           + "cầu ánh sáng vàng ấm",
+                    Label:   "Khu riêng",
+                    Caption: "Ánh sáng vàng, bàn kê thưa, ổ cắm từng bàn. Chỗ của "
+                           + "người mở laptop và ngồi hết buổi chiều.",
+                    Width: 800, Height: 1066, Shape: "shot-tall"),
+
+                new Shot(
+                    Image:   DrinkPhoto.KhongGianNgoaiTroi,
+                    Alt:     "Mảng ngoài trời tại Một Chút Coffee với ghế nệm, cây "
+                           + "xanh và mái mở nhìn ra hàng cây",
+                    Label:   "Ngoài trời",
+                    Caption: "Mái mở, cây che nắng, gió đi thẳng qua. Buổi chiều "
+                           + "muộn đây là khu kín chỗ đầu tiên.",
+                    Width: 800, Height: 1066, Shape: "shot-tall")
+            })
+    };
+}

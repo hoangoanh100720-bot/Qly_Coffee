@@ -131,7 +131,7 @@
     private string PhotoUrl => DrinkPhoto.PhotoFor(
         Product.ImageUrl, Product.CategoryName, Product.Name);
 
-    private string PhotoAlt => DrinkPhoto.AltFor(Product.ImageUrl, Product.Name);
+    private string PhotoAlt => DrinkPhoto.AltFor(Product.ImageUrl, Product.Name, Product.CategoryName);
 
     /// <summary>Đổi mã nhãn trong database sang chữ tiếng Việt hiển thị cho khách.</summary>
     private static string TagLabel(string tag) => tag switch

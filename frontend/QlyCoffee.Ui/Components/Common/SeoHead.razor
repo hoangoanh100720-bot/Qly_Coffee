@@ -68,6 +68,20 @@
     <meta name="twitter:title" content="@FullTitle" />
     <meta name="twitter:description" content="@Description" />
     <meta name="twitter:image" content="@AbsoluteImageUrl" />
+
+    @*  --- Dữ liệu có cấu trúc -------------------------------------------
+        Khối JSON-LD riêng của từng trang. Trang món truyền vào lược đồ
+        Product; nhờ nó ẢNH MÓN mới đủ điều kiện hiện kèm tên và giá trong
+        Google Images và trong kết quả tìm kiếm — chỉ thẻ og:image thôi thì
+        Google biết có ảnh nhưng không biết ảnh đó là món gì, giá bao nhiêu.
+
+        MarkupString vì nội dung là JSON đã dựng sẵn ở trang gọi; chuỗi đó
+        phải được tạo bằng JsonSerializer chứ KHÔNG nối tay, nếu không tên
+        món có dấu nháy là vỡ cả khối. *@
+    @if (!string.IsNullOrWhiteSpace(JsonLd))
+    {
+        <script type="application/ld+json">@((MarkupString)JsonLd)</script>
+    }
 </HeadContent>
 
 @* PageTitle tách riêng khỏi HeadContent — Blazor xử lý <title> qua kênh riêng *@
@@ -98,6 +112,12 @@
 
     /// <summary>Mô tả ảnh xem trước, dành cho người dùng trình đọc màn hình.</summary>
     [Parameter] public string? ImageAlt { get; set; }
+
+    /// <summary>
+    /// Khối JSON-LD của riêng trang, đã tuần tự hóa sẵn. Dùng
+    /// <see cref="QlyCoffee.Client.Services.SeoJson.Product"/> để dựng cho trang món.
+    /// </summary>
+    [Parameter] public string? JsonLd { get; set; }
 
     /// <summary>
     /// Đặt true cho các trang KHÔNG được lên Google: giỏ hàng, đăng nhập,
