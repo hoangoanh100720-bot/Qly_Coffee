@@ -21,17 +21,19 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // --- Địa chỉ backend --------------------------------------------------------
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
-
-if (string.IsNullOrWhiteSpace(apiBaseUrl))
-    apiBaseUrl = builder.HostEnvironment.BaseAddress;
+// Xem ghi chú trong QlyCoffee.Client/Program.cs và QlyCoffee.Ui/Services/ApiAddress.cs:
+// địa chỉ IP ghi cứng trong appsettings.json chết mỗi lần đổi wifi, nên host
+// được suy từ chính trang đang mở khi cả hai đều nằm trong mạng nội bộ.
+var apiBaseUrl = ApiAddress.Resolve(
+    builder.Configuration["ApiBaseUrl"],
+    builder.HostEnvironment.BaseAddress);
 
 // Ảnh món lưu ở backend nên cần biết địa chỉ backend để ghép đường dẫn
 Media.ApiBaseUrl = apiBaseUrl;
 
 // --- Liên kết sang trang bán hàng -------------------------------------------
 // Hai ứng dụng có thể ở hai tên miền, nên đây là cấu hình chứ không phải "/".
-AppLinks.ShopUrl = builder.Configuration["ShopUrl"] ?? "";
+AppLinks.ShopUrl = ApiAddress.ResolveLink(builder.Configuration["ShopUrl"], builder.HostEnvironment.BaseAddress);
 
 // --- Tài khoản nhận chuyển khoản --------------------------------------------
 // Dùng cho mã QR ở màn hình bán hàng tại quầy. Thiếu cấu hình không phải là lỗi:

@@ -21,14 +21,14 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 // --- Địa chỉ backend --------------------------------------------------------
-var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
-
-if (string.IsNullOrWhiteSpace(apiBaseUrl))
-{
-    // Không có cấu hình thì mặc định gọi cùng máy chủ đang phục vụ frontend.
-    // Trường hợp này xảy ra khi backend đứng luôn làm host cho file tĩnh.
-    apiBaseUrl = builder.HostEnvironment.BaseAddress;
-}
+// ApiAddress tự đổi host của địa chỉ cấu hình thành host mà trình duyệt đang
+// mở, KHI cả hai đều là máy trong mạng nội bộ. Không có bước này thì địa chỉ
+// IP mà script chạy LAN ghi vào appsettings.json sẽ chết ngay lần đổi wifi kế
+// tiếp, và cả trang trắng dữ liệu mà không nói được vì sao. Cấu hình trỏ ra
+// tên miền thật thì giữ nguyên. Xem QlyCoffee.Ui/Services/ApiAddress.cs.
+var apiBaseUrl = ApiAddress.Resolve(
+    builder.Configuration["ApiBaseUrl"],
+    builder.HostEnvironment.BaseAddress);
 
 // Ảnh món lưu ở backend nên cần biết địa chỉ backend để ghép đường dẫn
 Media.ApiBaseUrl = apiBaseUrl;
@@ -36,7 +36,7 @@ Media.ApiBaseUrl = apiBaseUrl;
 // --- Liên kết sang app quản lý ----------------------------------------------
 // Hai ứng dụng có thể ở hai tên miền, nên đây là cấu hình chứ không phải "/admin".
 // Để trống thì liên kết ở chân trang tự ẩn đi.
-AppLinks.AdminUrl = builder.Configuration["AdminUrl"] ?? "";
+AppLinks.AdminUrl = ApiAddress.ResolveLink(builder.Configuration["AdminUrl"], builder.HostEnvironment.BaseAddress);
 
 builder.Services.AddScoped(_ => new HttpClient
 {

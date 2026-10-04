@@ -165,11 +165,60 @@ builder.Services.AddAuthorization();
 var allowedOrigins = Cfg("CORS_ALLOWED_ORIGINS", "http://localhost:5180")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-builder.Services.AddCors(o => o.AddPolicy("QlyClient", p => p
-    .WithOrigins(allowedOrigins)
-    .AllowAnyHeader()
-    .AllowAnyMethod()
-    .AllowCredentials()));
+builder.Services.AddCors(o => o.AddPolicy("QlyClient", p =>
+{
+    p.AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+
+    if (builder.Environment.IsDevelopment())
+    {
+        // Ở máy phát triển, chấp nhận MỌI nguồn trong mạng nội bộ.
+        //
+        // Vì sao không dùng danh sách cứng: địa chỉ IP của máy đổi mỗi lần đổi
+        // wifi. Danh sách ghi sẵn "http://10.50.104.62:5180" sẽ chặn đúng cái
+        // máy đang chạy ngay hôm sau, và lỗi hiện ra là "không kết nối được
+        // máy chủ" — không ai đoán được nguyên nhân là CORS.
+        //
+        // AllowAnyOrigin() KHÔNG dùng được vì đi cùng AllowCredentials là tổ
+        // hợp bị trình duyệt cấm. SetIsOriginAllowed cho phép xét từng nguồn.
+        //
+        // Chỉ nới trong Development. Lên máy chủ thật thì quay về danh sách
+        // cứng bên dưới — mở toang CORS ở môi trường thật là để trang web bất
+        // kỳ gọi API nhân danh người đã đăng nhập.
+        p.SetIsOriginAllowed(IsLocalNetworkOrigin);
+    }
+    else
+    {
+        p.WithOrigins(allowedOrigins);
+    }
+}));
+
+// Nguồn này có nằm trong mạng nội bộ không — dùng cho CORS ở máy phát triển.
+// Các dải riêng theo RFC 1918, link-local, CGNAT, localhost và tên máy nội bộ.
+static bool IsLocalNetworkOrigin(string origin)
+{
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return false;
+
+    var host = uri.Host;
+    if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+    if (host is "127.0.0.1" or "::1") return true;
+    if (host.EndsWith(".local", StringComparison.OrdinalIgnoreCase)) return true;
+    if (!host.Contains('.')) return true;
+
+    var parts = host.Split('.');
+    if (parts.Length != 4) return false;
+    if (!int.TryParse(parts[0], out var a) || !int.TryParse(parts[1], out var b)) return false;
+
+    return a switch
+    {
+        10  => true,
+        127 => true,
+        169 => b == 254,
+        172 => b >= 16 && b <= 31,
+        192 => b == 168,
+        100 => b >= 64 && b <= 127,
+        _   => false
+    };
+}
 
 // ---- API --------------------------------------------------------------------
 builder.Services.AddControllers()
