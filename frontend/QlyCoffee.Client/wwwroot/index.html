@@ -267,9 +267,18 @@
     <!-- =====================================================================
          PHÔNG CHỮ
          =====================================================================
-         Be Vietnam Pro — thân bài và giao diện. Được vẽ riêng cho tiếng Việt
-                          nên dấu không bị đè lên chữ hoa hay lệch sang bên.
-         Baloo 2         — tiêu đề. Bo tròn, vui, hợp nhóm khách trẻ.
+         Be Vietnam Pro   — thân bài và giao diện. Được vẽ riêng cho tiếng Việt
+                            nên dấu không bị đè lên chữ hoa hay lệch sang bên.
+         Playfair Display — tiêu đề. Serif tương phản cao, kiểu chữ của tạp chí
+                            ẩm thực. Thay cho Baloo 2 (bo tròn, vui) vì trang
+                            này cần "có gu" hơn là "dễ thương".
+
+         CHỈ TRANG BÁN HÀNG DÙNG PLAYFAIR. App quản lý vẫn tải Baloo 2 trong
+         index.html riêng của nó — serif editorial đặt lên bảng tồn kho thì vừa
+         khó đọc vừa lạc tông. Token --font-display được đè ở css/app.css.
+
+         Tải bốn nét 500–800 chứ không tải cả dải 400–900: mỗi nét là một file
+         thật, tải nét không ai dùng là bắt khách trả băng thông cho số không.
 
          preconnect mở sẵn kết nối tới hai máy chủ của Google Fonts ngay từ đầu,
          tiết kiệm khoảng 100–300ms so với để trình duyệt tự phát hiện.
@@ -284,7 +293,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600..800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
 
     <!-- Ảnh hero là phần tử LCP (Largest Contentful Paint) — chỉ số Google dùng
          để chấm tốc độ. preload để nó bắt đầu tải song song với WebAssembly

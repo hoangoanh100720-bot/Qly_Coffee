@@ -22,6 +22,65 @@
 ============================================================================= */
 
 /* =============================================================================
+   §0  PHÔNG TIÊU ĐỀ RIÊNG CỦA TRANG BÁN HÀNG
+=============================================================================
+   Đè token --font-display của design-system.css, CHỈ Ở APP NÀY.
+
+   Vì sao không sửa thẳng trong design-system.css: file đó dùng chung cho cả
+   app quản lý. Playfair Display là serif tương phản cao, đúng cho một trang
+   bán hàng nhưng sai cho màn hình dày số liệu — tiêu đề thẻ, tên nguyên liệu,
+   bảng tồn kho đặt bằng serif editorial sẽ vừa khó đọc vừa lạc tông. Hai loại
+   màn hình có hai bộ luật khác nhau, trộn vào là hỏng cả hai.
+
+   Nên: app quản lý giữ nguyên Baloo 2, trang bán hàng đổi sang Playfair.
+   Mỗi index.html chỉ tải đúng phông mình dùng, không app nào tải thừa.
+
+   DỰ PHÒNG là serif chứ không phải ui-rounded như bản Baloo: mạng chặn Google
+   Fonts thì trang rơi về Georgia — vẫn là serif, bố cục và cảm giác còn gần
+   đúng. Rơi về một phông bo tròn thì mất sạch ý đồ.                          */
+:root {
+  --font-display: "Playfair Display", "Be Vietnam Pro", Georgia, "Times New Roman", serif;
+}
+
+/* Playfair mảnh và cao hơn Baloo 2, nên ba thông số đi kèm phải chỉnh theo,
+   nếu không chữ sẽ vừa chật vừa mất dấu:
+
+   · font-weight 800 → 700. Playfair ở 800 nặng như poster, mất đúng cái
+     "tinh tế" đã chọn nó vì nó. 700 là cỡ đậm mà serif editorial hay dùng.
+
+   · line-height 1.18 → 1.26. ĐÂY LÀ THAY ĐỔI QUAN TRỌNG NHẤT. Dấu tiếng Việt
+     chồng lên chữ hoa (Ệ, Ố, Ằ) và dấu của Playfair cao hơn hẳn Baloo 2 —
+     Baloo vốn được vẽ với dấu nén sát thân chữ. Giữ 1.18 thì dòng trên và
+     dấu của dòng dưới chạm nhau, và ở khối nào có overflow:hidden thì dấu
+     bị cắt cụt. Lỗi này chỉ lộ ra ở tiếng Việt nên rất dễ bỏ sót.
+
+   · letter-spacing -0.015em → -0.005em. Siết chữ là mẹo cho sans hình học;
+     serif có chân, siết mạnh thì chân chữ dính vào nhau.
+
+   Danh sách thẻ bọc trong :where() để độ ưu tiên của cả câu lệnh chỉ còn bằng
+   một class. Không có nó thì ".shop-root h1" (một class + một thẻ) mạnh hơn
+   ".hero-title" (một class), và mọi tinh chỉnh riêng cho từng tiêu đề ở
+   pages.css sẽ bị khối này đè mất — dù pages.css nạp sau.                    */
+.shop-root :where(h1, h2, h3, h4, h5) {
+  font-weight: 700;
+  line-height: 1.26;
+  letter-spacing: -0.005em;
+}
+
+/* Nhãn nhỏ trên đầu mỗi khối ("VÌ SAO CHỌN MỘT CHÚT", "GHÉ QUÁN") chỉnh cho
+   khớp với nhãn của hai con số ở hero: nhẹ nét hơn, giãn rộng hơn.
+
+   Bản gốc trong design-system.css là nét 700, giãn 0.08em — đó là nhãn của màn
+   hình quản lý, nơi chữ nhỏ phải đọc nhanh giữa một rừng số. Trên trang bán
+   hàng, nhãn chỉ có việc gợi ra đang sang khối mới, nên nó nên khẽ. Giãn rộng
+   hơn và nhẹ nét hơn cũng chính là thủ pháp đang dùng ở hai con số hero — cả
+   trang nhờ vậy nghe như một người nói, không phải hai. */
+.shop-root .label {
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+/* =============================================================================
    §2  KHUNG TRANG BÁN HÀNG
 ============================================================================= */
 .shop-root { display: flex; flex-direction: column; min-height: 100dvh; }

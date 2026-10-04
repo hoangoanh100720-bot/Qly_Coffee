@@ -15,6 +15,11 @@
                                          dùng cho thân bài và giao diện.
       Cả hai đều có bộ ký tự vietnamese trên Google Fonts nên dấu không bị
       cắt cụt hay lệch như khi mượn font Latin.
+
+      TRANG BÁN HÀNG ĐÈ --font-display THÀNH "Playfair Display" trong
+      QlyCoffee.Client/wwwroot/css/app.css §0. Baloo 2 ở đây vì vậy chỉ còn
+      phục vụ app quản lý — serif tương phản cao đặt lên bảng tồn kho thì vừa
+      khó đọc vừa lạc tông, nên hai app cố ý không dùng chung phông tiêu đề.
       Nếu mạng chặn Google Fonts thì rơi về font hệ thống — bố cục không vỡ
       vì mọi kích thước đều tính bằng rem, không phụ thuộc font.
 
@@ -323,6 +328,29 @@ button, input, select, textarea { font: inherit; color: inherit; }
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+/* NGOẠI LỆ DUY NHẤT: tiêu đề được focus bằng lệnh, không phải bằng phím Tab.
+   <FocusOnNavigate Selector="h1"> của Blazor gắn tabindex="-1" vào h1 rồi đưa
+   con trỏ vào đó sau mỗi lần chuyển trang, để trình đọc màn hình đọc tên trang
+   mới thay vì để người dùng đứng lại ở liên kết vừa bấm. Chrome coi cú focus
+   bằng lệnh đó là "đáng vẽ vòng" và kẻ nguyên một khung cam quanh tiêu đề —
+   ngay giữa trang chủ, trông như lỗi giao diện.
+
+   Bỏ vòng ở đây KHÔNG mất gì: h1 không phải phần tử nhận focus tự nhiên, phím
+   Tab không bao giờ dừng tại đây, nên chẳng người dùng bàn phím nào cần vòng
+   để biết mình đang đứng đâu. Phần việc thật sự của FocusOnNavigate — thông
+   báo cho trình đọc màn hình — vẫn nguyên vẹn.
+
+   Nhắm thẳng vào h1 chứ không vào h1[tabindex="-1"]: bản trước dựa vào việc
+   Blazor gắn thuộc tính tabindex, mà đó là chi tiết cài đặt bên trong khung —
+   phiên bản sau đổi cách làm thì luật này im lặng mất tác dụng, và cái khung
+   cam quay lại giữa trang chủ mà không ai biết vì sao. Một h1 chỉ có thể nhận
+   focus bằng lệnh, nên bỏ vòng cho mọi h1 là đúng và không mất gì thêm.
+
+   Chỉ nới cho h1, không nới cho mọi tabindex="-1" khác: hộp thoại và vùng
+   cuộn vẫn cần vòng focus thật.                                              */
+h1:focus,
+h1:focus-visible { outline: none; }
 
 ::selection { background: var(--accent-soft); color: var(--text); }
 
@@ -773,8 +801,17 @@ legend { padding: 0; }
 .badge-fresh { background: var(--fresh-soft); color: var(--fresh); }
 .badge-grape { background: var(--grape-soft); color: var(--grape); }
 
-/* Nhãn đặc/gradient — đặt đè lên ảnh, nơi nhãn nền nhạt sẽ chìm mất */
-.badge-solid { background: var(--grad-hot); color: hsl(40 60% 99%); border: none; }
+/* Nhãn đặc — đặt đè lên ảnh, nơi nhãn nền nhạt sẽ chìm mất.
+
+   MỘT SẮC ĐẶC, KHÔNG GRADIENT. Nhãn này rộng chừng 60px: ở bề rộng đó không
+   ai nhận ra đó là dải chuyển màu, chỉ thấy một mảng màu hơi đục vì hai đầu
+   dải kéo nhau. Gradient cần diện tích mới có nghĩa — để dành cho dải chốt
+   cuối trang và nút chính, là hai chỗ đủ lớn để thấy nó chuyển.
+
+   Màu lấy đúng --accent, trùng với cụm chữ được nhấn ở tiêu đề hero. Cả trang
+   bán hàng vì vậy chỉ có MỘT sắc để nhấn mạnh, dùng lại ở mọi cỡ — đó là thứ
+   làm một giao diện trông có người thiết kế.                                 */
+.badge-solid { background: var(--accent); color: hsl(40 60% 99%); border: none; }
 .badge-dark  { background: hsl(22 45% 12% / .72); color: hsl(40 60% 99%); border: none;
                backdrop-filter: blur(6px); }
 
