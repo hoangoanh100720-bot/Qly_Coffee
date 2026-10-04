@@ -1437,3 +1437,234 @@ public record LiveScoreBoardDto(
 
     /// <summary>Lời nhắn khi nguồn lỗi. Tỉ số cũ vẫn giữ nguyên bên dưới.</summary>
     string? Notice = null);
+
+// ------------------------------------------------------------------------------
+//  WORKSHOP PHA CHẾ — ĐẶT LỊCH
+//
+//  Hợp đồng dữ liệu của trang /dat-lich-workshop.
+//
+//  NGÀY GIỜ TRUYỀN BẰNG CHUỖI "yyyy-MM-dd" VÀ "HH:mm", KHÔNG PHẢI DateTime.
+//  Buổi học diễn ra vào "thứ Bảy 8 giờ sáng theo giờ quán", không phải vào một
+//  mốc UTC. Truyền DateTime thì trình duyệt của khách ở múi giờ khác sẽ hiện
+//  sang ngày hôm trước — mà khách đó vẫn tới quán vào đúng thứ Bảy.
+//
+//  GIÁ DO MÁY CHỦ TÍNH. Giao diện có tính lại để hiện ngay khi khách bấm, nhưng
+//  con số đó chỉ để xem: lúc đặt, máy chủ tính lại từ đầu và lấy kết quả của
+//  chính nó. Tin số tiền do trình duyệt gửi lên là mở cửa cho người sửa giá.
+// ------------------------------------------------------------------------------
+
+/// <summary>Một diện ưu đãi, hiện cho khách chọn hoặc để giải thích ưu đãi tự động.</summary>
+public record WorkshopDiscountDto(
+    Guid Id,
+    string Code,
+    string Name,
+    string Description,
+
+    /// <summary>0 = khách tự chọn cho từng chỗ; 1 = hệ thống tự áp cho cả lượt.</summary>
+    int Scope,
+
+    int Percent,
+    int MinSeats,
+    int MinDaysAhead,
+
+    /// <summary>true thì giao diện phải nói rõ là cần trình thẻ khi tới quán.</summary>
+    bool RequiresProof,
+    string? ProofNote);
+
+/// <summary>Một khung giờ trên lịch: đủ thông tin để khách chọn mà không mở thêm trang.</summary>
+public record WorkshopSlotDto(
+    Guid Id,
+    string Topic,
+    string Summary,
+
+    /// <summary>Ngày diễn ra, "yyyy-MM-dd" theo giờ quán.</summary>
+    string Date,
+
+    /// <summary>Giờ bắt đầu, "HH:mm".</summary>
+    string StartTime,
+
+    /// <summary>Giờ kết thúc, "HH:mm".</summary>
+    string EndTime,
+
+    int Capacity,
+
+    /// <summary>
+    /// Số chỗ CÒN LẠI, tính lúc đọc. Có thể về 0 giữa lúc khách đang điền form —
+    /// nên máy chủ vẫn kiểm tra lại một lần nữa lúc đặt.
+    /// </summary>
+    int SeatsLeft,
+
+    /// <summary>Giá một chỗ, giá thường, đồng.</summary>
+    int BasePrice,
+
+    /// <summary>Giá một chỗ theo mức ưu đãi TỐT NHẤT — dùng cho dòng "chỉ từ ... đ".</summary>
+    int BestPrice,
+
+    /// <summary>
+    /// Vì sao không đặt được. null = đặt được.
+    /// Có chuỗi thì giao diện hiện thẳng câu này thay vì tự đoán lý do.
+    /// </summary>
+    string? UnavailableReason);
+
+/// <summary>Các buổi của MỘT ngày, gom lại để lịch vẽ theo ô ngày.</summary>
+public record WorkshopDayDto(
+    /// <summary>"yyyy-MM-dd".</summary>
+    string Date,
+
+    IReadOnlyList<WorkshopSlotDto> Slots)
+{
+    /// <summary>Ngày này còn chỗ nào không — lịch tô màu ô ngày theo cờ này.</summary>
+    public bool HasSeats => Slots.Any(s => s.UnavailableReason is null && s.SeatsLeft > 0);
+
+    /// <summary>Giá thấp nhất trong ngày, để ô ngày hiện "từ ...đ".</summary>
+    public int FromPrice => Slots.Count == 0 ? 0 : Slots.Min(s => s.BestPrice);
+}
+
+/// <summary>Toàn bộ dữ liệu trang đặt lịch cần cho một khoảng ngày.</summary>
+public record WorkshopCalendarDto(
+    /// <summary>Ngày đầu khoảng, "yyyy-MM-dd".</summary>
+    string From,
+
+    /// <summary>Ngày cuối khoảng, "yyyy-MM-dd".</summary>
+    string To,
+
+    /// <summary>Hôm nay theo giờ quán — để giao diện không tự tính từ đồng hồ máy khách.</summary>
+    string Today,
+
+    IReadOnlyList<WorkshopDayDto> Days,
+
+    /// <summary>Ưu đãi theo từng chỗ, khách tự chọn.</summary>
+    IReadOnlyList<WorkshopDiscountDto> SeatDiscounts,
+
+    /// <summary>Ưu đãi cả lượt, hệ thống tự áp. Hiện ra để khách biết mà gom nhóm.</summary>
+    IReadOnlyList<WorkshopDiscountDto> BookingDiscounts);
+
+// ------------------------------------------------------------------------------
+//  SỬA GIÁ VÀ SỨC CHỨA MỘT BUỔI — chỉ app quản lý dùng
+// ------------------------------------------------------------------------------
+
+/// <summary>
+/// Yêu cầu sửa một buổi workshop từ trang quản lý.
+/// <para>
+/// KHÔNG đổi ngày giờ ở đây. Dời giờ một buổi đã có người đặt là việc phải báo
+/// lại từng khách, không phải sửa một ô rồi lưu — nên giao diện chỉ cho hủy buổi
+/// rồi mở buổi mới, để quán buộc phải nhìn thấy danh sách người cần gọi.
+/// </para>
+/// </summary>
+public class UpdateWorkshopSessionRequest
+{
+    /// <summary>Giá một chỗ, giá thường, đồng. 0 = buổi miễn phí.</summary>
+    public int BasePrice { get; set; }
+
+    /// <summary>Số chỗ tối đa. Không hạ được xuống dưới số chỗ đã có người giữ.</summary>
+    public int Capacity { get; set; }
+
+    /// <summary>Đổi chủ đề. Bỏ trống = giữ nguyên.</summary>
+    public string? Topic { get; set; }
+
+    /// <summary>Đổi câu mô tả hiện cho khách. Bỏ trống = giữ nguyên.</summary>
+    public string? Summary { get; set; }
+
+    /// <summary>Ghi chú nội bộ, khách không thấy.</summary>
+    public string? Note { get; set; }
+
+    /// <summary>
+    /// true = áp cùng giá và sức chứa cho MỌI buổi tương lai trùng thứ và trùng
+    /// giờ bắt đầu.
+    /// <para>
+    /// Lịch được sinh tự động tám tuần một lượt, nên một khung giờ có tới bốn
+    /// mươi buổi. Bắt chủ quán sửa giá từng buổi một là biến một quyết định
+    /// kinh doanh ("từ nay sáng thứ Bảy 420k") thành bốn mươi lần gõ phím, và
+    /// chỉ cần bỏ sót một buổi là giá trên lịch mâu thuẫn nhau.
+    /// </para>
+    /// </summary>
+    public bool ApplyToSameSlot { get; set; }
+}
+
+/// <summary>Kết quả sau khi lưu — đủ để giao diện cập nhật tại chỗ và báo rõ đã sửa mấy buổi.</summary>
+public record WorkshopSessionSavedDto(
+    Guid Id,
+    int BasePrice,
+    int Capacity,
+
+    /// <summary>Số chỗ đang có người giữ ở buổi vừa sửa.</summary>
+    int SeatsTaken,
+
+    /// <summary>Tổng số buổi thực sự đã đổi, tính cả buổi đang mở.</summary>
+    int UpdatedCount,
+
+    /// <summary>
+    /// Số buổi bị BỎ QUA khi áp hàng loạt vì sức chứa mới thấp hơn số chỗ đã
+    /// bán ở buổi đó. Khác 0 thì giao diện phải nói ra, không được lặng lẽ.
+    /// </summary>
+    int SkippedCount,
+
+    /// <summary>Câu tóm tắt tiếng Việt để hiện thẳng lên thông báo.</summary>
+    string Message);
+
+/// <summary>Một dòng khách chọn: mấy chỗ theo diện nào.</summary>
+public class WorkshopBookingLineRequest
+{
+    /// <summary>Ưu đãi áp cho các chỗ này. Null = giá thường.</summary>
+    public Guid? DiscountId { get; set; }
+
+    public int Quantity { get; set; }
+}
+
+/// <summary>Yêu cầu đặt chỗ khách gửi lên.</summary>
+public class CreateWorkshopBookingRequest
+{
+    public Guid SessionId { get; set; }
+    public string CustomerName { get; set; } = string.Empty;
+    public string Phone { get; set; } = string.Empty;
+    public string? Email { get; set; }
+    public string? Note { get; set; }
+
+    public List<WorkshopBookingLineRequest> Lines { get; set; } = new();
+}
+
+/// <summary>Một dòng trong lượt đặt, đã chốt giá.</summary>
+public record WorkshopBookingLineDto(
+    string TierName,
+    int Percent,
+    int Quantity,
+    int UnitPrice,
+    int LineTotal);
+
+/// <summary>Kết quả đặt chỗ, cũng là dữ liệu trang tra cứu.</summary>
+public record WorkshopBookingDto(
+    Guid Id,
+    string Code,
+    string CustomerName,
+    string Phone,
+    string? Email,
+    string? Note,
+
+    /// <summary>0 chờ xác nhận, 1 đã xác nhận, 2 đã tới, 3 đã hủy, 4 không tới.</summary>
+    int Status,
+    string StatusLabel,
+
+    Guid SessionId,
+    string Topic,
+    string Date,
+    string StartTime,
+    string EndTime,
+
+    int Seats,
+    IReadOnlyList<WorkshopBookingLineDto> Lines,
+    int Subtotal,
+    string? BookingDiscountName,
+    int BookingDiscountAmount,
+    int GrandTotal,
+
+    /// <summary>Những gì khách cần mang theo — gom từ các diện ưu đãi cần trình thẻ.</summary>
+    IReadOnlyList<string> ProofReminders,
+
+    string? CancelReason);
+
+/// <summary>Yêu cầu hủy chỗ. Cần cả mã lẫn số điện thoại đã dùng khi đặt.</summary>
+public class CancelWorkshopBookingRequest
+{
+    public string Phone { get; set; } = string.Empty;
+    public string? Reason { get; set; }
+}

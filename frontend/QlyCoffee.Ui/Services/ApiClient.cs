@@ -361,6 +361,55 @@ public class ApiClient
         => PostAsync<LoginResult>("api/auth/login", req);
 
     // ==========================================================================
+    //  WORKSHOP PHA CHẾ
+    // ==========================================================================
+
+    /// <summary>
+    /// Lịch workshop trong một khoảng ngày, kèm bảng ưu đãi.
+    /// <para>
+    /// Ngày truyền dạng "yyyy-MM-dd" chứ không phải DateTime: buổi học gắn với
+    /// ngày theo giờ quán, không phải một mốc UTC.
+    /// </para>
+    /// </summary>
+    public Task<ApiResponse<WorkshopCalendarDto>> GetWorkshopCalendarAsync(string from, string to)
+        => GetAsync<WorkshopCalendarDto>($"api/shop/workshop/lich?tu={from}&den={to}");
+
+    public Task<ApiResponse<WorkshopBookingDto>> CreateWorkshopBookingAsync(CreateWorkshopBookingRequest req)
+        => PostAsync<WorkshopBookingDto>("api/shop/workshop/dat-cho", req);
+
+    /// <summary>Tra cứu lượt đặt. Số điện thoại là bắt buộc — mã thôi chưa đủ để xem.</summary>
+    public Task<ApiResponse<WorkshopBookingDto>> GetWorkshopBookingAsync(string code, string phone)
+        => GetAsync<WorkshopBookingDto>(
+            $"api/shop/workshop/dat-cho/{Uri.EscapeDataString(code)}?sdt={Uri.EscapeDataString(phone)}");
+
+    public Task<ApiResponse<WorkshopBookingDto>> CancelWorkshopBookingAsync(
+        string code, CancelWorkshopBookingRequest req)
+        => PostAsync<WorkshopBookingDto>(
+            $"api/shop/workshop/dat-cho/{Uri.EscapeDataString(code)}/huy", req);
+
+    // --- Phía quán -------------------------------------------------------------
+
+    public Task<ApiResponse<List<WorkshopBookingDto>>> GetWorkshopBookingsAsync(
+        string? from = null, string? to = null, int? status = null)
+        => GetAsync<List<WorkshopBookingDto>>(
+            $"api/admin/workshop/dat-cho?tu={from}&den={to}&trangThai={status}");
+
+    public Task<ApiResponse<WorkshopBookingDto>> UpdateWorkshopBookingStatusAsync(
+        Guid id, int status, string? reason = null)
+        => PostAsync<WorkshopBookingDto>(
+            $"api/admin/workshop/dat-cho/{id}/trang-thai", new { Status = status, Reason = reason });
+
+    /// <summary>Lịch workshop phía quán — cùng dữ liệu với trang khách, kèm cả buổi đã kín chỗ.</summary>
+    public Task<ApiResponse<WorkshopCalendarDto>> GetAdminWorkshopCalendarAsync(
+        string? from = null, string? to = null)
+        => GetAsync<WorkshopCalendarDto>($"api/admin/workshop/lich?tu={from}&den={to}");
+
+    /// <summary>Sửa giá và sức chứa một buổi. Chỉ Manager/Owner gọi được.</summary>
+    public Task<ApiResponse<WorkshopSessionSavedDto>> UpdateWorkshopSessionAsync(
+        Guid id, UpdateWorkshopSessionRequest req)
+        => PostAsync<WorkshopSessionSavedDto>($"api/admin/workshop/lich/{id}", req);
+
+    // ==========================================================================
     //  LỚP GỌI HTTP DÙNG CHUNG
     // ==========================================================================
 

@@ -133,6 +133,7 @@ builder.Services.AddScoped<IWasteRiskService, WasteRiskService>();
 builder.Services.AddScoped<IPromotionPlanner, PromotionPlanner>();
 builder.Services.AddScoped<IAiNarrator, ClaudeNarrator>();
 builder.Services.AddScoped<IDailyPlanService, DailyPlanService>();
+builder.Services.AddScoped<IWorkshopService, WorkshopService>();
 
 // ---- Xác thực JWT -----------------------------------------------------------
 var jwtSecret = Cfg("JWT_SECRET", "");
@@ -302,6 +303,33 @@ using (var scope = app.Services.CreateScope())
 
                     logger.LogInformation("Đã tính lại giá vốn và tồn kho khả dụng cho toàn bộ thực đơn");
                 }
+            }
+        }
+
+        // ---- Lịch workshop luôn phải có buổi ở phía trước -------------------
+        //
+        //  Khác MenuSync ở một điểm quan trọng: thực đơn thêm món là việc thỉnh
+        //  thoảng, còn lịch workshop HẾT HẠN theo thời gian. Seed 8 tuần vào ngày
+        //  khai trương thì hai tháng sau trang đặt lịch trống trơn, và không ai
+        //  phát hiện cho tới khi khách hỏi. Nên mặc định BẬT, và chạy mỗi lần
+        //  khởi động để luôn phủ đủ số tuần phía trước.
+        //
+        //  Chỉ BÙ buổi còn thiếu, không đụng vào buổi đã có — chủ quán đổi giờ,
+        //  đổi giá hay hủy buổi nào thì buổi đó giữ nguyên.
+        if (Cfg("WORKSHOP_SYNC_ENABLED", "true") == "true")
+        {
+            var storeId = Guid.TryParse(Cfg("DEFAULT_STORE_ID", ""), out var wsid)
+                ? wsid
+                : (await db.Stores.OrderBy(s => s.CreatedAt).FirstOrDefaultAsync())?.Id ?? Guid.Empty;
+
+            if (storeId == Guid.Empty)
+            {
+                logger.LogWarning("WORKSHOP_SYNC_ENABLED=true nhưng chưa có cửa hàng nào — bỏ qua");
+            }
+            else
+            {
+                var weeks = int.TryParse(Cfg("WORKSHOP_SYNC_WEEKS", "10"), out var w) ? w : 10;
+                await WorkshopSync.ApplyAsync(db, storeId, logger, weeks);
             }
         }
 

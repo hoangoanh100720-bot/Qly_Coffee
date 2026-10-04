@@ -1,0 +1,1010 @@
+@*
+    =============================================================================
+    TRANG ĐẶT LỊCH WORKSHOP — /dat-lich-workshop
+    =============================================================================
+    Archetype: PHỄU CHUYỂN ĐỔI. Chữ lớn ở đầu trang, nhưng từ bước chọn ngày trở
+    xuống thì theo luật của FORM: nhãn nằm trên ô nhập, viền focus thấy rõ, lỗi
+    hiện ngay cạnh ô sai.
+
+    VÌ SAO CÓ TRANG NÀY
+    Trang giới thiệu workshop trước đây kết thúc bằng nút "Gọi đặt lịch". Nút đó
+    đẩy phần khó sang khách: phải gọi trong giờ quán mở, và không biết còn buổi
+    nào trống hay giá bao nhiêu cho tới khi gọi được người.
+
+    BA BƯỚC TRÊN MỘT TRANG, KHÔNG PHẢI BA TRANG
+    Mỗi lần chuyển trang là một lần khách có thể bỏ đi. Ba bước ở đây mở dần
+    xuống dưới, bước sau chỉ hiện khi bước trước đã xong — khách luôn nhìn thấy
+    mình đang ở đâu và đã chọn gì, không phải nhớ.
+
+      1. CHỌN NGÀY      lịch tháng, ngày có buổi mới bấm được
+      2. CHỌN KHUNG GIỜ các buổi của ngày đó, kèm giá và số chỗ còn
+      3. CHỌN CHỖ       mấy người, ai được ưu đãi nào, rồi điền liên hệ
+
+    THẺ TÓM TẮT DÍNH BÊN PHẢI
+    Tiền thay đổi mỗi lần khách bấm tăng giảm. Thẻ tóm tắt luôn trong tầm mắt
+    để khách thấy con số đổi ngay lúc bấm, chứ không phải cuộn xuống cuối trang
+    mới biết mình vừa làm gì với hóa đơn.
+
+    GIÁ HIỆN Ở ĐÂY CHỈ LÀ BẢN XEM TRƯỚC
+    Trang tự tính lại để hiện ngay, nhưng số tiền THẬT do máy chủ tính lúc đặt.
+    Hai bên dùng chung một quy tắc (giảm theo chỗ trước, ưu đãi cả lượt sau, làm
+    tròn xuống tới nghìn). Nếu lệch nhau thì con số của máy chủ là con số đúng —
+    xem WorkshopService.ApplyPercent.
+    =============================================================================
+*@
+@page "/dat-lich-workshop"
+@layout ShopLayout
+@inject ApiClient Api
+@inject AlertService Alerts
+
+<SeoHead Title="Đặt lịch workshop pha chế"
+         Description="Chọn ngày, chọn khung giờ và giữ chỗ workshop pha chế tại Một Chút Coffee. Giảm 30% cho học sinh – sinh viên, 20% cho bạn dưới 22 tuổi, thêm ưu đãi cho nhóm đông và đặt sớm."
+         Path="/dat-lich-workshop"
+         Image="@DrinkPhoto.LatteArt"
+         ImageAlt="Người pha rót sữa tạo hình latte art trên ly cà phê" />
+
+<div class="container section-sm">
+
+    @* ═══ ĐẦU TRANG ═══════════════════════════════════════════════════════ *@
+    <header class="book-head">
+        <nav class="story-crumb" aria-label="Đường dẫn">
+            <a href="/">Trang chủ</a>
+            <span aria-hidden="true">›</span>
+            <a href="/cau-chuyen/workshop-pha-che">Workshop pha chế</a>
+            <span aria-hidden="true">›</span>
+            <span>Đặt lịch</span>
+        </nav>
+
+        <h1 class="book-title">Chọn buổi, giữ chỗ, xong.</h1>
+        <p class="book-lead">
+            Không cần gọi điện. Chọn ngày và khung giờ hợp với bạn, hệ thống giữ chỗ
+            ngay và quán gọi lại xác nhận sau.
+        </p>
+
+        @* Ưu đãi để NGAY ĐẦU TRANG chứ không giấu ở bước 3: đây là lý do khách
+           quyết định đọc tiếp hay đóng tab, mà bước 3 thì còn cách ba cú cuộn. *@
+        @if (_calendar is not null && _calendar.SeatDiscounts.Count > 0)
+        {
+            <ul class="book-perks">
+                @foreach (var d in _calendar.SeatDiscounts.OrderByDescending(x => x.Percent))
+                {
+                    <li>
+                        <span class="book-perk-num">−@d.Percent%</span>
+                        <span class="book-perk-name">@d.Name</span>
+                    </li>
+                }
+                @foreach (var d in _calendar.BookingDiscounts.OrderByDescending(x => x.Percent))
+                {
+                    <li>
+                        <span class="book-perk-num">−@d.Percent%</span>
+                        <span class="book-perk-name">@d.Name</span>
+                    </li>
+                }
+            </ul>
+        }
+    </header>
+
+    @* ═══ ĐÃ ĐẶT XONG ═════════════════════════════════════════════════════
+         Đặt xong thì KHÔNG giữ lại form bên dưới: khách vừa hoàn thành việc
+         mình tới đây để làm, thấy lại form chỉ khiến họ tưởng chưa xong và
+         bấm đặt lần nữa.                                                      *@
+    @if (_result is not null)
+    {
+        <section class="book-done card">
+            <span class="badge badge-ok">Đã giữ chỗ</span>
+
+            <h2 class="book-done-title">Xong rồi, @_result.CustomerName.</h2>
+
+            <p class="book-done-code">
+                Mã đặt chỗ của bạn
+                <strong class="mono">@_result.Code</strong>
+            </p>
+
+            <dl class="book-done-list">
+                <div>
+                    <dt>Buổi học</dt>
+                    <dd>@_result.Topic</dd>
+                </div>
+                <div>
+                    <dt>Thời gian</dt>
+                    <dd>@FormatDayLong(_result.Date), @_result.StartTime – @_result.EndTime</dd>
+                </div>
+                <div>
+                    <dt>Số chỗ</dt>
+                    <dd>@_result.Seats người</dd>
+                </div>
+                <div>
+                    <dt>Tổng tiền</dt>
+                    <dd class="num">@Money.Format(_result.GrandTotal)</dd>
+                </div>
+            </dl>
+
+            @*  Trả tiền tại quán: đặt chỗ này KHÔNG thu tiền trước. Phải nói
+                thẳng, nếu không khách sẽ ngồi đợi một màn hình thanh toán
+                không bao giờ tới.                                             *@
+            <p class="book-done-note">
+                Trả tiền tại quán khi bạn tới. Quán sẽ gọi vào số
+                <strong class="num">@_result.Phone</strong> để xác nhận.
+            </p>
+
+            @if (_result.ProofReminders.Count > 0)
+            {
+                <div class="alert alert-warn">
+                    <span class="alert-title">Nhớ mang theo</span>
+                    <ul class="tick-list">
+                        @foreach (var r in _result.ProofReminders)
+                        {
+                            <li>@r</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <div class="row row-wrap">
+                <a href="/menu" class="btn btn-primary">Xem thực đơn</a>
+                <button type="button" class="btn btn-secondary" @onclick="StartOver">
+                    Đặt thêm một buổi nữa
+                </button>
+            </div>
+        </section>
+    }
+    else if (_loading)
+    {
+        <div class="stack stack-3" aria-live="polite" aria-busy="true">
+            <span class="sr-only">Đang tải lịch workshop</span>
+            <div class="skeleton skeleton-title"></div>
+            <div class="skeleton skeleton-card"></div>
+        </div>
+    }
+    else if (_calendar is null)
+    {
+        <div class="empty">
+            <CupIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">Chưa tải được lịch</span>
+            <span class="empty-text">@(_loadError ?? "Thử tải lại trang giúp.")</span>
+            <button type="button" class="btn btn-primary" @onclick="LoadCalendarAsync">Thử lại</button>
+        </div>
+    }
+    else
+    {
+        <div class="book-grid">
+
+            @* ════════════════════════════════════════════════════════════════
+                 CỘT TRÁI — BA BƯỚC
+               ════════════════════════════════════════════════════════════════ *@
+            <div class="book-main">
+
+                @* ── BƯỚC 1: CHỌN NGÀY ─────────────────────────────────── *@
+                <section class="book-step" aria-labelledby="buoc-1">
+                    <h2 class="book-step-title" id="buoc-1">
+                        <span class="book-step-num">1</span>
+                        Chọn ngày
+                    </h2>
+
+                    <div class="book-cal">
+                        <div class="book-cal-bar">
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    disabled="@(!CanGoPrevMonth)"
+                                    @onclick="PrevMonth"
+                                    aria-label="Tháng trước">‹</button>
+
+                            <strong class="book-cal-month" aria-live="polite">
+                                Tháng @_viewMonth.Month, @_viewMonth.Year
+                            </strong>
+
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                    disabled="@(!CanGoNextMonth)"
+                                    @onclick="NextMonth"
+                                    aria-label="Tháng sau">›</button>
+                        </div>
+
+                        @*  Tiêu đề cột là chữ viết tắt, nhưng trình đọc màn hình
+                            phải nghe được tên đầy đủ — nếu không sẽ đọc "T hai"
+                            rời rạc và người dùng không dựng lại được cái lịch.  *@
+                        <div class="book-cal-dows" aria-hidden="true">
+                            @foreach (var d in DowLabels) { <span>@d</span> }
+                        </div>
+
+                        <div class="book-cal-grid" role="group" aria-label="Chọn ngày học">
+                            @foreach (var cell in BuildMonthCells())
+                            {
+                                if (cell is null)
+                                {
+                                    <span class="book-day is-blank" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    var day = cell.Value;
+                                    var key = day.ToString("yyyy-MM-dd");
+                                    var info = _byDate.GetValueOrDefault(key);
+                                    var open = info is not null && info.HasSeats;
+                                    var selected = key == _selectedDate;
+
+                                    <button type="button"
+                                            class="book-day @(open ? "is-open" : "is-closed") @(selected ? "is-selected" : "")"
+                                            disabled="@(!open)"
+                                            aria-pressed="@selected"
+                                            aria-label="@DayAriaLabel(day, info)"
+                                            @onclick="() => SelectDate(key)">
+                                        <span class="book-day-num">@day.Day</span>
+                                        @if (open)
+                                        {
+                                            <span class="book-day-price">@Money.FormatShort(info!.FromPrice)</span>
+                                        }
+                                    </button>
+                                }
+                            }
+                        </div>
+
+                        <p class="book-cal-legend">
+                            <span class="book-legend-dot"></span>
+                            Ngày có ô sáng là ngày còn chỗ. Số bên dưới là giá thấp nhất của ngày đó.
+                        </p>
+                    </div>
+                </section>
+
+                @* ── BƯỚC 2: CHỌN KHUNG GIỜ ────────────────────────────── *@
+                <section class="book-step @(_selectedDate is null ? "is-waiting" : "")"
+                         aria-labelledby="buoc-2">
+                    <h2 class="book-step-title" id="buoc-2">
+                        <span class="book-step-num">2</span>
+                        Chọn khung giờ
+                    </h2>
+
+                    @if (_selectedDate is null)
+                    {
+                        <p class="book-waiting">Chọn một ngày ở trên để xem các khung giờ.</p>
+                    }
+                    else
+                    {
+                        <div class="book-slots" role="radiogroup" aria-label="Khung giờ">
+                            @foreach (var slot in _byDate[_selectedDate].Slots)
+                            {
+                                var picked = _slot?.Id == slot.Id;
+                                var blocked = slot.UnavailableReason is not null;
+
+                                <button type="button"
+                                        class="book-slot @(picked ? "is-selected" : "") @(blocked ? "is-blocked" : "")"
+                                        role="radio"
+                                        aria-checked="@picked"
+                                        disabled="@blocked"
+                                        @onclick="() => SelectSlot(slot)">
+
+                                    <span class="book-slot-time num">@slot.StartTime – @slot.EndTime</span>
+
+                                    <span class="book-slot-body">
+                                        <span class="book-slot-topic">@slot.Topic</span>
+                                        <span class="book-slot-sum">@slot.Summary</span>
+                                    </span>
+
+                                    <span class="book-slot-right">
+                                        <span class="book-slot-price num">@Money.Format(slot.BasePrice)</span>
+                                        @if (blocked)
+                                        {
+                                            <span class="badge badge-neutral">@slot.UnavailableReason</span>
+                                        }
+                                        else if (slot.SeatsLeft <= 3)
+                                        {
+                                            @*  Chỉ cảnh báo khi sắp hết. Hiện "còn 10/10 chỗ"
+                                                ở mọi buổi thì con số mất hết sức nặng đúng lúc
+                                                nó thật sự quan trọng.                          *@
+                                            <span class="badge badge-warn">Còn @slot.SeatsLeft chỗ</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="book-slot-seats">Còn @slot.SeatsLeft chỗ</span>
+                                        }
+                                    </span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </section>
+
+                @* ── BƯỚC 3: CHỌN CHỖ VÀ ĐIỀN LIÊN HỆ ──────────────────── *@
+                <section class="book-step @(_slot is null ? "is-waiting" : "")" aria-labelledby="buoc-3">
+                    <h2 class="book-step-title" id="buoc-3">
+                        <span class="book-step-num">3</span>
+                        Chọn chỗ và điền liên hệ
+                    </h2>
+
+                    @if (_slot is null)
+                    {
+                        <p class="book-waiting">Chọn một khung giờ ở trên để tiếp tục.</p>
+                    }
+                    else
+                    {
+                        <div class="stack stack-6">
+
+                            @* --- Bảng diện giá --------------------------------
+                                 Mỗi diện một dòng có nút tăng giảm riêng, vì một
+                                 nhóm có thể gồm cả sinh viên lẫn người đi làm.  *@
+                            <div class="book-tiers">
+                                @foreach (var tier in Tiers)
+                                {
+                                    var qty = _quantities.GetValueOrDefault(tier.Key, 0);
+
+                                    <div class="book-tier @(qty > 0 ? "is-active" : "")">
+                                        <div class="book-tier-info">
+                                            <span class="book-tier-name">
+                                                @tier.Name
+                                                @if (tier.Percent > 0)
+                                                {
+                                                    <span class="badge badge-accent">−@tier.Percent%</span>
+                                                }
+                                            </span>
+                                            <span class="book-tier-desc">@tier.Description</span>
+                                            @if (tier.ProofNote is not null)
+                                            {
+                                                <span class="book-tier-proof">@tier.ProofNote</span>
+                                            }
+                                        </div>
+
+                                        <div class="book-tier-right">
+                                            <span class="book-tier-price num">
+                                                @Money.Format(UnitPriceFor(tier.Percent))
+                                            </span>
+
+                                            <div class="qty-stepper">
+                                                <button type="button" class="qty-btn"
+                                                        disabled="@(qty == 0)"
+                                                        aria-label="@($"Bớt một chỗ {tier.Name}")"
+                                                        @onclick="() => ChangeQty(tier.Key, -1)">−</button>
+
+                                                <span class="qty-value num"
+                                                      aria-label="@($"{tier.Name}: {qty} chỗ")">@qty</span>
+
+                                                <button type="button" class="qty-btn"
+                                                        disabled="@(TotalSeats >= MaxSeats)"
+                                                        aria-label="@($"Thêm một chỗ {tier.Name}")"
+                                                        @onclick="() => ChangeQty(tier.Key, 1)">+</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (TotalSeats >= MaxSeats)
+                            {
+                                <p class="field-hint">
+                                    Đã chọn hết số chỗ còn lại của buổi này (@MaxSeats chỗ).
+                                </p>
+                            }
+
+                            @* --- Thông tin liên hệ --------------------------- *@
+                            <div class="book-fields">
+                                <div class="field">
+                                    <label class="field-label" for="ten">Tên người đặt</label>
+                                    <input id="ten" class="input" type="text" autocomplete="name"
+                                           maxlength="120" placeholder="Nguyễn Văn A"
+                                           @bind="_name" @bind:event="oninput" />
+                                    @if (_touched && !IsNameValid)
+                                    {
+                                        <span class="field-error">Nhập giúp tên để quán gọi đúng tên khi bạn tới.</span>
+                                    }
+                                </div>
+
+                                <div class="field">
+                                    <label class="field-label" for="sdt">Số điện thoại</label>
+                                    <input id="sdt" class="input" type="tel" inputmode="numeric"
+                                           autocomplete="tel" maxlength="15" placeholder="09xx xxx xxx"
+                                           @bind="_phone" @bind:event="oninput" />
+                                    <span class="field-hint">Quán gọi vào số này để xác nhận, và bạn dùng nó để tra cứu hoặc hủy chỗ.</span>
+                                    @if (_touched && !IsPhoneValid)
+                                    {
+                                        <span class="field-error">Số điện thoại chưa đúng. Nhập 10 số, bắt đầu bằng 0.</span>
+                                    }
+                                </div>
+
+                                <div class="field">
+                                    <label class="field-label" for="email">
+                                        Email <span class="muted">(không bắt buộc)</span>
+                                    </label>
+                                    <input id="email" class="input" type="email" autocomplete="email"
+                                           maxlength="200" placeholder="ban@email.com" @bind="_email" />
+                                </div>
+
+                                <div class="field">
+                                    <label class="field-label" for="ghichu">
+                                        Ghi chú <span class="muted">(không bắt buộc)</span>
+                                    </label>
+                                    <input id="ghichu" class="input" type="text" maxlength="500"
+                                           placeholder="Dị ứng sữa, đi cùng trẻ nhỏ…" @bind="_note" />
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </section>
+            </div>
+
+            @* ════════════════════════════════════════════════════════════════
+                 CỘT PHẢI — TÓM TẮT, DÍNH THEO CUỘN
+               ════════════════════════════════════════════════════════════════ *@
+            <aside class="book-aside">
+                <div class="book-summary card">
+                    <span class="label">Tóm tắt</span>
+
+                    @if (_slot is null)
+                    {
+                        <p class="book-summary-empty">
+                            Chọn ngày và khung giờ, số tiền sẽ hiện ở đây.
+                        </p>
+                    }
+                    else
+                    {
+                        <div class="book-summary-slot">
+                            <strong>@_slot.Topic</strong>
+                            <span class="text-2">
+                                @FormatDayLong(_slot.Date)<br />
+                                @_slot.StartTime – @_slot.EndTime
+                            </span>
+                        </div>
+
+                        <div class="divider"></div>
+
+                        @if (TotalSeats == 0)
+                        {
+                            <p class="book-summary-empty">Chọn ít nhất một chỗ ở bước 3.</p>
+                        }
+                        else
+                        {
+                            <dl class="pl-table">
+                                @foreach (var tier in Tiers.Where(t => _quantities.GetValueOrDefault(t.Key, 0) > 0))
+                                {
+                                    var qty = _quantities[tier.Key];
+                                    <div class="pl-row">
+                                        <dt class="pl-label">@tier.Name × @qty</dt>
+                                        <dd class="pl-value num">@Money.Format(UnitPriceFor(tier.Percent) * qty)</dd>
+                                    </div>
+                                }
+
+                                @if (AppliedBookingDiscount is { } bd)
+                                {
+                                    <div class="pl-row">
+                                        <dt class="pl-label pl-positive">@bd.Name (−@bd.Percent%)</dt>
+                                        <dd class="pl-value pl-negative num">−@Money.Format(BookingDiscountAmount)</dd>
+                                    </div>
+                                }
+
+                                <div class="pl-row pl-total">
+                                    <dt class="pl-label">Tổng cộng</dt>
+                                    <dd class="pl-value num">@Money.Format(GrandTotal)</dd>
+                                </div>
+                            </dl>
+
+                            @*  Nói trước cái khách sắp mất: ưu đãi nhóm chỉ cách một
+                                người. Gợi ý lúc này rẻ hơn nhiều so với lúc khách đã
+                                đặt xong rồi mới biết.                               *@
+                            @if (NextBookingDiscountHint is { } hint)
+                            {
+                                <p class="book-nudge">@hint</p>
+                            }
+                        }
+                    }
+
+                    <button type="button" class="btn btn-hot btn-block btn-lg"
+                            disabled="@(!CanSubmit || _submitting)"
+                            @onclick="SubmitAsync">
+                        @(_submitting ? "Đang giữ chỗ…" : "Giữ chỗ")
+                    </button>
+
+                    @* aria-live để trình đọc màn hình đọc lỗi ngay khi nó xuất
+                       hiện — người không nhìn màn hình sẽ không thấy ô đỏ.     *@
+                    <div aria-live="assertive">
+                        @if (_submitError is not null)
+                        {
+                            <p class="field-error">@_submitError</p>
+                        }
+                    </div>
+
+                    <p class="book-summary-note">
+                        Không thu tiền trước. Trả tại quán khi bạn tới.
+                    </p>
+                </div>
+            </aside>
+        </div>
+    }
+
+    @* ═══ TRA CỨU VÀ HỦY ══════════════════════════════════════════════════
+         Để cuối trang, sau phễu đặt: người vào đây để ĐẶT là đa số, người vào
+         để tra cứu là thiểu số. Đặt ô tra cứu lên trên sẽ chen ngang đúng dòng
+         chảy mà cả trang này được dựng ra để giữ.                             *@
+    <section class="book-lookup" aria-labelledby="tra-cuu">
+        <h2 class="book-step-title" id="tra-cuu">Đã đặt rồi? Tra cứu hoặc hủy chỗ</h2>
+
+        <div class="book-lookup-form">
+            <div class="field">
+                <label class="field-label" for="ma">Mã đặt chỗ</label>
+                <input id="ma" class="input mono" type="text" maxlength="20"
+                       placeholder="WS-XXXXXX" @bind="_lookupCode" />
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="sdt-tra">Số điện thoại đã dùng</label>
+                <input id="sdt-tra" class="input" type="tel" inputmode="numeric" maxlength="15"
+                       placeholder="09xx xxx xxx" @bind="_lookupPhone" />
+            </div>
+
+            <button type="button" class="btn btn-secondary"
+                    disabled="@_lookingUp" @onclick="LookupAsync">
+                @(_lookingUp ? "Đang tìm…" : "Tra cứu")
+            </button>
+        </div>
+
+        <div aria-live="polite">
+            @if (_lookupError is not null)
+            {
+                <p class="field-error">@_lookupError</p>
+            }
+
+            @if (_lookup is not null)
+            {
+                <div class="book-lookup-result card">
+                    <div class="row row-between row-wrap">
+                        <div>
+                            <strong>@_lookup.Topic</strong>
+                            <span class="text-2 small">
+                                @FormatDayLong(_lookup.Date), @_lookup.StartTime – @_lookup.EndTime
+                                · @_lookup.Seats chỗ · @Money.Format(_lookup.GrandTotal)
+                            </span>
+                        </div>
+                        <span class="badge @StatusBadgeClass(_lookup.Status)">@_lookup.StatusLabel</span>
+                    </div>
+
+                    @if (_lookup.CancelReason is { Length: > 0 })
+                    {
+                        <p class="text-2 small">Lý do: @_lookup.CancelReason</p>
+                    }
+
+                    @if (_lookup.Status is 0 or 1)
+                    {
+                        <button type="button" class="btn btn-danger btn-sm"
+                                disabled="@_cancelling" @onclick="CancelAsync">
+                            @(_cancelling ? "Đang hủy…" : "Hủy chỗ này")
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    // ==========================================================================
+    //  TRẠNG THÁI
+    // ==========================================================================
+
+    private WorkshopCalendarDto? _calendar;
+    private string? _loadError;
+    private bool _loading = true;
+
+    /// <summary>Lịch gom theo ngày "yyyy-MM-dd" để ô lịch tra được trong một bước.</summary>
+    private Dictionary<string, WorkshopDayDto> _byDate = new();
+
+    private string? _selectedDate;
+    private WorkshopSlotDto? _slot;
+
+    /// <summary>Tháng đang hiện trên lịch. Luôn là ngày mùng 1.</summary>
+    private DateOnly _viewMonth;
+
+    private DateOnly _today;
+    private DateOnly _rangeFrom;
+    private DateOnly _rangeTo;
+
+    /// <summary>Số chỗ theo từng diện giá. Khóa là mã ưu đãi, "" là giá thường.</summary>
+    private Dictionary<string, int> _quantities = new();
+
+    private string _name = "";
+    private string _phone = "";
+    private string _email = "";
+    private string _note = "";
+
+    /// <summary>
+    /// Khách đã bấm Giữ chỗ lần nào chưa.
+    /// <para>
+    /// Lỗi chỉ hiện sau lần bấm đầu tiên. Bôi đỏ ô "Tên" ngay khi trang vừa mở,
+    /// lúc khách còn chưa kịp gõ gì, là mắng người ta vì chưa làm việc chưa tới
+    /// lượt.
+    /// </para>
+    /// </summary>
+    private bool _touched;
+
+    private bool _submitting;
+    private string? _submitError;
+    private WorkshopBookingDto? _result;
+
+    private string _lookupCode = "";
+    private string _lookupPhone = "";
+    private bool _lookingUp;
+    private bool _cancelling;
+    private string? _lookupError;
+    private WorkshopBookingDto? _lookup;
+
+    private static readonly string[] DowLabels = { "T2", "T3", "T4", "T5", "T6", "T7", "CN" };
+
+    // ==========================================================================
+    //  NẠP DỮ LIỆU
+    // ==========================================================================
+
+    protected override Task OnInitializedAsync() => LoadCalendarAsync();
+
+    private async Task LoadCalendarAsync()
+    {
+        _loading = true;
+        _loadError = null;
+        StateHasChanged();
+
+        // Lấy 12 tuần một lần thay vì mỗi lần đổi tháng gọi lại: cả khoảng chỉ
+        // vài chục kilobyte, mà bấm sang tháng sau thì hiện ngay, không chớp.
+        var from = DateTime.UtcNow.AddHours(7).Date;
+        var to = from.AddDays(84);
+
+        var res = await Api.GetWorkshopCalendarAsync(
+            from.ToString("yyyy-MM-dd"), to.ToString("yyyy-MM-dd"));
+
+        _loading = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            _loadError = res.Error?.Message;
+            return;
+        }
+
+        _calendar = res.Data;
+        _byDate = res.Data.Days.ToDictionary(d => d.Date);
+        _today = ParseDate(res.Data.Today);
+        _rangeFrom = ParseDate(res.Data.From);
+        _rangeTo = ParseDate(res.Data.To);
+        _viewMonth = new DateOnly(_today.Year, _today.Month, 1);
+
+        ResetQuantities();
+    }
+
+    // ==========================================================================
+    //  LỊCH THÁNG
+    // ==========================================================================
+
+    /// <summary>
+    /// Các ô của tháng đang xem. <c>null</c> = ô trống trước ngày mùng 1.
+    /// <para>
+    /// Tuần bắt đầu từ THỨ HAI, không phải chủ nhật: lịch ở Việt Nam viết T2 đầu
+    /// tuần, và <see cref="DayOfWeek"/> của .NET đánh số chủ nhật là 0 — nên phải
+    /// dịch đi, không dùng thẳng được.
+    /// </para>
+    /// </summary>
+    private List<DateOnly?> BuildMonthCells()
+    {
+        var first = _viewMonth;
+        var daysInMonth = DateTime.DaysInMonth(first.Year, first.Month);
+
+        var lead = ((int)first.DayOfWeek + 6) % 7;   // T2 = 0 … CN = 6
+
+        var cells = new List<DateOnly?>(lead + daysInMonth);
+        for (var i = 0; i < lead; i++) cells.Add(null);
+        for (var d = 1; d <= daysInMonth; d++) cells.Add(new DateOnly(first.Year, first.Month, d));
+
+        return cells;
+    }
+
+    private bool CanGoPrevMonth => _viewMonth > new DateOnly(_rangeFrom.Year, _rangeFrom.Month, 1);
+    private bool CanGoNextMonth => _viewMonth < new DateOnly(_rangeTo.Year, _rangeTo.Month, 1);
+
+    private void PrevMonth() { if (CanGoPrevMonth) _viewMonth = _viewMonth.AddMonths(-1); }
+    private void NextMonth() { if (CanGoNextMonth) _viewMonth = _viewMonth.AddMonths(1); }
+
+    private void SelectDate(string date)
+    {
+        _selectedDate = date;
+        _slot = null;
+        ResetQuantities();
+        _submitError = null;
+    }
+
+    private void SelectSlot(WorkshopSlotDto slot)
+    {
+        _slot = slot;
+        ResetQuantities();
+
+        // Chọn sẵn một chỗ giá thường: gần như không ai đặt 0 chỗ, mà bắt khách
+        // bấm dấu cộng một lần chỉ để về trạng thái hiển nhiên là thêm việc.
+        _quantities[""] = 1;
+        _submitError = null;
+    }
+
+    /// <summary>Nhãn đọc cho trình đọc màn hình — ô lịch chỉ có mỗi con số thì không đủ nghĩa.</summary>
+    private string DayAriaLabel(DateOnly day, WorkshopDayDto? info)
+    {
+        var label = $"Ngày {day.Day} tháng {day.Month}";
+        if (info is null || !info.HasSeats) return label + ", không có buổi học";
+        return $"{label}, còn chỗ, từ {Money.FormatPlain(info.FromPrice)} đồng";
+    }
+
+    // ==========================================================================
+    //  DIỆN GIÁ VÀ TÍNH TIỀN
+    //
+    //  Quy tắc PHẢI khớp WorkshopService ở backend:
+    //    1. Giảm theo từng chỗ → giá một chỗ, làm tròn XUỐNG tới nghìn.
+    //    2. Cộng thành tạm tính.
+    //    3. Áp MỘT ưu đãi cả lượt có lợi nhất, cũng làm tròn xuống tới nghìn.
+    //  Lệch nhau thì số của máy chủ là số đúng; con số ở đây chỉ để xem trước.
+    // ==========================================================================
+
+    private record Tier(string Key, string Name, string Description, int Percent, string? ProofNote);
+
+    /// <summary>Các diện giá hiện trên bước 3: giá thường trước, rồi tới các ưu đãi theo chỗ.</summary>
+    private List<Tier> Tiers
+    {
+        get
+        {
+            var list = new List<Tier>
+            {
+                new("", "Giá thường", "Không cần giấy tờ gì.", 0, null)
+            };
+
+            if (_calendar is not null)
+            {
+                list.AddRange(_calendar.SeatDiscounts
+                    .OrderByDescending(d => d.Percent)
+                    .Select(d => new Tier(d.Code, d.Name, d.Description, d.Percent,
+                                          d.RequiresProof ? d.ProofNote : null)));
+            }
+
+            return list;
+        }
+    }
+
+    private void ResetQuantities() =>
+        _quantities = Tiers.ToDictionary(t => t.Key, _ => 0);
+
+    private void ChangeQty(string key, int delta)
+    {
+        var current = _quantities.GetValueOrDefault(key, 0);
+        var next = current + delta;
+
+        if (next < 0) return;
+        if (delta > 0 && TotalSeats >= MaxSeats) return;
+
+        _quantities[key] = next;
+        _submitError = null;
+    }
+
+    private int TotalSeats => _quantities.Values.Sum();
+
+    /// <summary>Trần số chỗ: ít hơn giữa số chỗ còn của buổi và trần 20 chỗ một lượt.</summary>
+    private int MaxSeats => Math.Min(_slot?.SeatsLeft ?? 0, 20);
+
+    private int UnitPriceFor(int percent) => ApplyPercent(_slot?.BasePrice ?? 0, percent);
+
+    /// <summary>Bản sao của <c>WorkshopService.ApplyPercent</c>. Hai bên PHẢI làm tròn giống nhau.</summary>
+    private static int ApplyPercent(int amount, int percent)
+    {
+        if (percent <= 0) return amount;
+        if (percent >= 100) return 0;
+        var after = (long)amount * (100 - percent) / 100;
+        return (int)(after / 1000 * 1000);
+    }
+
+    private int Subtotal =>
+        Tiers.Sum(t => UnitPriceFor(t.Percent) * _quantities.GetValueOrDefault(t.Key, 0));
+
+    /// <summary>Ưu đãi cả lượt đang đủ điều kiện, lấy cái giảm nhiều nhất.</summary>
+    private WorkshopDiscountDto? AppliedBookingDiscount
+    {
+        get
+        {
+            if (_calendar is null || _slot is null || TotalSeats == 0) return null;
+
+            var daysAhead = (ParseDate(_slot.Date).DayNumber - _today.DayNumber);
+
+            return _calendar.BookingDiscounts
+                .Where(d => d.MinSeats == 0 || TotalSeats >= d.MinSeats)
+                .Where(d => d.MinDaysAhead == 0 || daysAhead >= d.MinDaysAhead)
+                .OrderByDescending(d => d.Percent)
+                .FirstOrDefault();
+        }
+    }
+
+    private int BookingDiscountAmount =>
+        AppliedBookingDiscount is { } d ? Subtotal - ApplyPercent(Subtotal, d.Percent) : 0;
+
+    private int GrandTotal => Subtotal - BookingDiscountAmount;
+
+    /// <summary>
+    /// Câu gợi ý "thêm một người nữa là được giảm thêm", hoặc null nếu không có
+    /// ưu đãi nào đang ở trong tầm với.
+    /// </summary>
+    private string? NextBookingDiscountHint
+    {
+        get
+        {
+            if (_calendar is null || _slot is null || TotalSeats == 0) return null;
+
+            var applied = AppliedBookingDiscount;
+            var daysAhead = ParseDate(_slot.Date).DayNumber - _today.DayNumber;
+
+            // Chỉ gợi ý ưu đãi theo SỐ NGƯỜI: "đặt sớm hơn 7 ngày" thì khách
+            // không làm gì được nữa, nói ra chỉ để khách tiếc.
+            var candidate = _calendar.BookingDiscounts
+                .Where(d => d.MinSeats > TotalSeats)
+                .Where(d => d.MinDaysAhead == 0 || daysAhead >= d.MinDaysAhead)
+                .Where(d => applied is null || d.Percent > applied.Percent)
+                .Where(d => d.MinSeats <= MaxSeats)
+                .OrderBy(d => d.MinSeats - TotalSeats)
+                .FirstOrDefault();
+
+            if (candidate is null) return null;
+
+            var missing = candidate.MinSeats - TotalSeats;
+            return $"Thêm {missing} người nữa là được {candidate.Name} — giảm thêm {candidate.Percent}%.";
+        }
+    }
+
+    // ==========================================================================
+    //  GỬI ĐI
+    // ==========================================================================
+
+    private bool IsNameValid => _name.Trim().Length >= 2;
+
+    private bool IsPhoneValid
+    {
+        get
+        {
+            var digits = new string(_phone.Where(char.IsDigit).ToArray());
+            if (digits.StartsWith("84") && digits.Length == 11) digits = "0" + digits[2..];
+            return digits.Length == 10 && digits[0] == '0';
+        }
+    }
+
+    private bool CanSubmit => _slot is not null && TotalSeats > 0 && IsNameValid && IsPhoneValid;
+
+    private async Task SubmitAsync()
+    {
+        _touched = true;
+        _submitError = null;
+
+        if (_slot is null || TotalSeats == 0)
+        {
+            _submitError = "Chọn khung giờ và ít nhất một chỗ trước đã.";
+            return;
+        }
+        if (!IsNameValid || !IsPhoneValid)
+        {
+            _submitError = "Kiểm tra lại tên và số điện thoại giúp.";
+            return;
+        }
+
+        _submitting = true;
+
+        // Gửi MÃ ưu đãi đã chọn dưới dạng Id để máy chủ tra lại từ database.
+        // Không gửi phần trăm hay số tiền: đó là việc của máy chủ.
+        var byCode = _calendar!.SeatDiscounts.ToDictionary(d => d.Code);
+
+        var req = new CreateWorkshopBookingRequest
+        {
+            SessionId = _slot.Id,
+            CustomerName = _name.Trim(),
+            Phone = _phone.Trim(),
+            Email = string.IsNullOrWhiteSpace(_email) ? null : _email.Trim(),
+            Note = string.IsNullOrWhiteSpace(_note) ? null : _note.Trim(),
+            Lines = _quantities
+                .Where(kv => kv.Value > 0)
+                .Select(kv => new WorkshopBookingLineRequest
+                {
+                    DiscountId = kv.Key == "" ? null : byCode[kv.Key].Id,
+                    Quantity = kv.Value
+                })
+                .ToList()
+        };
+
+        var res = await Api.CreateWorkshopBookingAsync(req);
+        _submitting = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            _submitError = res.Error?.Message ?? "Chưa giữ được chỗ. Thử lại giúp.";
+
+            // Hết chỗ hay quá hạn thì lịch trên màn hình đã cũ — tải lại để
+            // khách không bấm tiếp vào đúng khung giờ vừa bị từ chối.
+            await LoadCalendarAsync();
+            return;
+        }
+
+        _result = res.Data;
+        Alerts.Success($"Đã giữ chỗ. Mã của bạn là {_result.Code}.");
+    }
+
+    private void StartOver()
+    {
+        _result = null;
+        _selectedDate = null;
+        _slot = null;
+        _touched = false;
+        _submitError = null;
+        ResetQuantities();
+    }
+
+    // ==========================================================================
+    //  TRA CỨU VÀ HỦY
+    // ==========================================================================
+
+    private async Task LookupAsync()
+    {
+        _lookupError = null;
+        _lookup = null;
+
+        if (string.IsNullOrWhiteSpace(_lookupCode) || string.IsNullOrWhiteSpace(_lookupPhone))
+        {
+            _lookupError = "Nhập cả mã đặt chỗ và số điện thoại đã dùng khi đặt.";
+            return;
+        }
+
+        _lookingUp = true;
+        var res = await Api.GetWorkshopBookingAsync(_lookupCode.Trim().ToUpperInvariant(), _lookupPhone.Trim());
+        _lookingUp = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            _lookupError = res.Error?.Message ?? "Không tìm thấy lượt đặt nào.";
+            return;
+        }
+
+        _lookup = res.Data;
+    }
+
+    private async Task CancelAsync()
+    {
+        if (_lookup is null) return;
+
+        _cancelling = true;
+        var res = await Api.CancelWorkshopBookingAsync(_lookup.Code,
+            new CancelWorkshopBookingRequest { Phone = _lookupPhone.Trim() });
+        _cancelling = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            _lookupError = res.Error?.Message ?? "Chưa hủy được. Thử lại giúp.";
+            return;
+        }
+
+        _lookup = res.Data;
+        Alerts.Success("Đã hủy chỗ. Chỗ này được trả lại cho người khác.");
+
+        // Chỗ vừa nhả ra phải hiện lại trên lịch ngay.
+        await LoadCalendarAsync();
+    }
+
+    // ==========================================================================
+    //  ĐỊNH DẠNG
+    // ==========================================================================
+
+    private static DateOnly ParseDate(string s) =>
+        DateOnly.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var d)
+            ? d : DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+
+    /// <summary>"Thứ Bảy, 26/09/2026". Tên thứ viết tay vì văn hóa Blazor WASM
+    /// chạy theo máy khách — máy đặt tiếng Anh sẽ hiện "Saturday".</summary>
+    private static string FormatDayLong(string isoDate)
+    {
+        var d = ParseDate(isoDate);
+        var dow = d.DayOfWeek switch
+        {
+            DayOfWeek.Monday    => "Thứ Hai",
+            DayOfWeek.Tuesday   => "Thứ Ba",
+            DayOfWeek.Wednesday => "Thứ Tư",
+            DayOfWeek.Thursday  => "Thứ Năm",
+            DayOfWeek.Friday    => "Thứ Sáu",
+            DayOfWeek.Saturday  => "Thứ Bảy",
+            _                   => "Chủ Nhật"
+        };
+        return $"{dow}, {d:dd/MM/yyyy}";
+    }
+
+    private static string StatusBadgeClass(int status) => status switch
+    {
+        0 => "badge-warn",
+        1 => "badge-ok",
+        2 => "badge-ok",
+        3 => "badge-danger",
+        _ => "badge-neutral"
+    };
+}

@@ -387,3 +387,77 @@ public enum PaymentMatchStatus
     /// <summary>Giao dịch tiền RA, hoặc không liên quan tới thanh toán đơn.</summary>
     Ignored = 6
 }
+
+// ==============================================================================
+//  WORKSHOP PHA CHẾ
+// ==============================================================================
+
+/// <summary>
+/// Tình trạng một buổi workshop.
+/// <para>
+/// <see cref="Full"/> KHÔNG được suy ra rồi lưu vào cột này: số chỗ còn lại là
+/// phép trừ giữa sức chứa và các đặt chỗ đang hiệu lực, tính lúc đọc. Lưu sẵn
+/// "đã đầy" thì chỉ cần một khách hủy là cột đó sai, và không ai biết để sửa.
+/// Giá trị này chỉ dùng khi chủ quán CHỦ ĐỘNG khóa buổi lại dù còn chỗ.
+/// </para>
+/// </summary>
+public enum WorkshopSessionStatus
+{
+    /// <summary>Đang mở nhận đặt chỗ.</summary>
+    Open = 0,
+
+    /// <summary>Chủ quán khóa tay, không nhận thêm dù hệ thống còn đếm ra chỗ trống.</summary>
+    Full = 1,
+
+    /// <summary>Đã hủy buổi. Mọi đặt chỗ của buổi này phải được báo lại cho khách.</summary>
+    Cancelled = 2,
+
+    /// <summary>Đã diễn ra xong.</summary>
+    Completed = 3
+}
+
+/// <summary>
+/// Tình trạng một lượt đặt chỗ workshop.
+/// <para>
+/// Chỗ bị GIỮ ngay từ <see cref="Pending"/> chứ không đợi tới <see cref="Confirmed"/>.
+/// Nếu đợi xác nhận mới giữ thì hai khách đặt cùng một phút sẽ cùng thấy còn chỗ,
+/// và người thứ hai chỉ biết mình hụt khi quán gọi lại — đúng cái phiền mà trang
+/// đặt lịch này sinh ra để xóa bỏ.
+/// </para>
+/// </summary>
+public enum WorkshopBookingStatus
+{
+    /// <summary>Khách vừa đặt, quán chưa liên hệ lại. ĐÃ GIỮ CHỖ.</summary>
+    Pending = 0,
+
+    /// <summary>Quán đã xác nhận với khách. ĐÃ GIỮ CHỖ.</summary>
+    Confirmed = 1,
+
+    /// <summary>Khách đã tới và điểm danh. ĐÃ GIỮ CHỖ.</summary>
+    CheckedIn = 2,
+
+    /// <summary>Đã hủy — do khách hoặc do quán. NHẢ CHỖ lại cho người khác.</summary>
+    Cancelled = 3,
+
+    /// <summary>Đặt rồi không tới. Không nhả chỗ nữa vì buổi đã diễn ra.</summary>
+    NoShow = 4
+}
+
+/// <summary>
+/// Ưu đãi workshop áp cho từng chỗ ngồi hay cho cả lượt đặt.
+/// <para>
+/// Hai loại này KHÔNG trộn vào nhau được: "sinh viên giảm 30%" là thuộc tính của
+/// một NGƯỜI — nhóm bốn người có hai sinh viên thì chỉ hai chỗ được giảm. Còn
+/// "đi từ bốn người giảm thêm 10%" là thuộc tính của cả LƯỢT ĐẶT. Gộp chung một
+/// kiểu tính sẽ hoặc giảm thừa cho người không đủ điều kiện, hoặc giảm thiếu cho
+/// nhóm đông.
+/// </para>
+/// </summary>
+public enum WorkshopDiscountScope
+{
+    /// <summary>Khách tự chọn cho từng chỗ. VD: học sinh – sinh viên, U22.</summary>
+    PerSeat = 0,
+
+    /// <summary>Hệ thống tự áp cho cả lượt khi đủ điều kiện. VD: nhóm đông, đặt sớm.</summary>
+    Booking = 1
+}

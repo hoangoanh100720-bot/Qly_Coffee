@@ -1,0 +1,395 @@
+@*
+    =============================================================================
+    TRANG ĐẶT CHỖ WORKSHOP
+    =============================================================================
+    Archetype: BẢNG DÀY DỮ LIỆU. Mật độ là tính năng — nhân viên mở trang này
+    lúc chuẩn bị buổi học, cần thấy cả buổi trong một màn hình chứ không phải
+    cuộn qua từng thẻ đẹp.
+
+    TRANG NÀY TRẢ LỜI ĐÚNG BA CÂU NHÂN VIÊN HỎI TRƯỚC MỖI BUỔI
+      1. Buổi tới có mấy người?       → dải thống kê đầu trang
+      2. Ai chưa được gọi xác nhận?   → lọc "Chờ xác nhận"
+      3. Ai cần kiểm tra thẻ?         → cột diện giá, dòng nào có ưu đãi thì
+                                        hiện ngay tên diện
+
+    VÌ SAO KHÔNG CÓ NÚT SỬA GIỜ / SỬA GIÁ BUỔI HỌC Ở ĐÂY
+    Đổi giờ hay giá của một buổi đã có người đặt là việc phải báo lại cho từng
+    khách. Làm được bằng một cú bấm ở đây thì sớm muộn sẽ có người bấm nhầm.
+    Giai đoạn này sửa trực tiếp trong database, có chủ đích.
+    =============================================================================
+*@
+@page "/dat-lich-workshop"
+@layout AdminLayout
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+
+<PageTitle>Đặt chỗ workshop — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    <div class="row row-between row-wrap" style="gap: var(--space-4);">
+        <div class="stack stack-1">
+            <h2>Đặt chỗ workshop</h2>
+            <span class="xs muted">
+                Khách đặt qua trang /dat-lich-workshop. Chỗ được giữ ngay từ lúc đặt,
+                không đợi xác nhận.
+            </span>
+        </div>
+        <a href="@($"{AppLinks.ShopUrl}/dat-lich-workshop")" class="btn btn-secondary btn-sm"
+           target="_blank" rel="noopener">
+            Xem trang khách đặt
+        </a>
+    </div>
+
+    @* ── THẺ TỔNG QUAN ───────────────────────────────────────────────────── *@
+    <div class="grid grid-stats">
+        <div class="stat @(_pending > 0 ? "stat-warn" : "")">
+            <span class="stat-label">Chờ xác nhận</span>
+            <span class="stat-value">@_pending</span>
+            <span class="stat-meta">lượt cần gọi lại</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Đã xác nhận</span>
+            <span class="stat-value">@_confirmed</span>
+            <span class="stat-meta">lượt</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Tổng chỗ đang giữ</span>
+            <span class="stat-value">@_seats</span>
+            <span class="stat-meta">bộ dụng cụ cần chuẩn bị</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Doanh thu dự kiến</span>
+            <span class="stat-value">@Money.FormatShort(_revenue)</span>
+            <span class="stat-meta">chưa thu, trả tại quán</span>
+        </div>
+    </div>
+
+    @* ── BỘ LỌC ──────────────────────────────────────────────────────────── *@
+    <div class="filter-bar">
+        <div class="choice-group" role="group" aria-label="Lọc theo trạng thái">
+            @foreach (var f in Filters)
+            {
+                <button type="button"
+                        class="choice @(_status == f.Value ? "is-selected" : "")"
+                        aria-pressed="@(_status == f.Value)"
+                        @onclick="() => ApplyFilter(f.Value)">@f.Label</button>
+            }
+        </div>
+
+        <div class="row row-2" style="align-items: end;">
+            <div class="field">
+                <label class="field-label" for="tu">Từ ngày</label>
+                <input id="tu" class="input input-sm" type="date" @bind="_from" @bind:format="yyyy-MM-dd" />
+            </div>
+            <div class="field">
+                <label class="field-label" for="den">Đến ngày</label>
+                <input id="den" class="input input-sm" type="date" @bind="_to" @bind:format="yyyy-MM-dd" />
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" @onclick="LoadAsync">Lọc</button>
+        </div>
+    </div>
+
+    @* ── DANH SÁCH ───────────────────────────────────────────────────────── *@
+    @if (_loading)
+    {
+        <div class="stack stack-3" aria-busy="true">
+            <div class="skeleton skeleton-text"></div>
+            <div class="skeleton skeleton-card"></div>
+        </div>
+    }
+    else if (_bookings.Count == 0)
+    {
+        <div class="empty">
+            <CupIcon Size="48" CssClass="empty-icon" />
+            <span class="empty-title">Chưa có lượt đặt nào</span>
+            <span class="empty-text">
+                Không có lượt đặt nào khớp bộ lọc hiện tại.
+            </span>
+        </div>
+    }
+    else
+    {
+        @*  Gom theo BUỔI chứ không liệt kê phẳng: nhân viên chuẩn bị theo buổi
+            — "sáng thứ Bảy cần mấy bộ dụng cụ" — chứ không theo từng khách.   *@
+        @foreach (var group in _bookings
+                    .GroupBy(b => (b.Date, b.StartTime, b.Topic))
+                    .OrderBy(g => g.Key.Date).ThenBy(g => g.Key.StartTime))
+        {
+            var held = group.Where(b => b.Status != 3).Sum(b => b.Seats);
+
+            <section class="card">
+                <div class="card-header row row-between row-wrap">
+                    <div class="stack stack-1">
+                        <span class="card-title">@group.Key.Topic</span>
+                        <span class="xs muted num">
+                            @FormatDayLong(group.Key.Date) · @group.Key.StartTime
+                        </span>
+                    </div>
+                    <span class="badge badge-accent">@held chỗ đang giữ</span>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="table table-compact">
+                        <thead>
+                            <tr>
+                                <th>Mã</th>
+                                <th>Khách</th>
+                                <th>Điện thoại</th>
+                                <th>Diện giá</th>
+                                <th style="text-align: right;">Chỗ</th>
+                                <th style="text-align: right;">Tiền</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var b in group.OrderBy(x => x.Status).ThenBy(x => x.CustomerName))
+                            {
+                                <tr class="@(b.Status == 3 ? "" : b.Status == 0 ? "row-warn" : "")">
+                                    <td class="mono xs">@b.Code</td>
+                                    <td>
+                                        <strong>@b.CustomerName</strong>
+                                        @if (b.Note is { Length: > 0 })
+                                        {
+                                            <span class="xs muted" style="display: block;">@b.Note</span>
+                                        }
+                                    </td>
+                                    <td class="num xs">
+                                        <a href="tel:@b.Phone" class="plain-link">@b.Phone</a>
+                                    </td>
+                                    <td class="xs">
+                                        @*  Chỉ hiện diện CÓ ưu đãi. Liệt kê cả "Giá thường"
+                                            làm cột này dài ra mà không nói thêm điều gì —
+                                            nhân viên nhìn cột này để biết PHẢI KIỂM THẺ AI. *@
+                                        @if (b.Lines.Any(l => l.Percent > 0))
+                                        {
+                                            @foreach (var l in b.Lines.Where(l => l.Percent > 0))
+                                            {
+                                                <span class="badge badge-warn">@l.TierName × @l.Quantity</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="muted">—</span>
+                                        }
+                                    </td>
+                                    <td class="num" style="text-align: right;">@b.Seats</td>
+                                    <td class="num" style="text-align: right;">@Money.Format(b.GrandTotal)</td>
+                                    <td>
+                                        <span class="badge @StatusBadgeClass(b.Status)">@b.StatusLabel</span>
+                                    </td>
+                                    <td>
+                                        <div class="row row-2 row-wrap">
+                                            @if (b.Status == 0)
+                                            {
+                                                <button type="button" class="btn btn-primary btn-sm"
+                                                        disabled="@_busy"
+                                                        @onclick="() => SetStatusAsync(b, 1)">Xác nhận</button>
+                                            }
+                                            @if (b.Status is 0 or 1)
+                                            {
+                                                <button type="button" class="btn btn-secondary btn-sm"
+                                                        disabled="@_busy"
+                                                        @onclick="() => SetStatusAsync(b, 2)">Đã tới</button>
+                                                <button type="button" class="btn btn-danger btn-sm"
+                                                        disabled="@_busy"
+                                                        @onclick="() => AskCancel(b)">Hủy</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@* ── HỘP NHẬP LÝ DO HỦY ──────────────────────────────────────────────────
+     Hủy chỗ của khách BẮT BUỘC có lý do: khách sẽ đọc được câu này khi tra
+     cứu, và "đã hủy" không kèm lý do là thứ khiến người ta gọi điện phàn nàn. *@
+@if (_cancelling is not null)
+{
+    <div class="alert alert-warn" style="position: sticky; bottom: var(--space-4);">
+        <span class="alert-title">Hủy chỗ của @_cancelling.CustomerName</span>
+
+        <div class="field">
+            <label class="field-label" for="lydo">Lý do hủy (khách sẽ đọc được)</label>
+            <input id="lydo" class="input" type="text" maxlength="300"
+                   placeholder="VD: Buổi học phải dời vì người pha nghỉ ốm"
+                   @bind="_cancelReason" @bind:event="oninput" />
+        </div>
+
+        <div class="row row-2">
+            <button type="button" class="btn btn-danger btn-sm"
+                    disabled="@(_busy || string.IsNullOrWhiteSpace(_cancelReason))"
+                    @onclick="ConfirmCancelAsync">Xác nhận hủy</button>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    @onclick="() => _cancelling = null">Thôi</button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<WorkshopBookingDto> _bookings = new();
+    private bool _loading = true;
+    private bool _busy;
+
+    private int? _status;
+    private DateOnly _from;
+    private DateOnly _to;
+
+    private WorkshopBookingDto? _cancelling;
+    private string _cancelReason = "";
+
+    private record Filter(string Label, int? Value);
+
+    private static readonly Filter[] Filters =
+    {
+        new("Tất cả", null),
+        new("Chờ xác nhận", 0),
+        new("Đã xác nhận", 1),
+        new("Đã tới", 2),
+        new("Đã hủy", 3)
+    };
+
+    // Chỉ đếm các lượt ĐANG GIỮ CHỖ. Gộp cả lượt đã hủy vào thì con số "cần
+    // chuẩn bị mấy bộ dụng cụ" sẽ luôn thừa, và thừa im lặng.
+    private int _pending;
+    private int _confirmed;
+    private int _seats;
+    private int _revenue;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Mặc định: từ hôm nay trở đi. Buổi đã qua không còn việc gì để làm,
+        // mà lại là phần lớn dữ liệu sau vài tháng chạy.
+        var today = DateTime.UtcNow.AddHours(7).Date;
+        _from = DateOnly.FromDateTime(today);
+        _to = DateOnly.FromDateTime(today.AddDays(60));
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        var res = await Api.GetWorkshopBookingsAsync(
+            _from.ToString("yyyy-MM-dd"), _to.ToString("yyyy-MM-dd"), _status);
+        _loading = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            Alerts.Error(res.Error?.Message ?? "Chưa tải được danh sách đặt chỗ.");
+            _bookings = new();
+            return;
+        }
+
+        _bookings = res.Data;
+        Recount();
+    }
+
+    private void Recount()
+    {
+        var holding = _bookings.Where(b => b.Status != 3).ToList();
+
+        _pending = _bookings.Count(b => b.Status == 0);
+        _confirmed = _bookings.Count(b => b.Status == 1);
+        _seats = holding.Sum(b => b.Seats);
+        _revenue = holding.Sum(b => b.GrandTotal);
+    }
+
+    private async Task ApplyFilter(int? status)
+    {
+        _status = status;
+        await LoadAsync();
+    }
+
+    private async Task SetStatusAsync(WorkshopBookingDto b, int status)
+    {
+        _busy = true;
+        var res = await Api.UpdateWorkshopBookingStatusAsync(b.Id, status);
+        _busy = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            Alerts.Error(res.Error?.Message ?? "Chưa đổi được trạng thái.");
+            return;
+        }
+
+        Replace(res.Data);
+        Alerts.Success($"{b.CustomerName}: {res.Data.StatusLabel.ToLowerInvariant()}.");
+    }
+
+    private void AskCancel(WorkshopBookingDto b)
+    {
+        _cancelling = b;
+        _cancelReason = "";
+    }
+
+    private async Task ConfirmCancelAsync()
+    {
+        if (_cancelling is null) return;
+
+        _busy = true;
+        var res = await Api.UpdateWorkshopBookingStatusAsync(_cancelling.Id, 3, _cancelReason.Trim());
+        _busy = false;
+
+        if (!res.Success || res.Data is null)
+        {
+            Alerts.Error(res.Error?.Message ?? "Chưa hủy được.");
+            return;
+        }
+
+        Alerts.Success($"Đã hủy chỗ của {_cancelling.CustomerName}. Nhớ gọi báo khách.");
+        _cancelling = null;
+        Replace(res.Data);
+    }
+
+    /// <summary>
+    /// Thay bản ghi tại chỗ thay vì tải lại cả danh sách: nhân viên bấm xác nhận
+    /// liên tiếp năm sáu lượt, tải lại mỗi lần sẽ làm bảng nhảy về đầu và cuộn
+    /// lại từ đầu sau mỗi cú bấm.
+    /// </summary>
+    private void Replace(WorkshopBookingDto updated)
+    {
+        var i = _bookings.FindIndex(x => x.Id == updated.Id);
+        if (i >= 0) _bookings[i] = updated;
+        Recount();
+    }
+
+    private static string StatusBadgeClass(int status) => status switch
+    {
+        0 => "badge-warn",
+        1 => "badge-ok",
+        2 => "badge-info",
+        3 => "badge-danger",
+        _ => "badge-neutral"
+    };
+
+    /// <summary>"Thứ Bảy 26/09". Tên thứ viết tay vì Blazor WASM chạy theo văn
+    /// hóa của máy khách — máy đặt tiếng Anh sẽ hiện "Saturday".</summary>
+    private static string FormatDayLong(string isoDate)
+    {
+        if (!DateOnly.TryParse(isoDate, System.Globalization.CultureInfo.InvariantCulture, out var d))
+            return isoDate;
+
+        var dow = d.DayOfWeek switch
+        {
+            DayOfWeek.Monday    => "Thứ Hai",
+            DayOfWeek.Tuesday   => "Thứ Ba",
+            DayOfWeek.Wednesday => "Thứ Tư",
+            DayOfWeek.Thursday  => "Thứ Năm",
+            DayOfWeek.Friday    => "Thứ Sáu",
+            DayOfWeek.Saturday  => "Thứ Bảy",
+            _                   => "Chủ Nhật"
+        };
+        return $"{dow} {d:dd/MM}";
+    }
+}

@@ -67,6 +67,12 @@ public class AppDbContext : DbContext
     public DbSet<DailySales> DailySales => Set<DailySales>();
     public DbSet<StockShortageLog> StockShortageLogs => Set<StockShortageLog>();
 
+    // --- Workshop pha chế -------------------------------------------------------
+    public DbSet<WorkshopSession> WorkshopSessions => Set<WorkshopSession>();
+    public DbSet<WorkshopDiscount> WorkshopDiscounts => Set<WorkshopDiscount>();
+    public DbSet<WorkshopBooking> WorkshopBookings => Set<WorkshopBooking>();
+    public DbSet<WorkshopBookingLine> WorkshopBookingLines => Set<WorkshopBookingLine>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -774,6 +780,114 @@ public class AppDbContext : DbContext
 
             e.HasOne(x => x.Ingredient).WithMany()
                 .HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ======================================================================
+        //  WORKSHOP PHA CHẾ
+        // ======================================================================
+        b.Entity<WorkshopSession>(e =>
+        {
+            e.ToTable("workshop_sessions", t => t.HasComment(
+                "Một BUỔI workshop cụ thể trên lịch. Lịch lặp hằng tuần được sinh thành từng " +
+                "bản ghi rời chứ không lưu quy tắc lặp — buổi nào cũng có thể dời giờ, đổi chủ " +
+                "đề, hạ giá hoặc hủy riêng nó."));
+
+            // Truy vấn nóng nhất của trang đặt lịch: "tháng này có buổi nào còn
+            // mở". Lọc thẳng trên chi nhánh + ngày, không quét cả bảng lịch sử.
+            e.HasIndex(x => new { x.StoreId, x.SessionDate, x.Status })
+                .HasDatabaseName("ix_workshop_sessions_lich");
+
+            e.Property(x => x.Topic).HasMaxLength(120).IsRequired();
+            e.Property(x => x.Summary).HasMaxLength(400).IsRequired();
+            e.Property(x => x.SessionDate)
+                .HasComment("Ngày diễn ra theo giờ quán. Kiểu date — KHÔNG có múi giờ, nên không bị lệch ngày.");
+            e.Property(x => x.Capacity)
+                .HasComment("Số chỗ tối đa. Giới hạn bởi số BỘ DỤNG CỤ, không phải số ghế.");
+            e.Property(x => x.BasePrice)
+                .HasComment("Giá một chỗ, giá thường chưa ưu đãi, đơn vị đồng.");
+            e.Property(x => x.Note).HasMaxLength(500)
+                .HasComment("Ghi chú nội bộ, KHÔNG hiện cho khách.");
+            e.Property(x => x.CancelReason).HasMaxLength(300);
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        b.Entity<WorkshopDiscount>(e =>
+        {
+            e.ToTable("workshop_discounts", t => t.HasComment(
+                "Ưu đãi workshop. Là DỮ LIỆU chứ không phải enum cứng: đổi khuyến mãi là " +
+                "quyết định kinh doanh hằng tháng, không được bắt build lại hệ thống."));
+
+            // Mã là khóa định danh để seed lại không tạo bản trùng.
+            e.HasIndex(x => new { x.StoreId, x.Code }).IsUnique()
+                .HasDatabaseName("ux_workshop_discounts_ma");
+
+            e.Property(x => x.Code).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Name).HasMaxLength(120).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(400).IsRequired();
+            e.Property(x => x.Percent)
+                .HasComment("Phần trăm giảm trên giá buổi. Ghi bằng % chứ không bằng tiền vì mỗi buổi một giá.");
+            e.Property(x => x.MinSeats)
+                .HasComment("Chỉ với ưu đãi cả lượt: số chỗ tối thiểu. 0 = không ràng buộc.");
+            e.Property(x => x.MinDaysAhead)
+                .HasComment("Chỉ với ưu đãi cả lượt: phải đặt trước bao nhiêu ngày. 0 = không ràng buộc.");
+            e.Property(x => x.RequiresProof)
+                .HasComment("Hệ thống KHÔNG xác minh được diện ưu đãi — cờ này để giao diện nói thẳng là cần trình thẻ.");
+            e.Property(x => x.ProofNote).HasMaxLength(200);
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        b.Entity<WorkshopBooking>(e =>
+        {
+            e.ToTable("workshop_bookings", t => t.HasComment(
+                "Một lượt đặt chỗ. Mọi con số tiền được CHỤP LẠI lúc đặt, không tính lại khi " +
+                "đọc — đổi giá tuần sau không được làm đổi số tiền đã báo cho khách tuần này."));
+
+            // Mã đặt chỗ là thứ khách gõ vào ô tra cứu, phải duy nhất tuyệt đối.
+            e.HasIndex(x => x.Code).IsUnique()
+                .HasDatabaseName("ux_workshop_bookings_ma");
+            // Đếm chỗ còn lại của một buổi: lọc theo buổi rồi cộng cột seats.
+            e.HasIndex(x => new { x.SessionId, x.Status })
+                .HasDatabaseName("ix_workshop_bookings_dem_cho");
+            // Quán tra "khách này đã đặt những buổi nào".
+            e.HasIndex(x => new { x.StoreId, x.Phone })
+                .HasDatabaseName("ix_workshop_bookings_sdt");
+
+            e.Property(x => x.Code).HasMaxLength(20).IsRequired();
+            e.Property(x => x.CustomerName).HasMaxLength(120).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(20).IsRequired()
+                .HasComment("Vừa là cách liên hệ, vừa là mật khẩu để tra cứu và hủy — biết mã thôi chưa đủ.");
+            e.Property(x => x.Email).HasMaxLength(200);
+            e.Property(x => x.Seats)
+                .HasComment("Tổng số chỗ. Lưu dư ra để đếm chỗ trống chỉ cần cộng một cột, không phải nối bảng dòng.");
+            e.Property(x => x.BookingDiscountName).HasMaxLength(120);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.CancelReason).HasMaxLength(300);
+
+            // Restrict chứ không Cascade: xóa buổi học KHÔNG được phép xóa mất
+            // danh sách người đã đặt. Buổi hủy thì đổi Status, khách vẫn tra được.
+            e.HasOne(x => x.Session).WithMany(s => s.Bookings)
+                .HasForeignKey(x => x.SessionId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        b.Entity<WorkshopBookingLine>(e =>
+        {
+            e.ToTable("workshop_booking_lines", t => t.HasComment(
+                "Mấy chỗ theo diện ưu đãi nào. Tách dòng vì một nhóm có thể gồm cả sinh viên " +
+                "lẫn người đi làm — gán một diện cho cả lượt thì hoặc giảm thừa, hoặc mất khách."));
+
+            e.HasIndex(x => x.BookingId);
+
+            e.Property(x => x.TierName).HasMaxLength(120).IsRequired()
+                .HasComment("Tên diện giá chụp lại lúc đặt. 'Giá thường' khi không có ưu đãi.");
+            e.Property(x => x.UnitPrice)
+                .HasComment("Giá một chỗ SAU ưu đãi theo chỗ, đồng.");
+
+            e.HasOne(x => x.Booking).WithMany(bk => bk.Lines)
+                .HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // ======================================================================
