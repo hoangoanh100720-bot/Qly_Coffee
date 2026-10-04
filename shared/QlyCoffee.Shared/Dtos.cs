@@ -1516,8 +1516,22 @@ public record WorkshopDayDto(
     /// <summary>Ngày này còn chỗ nào không — lịch tô màu ô ngày theo cờ này.</summary>
     public bool HasSeats => Slots.Any(s => s.UnavailableReason is null && s.SeatsLeft > 0);
 
-    /// <summary>Giá thấp nhất trong ngày, để ô ngày hiện "từ ...đ".</summary>
-    public int FromPrice => Slots.Count == 0 ? 0 : Slots.Min(s => s.BestPrice);
+    /// <summary>
+    /// Giá THƯỜNG thấp nhất trong ngày, để ô ngày hiện "từ ...đ".
+    /// <para>
+    /// Lấy <see cref="WorkshopSlotDto.BasePrice"/> chứ KHÔNG lấy
+    /// <see cref="WorkshopSlotDto.BestPrice"/>. BestPrice đã trừ diện ưu đãi
+    /// cao nhất (học sinh – sinh viên 30%), mà phần lớn khách không thuộc diện
+    /// đó. Dùng nó thì ô lịch ghi "203k" rồi bấm vào khung giờ lại thấy
+    /// "290.000đ" — khách có cảm giác bị dụ, dù hai con số đều đúng theo cách
+    /// tính của chúng.
+    /// </para>
+    /// <para>
+    /// Các mức ưu đãi đã được bày rõ ngay đầu trang đặt lịch, nên không mất gì
+    /// khi ô lịch nói con số mà đa số người sẽ trả.
+    /// </para>
+    /// </summary>
+    public int FromPrice => Slots.Count == 0 ? 0 : Slots.Min(s => s.BasePrice);
 }
 
 /// <summary>Toàn bộ dữ liệu trang đặt lịch cần cho một khoảng ngày.</summary>

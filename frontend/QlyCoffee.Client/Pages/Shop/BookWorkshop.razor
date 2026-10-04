@@ -238,7 +238,7 @@
 
                         <p class="book-cal-legend">
                             <span class="book-legend-dot"></span>
-                            Ngày có ô sáng là ngày còn chỗ. Số bên dưới là giá thấp nhất của ngày đó.
+                            Ngày có ô sáng là ngày còn chỗ. Số bên dưới là giá thường thấp nhất của ngày đó, chưa trừ ưu đãi.
                         </p>
                     </div>
                 </section>
@@ -658,6 +658,44 @@
         _viewMonth = new DateOnly(_today.Year, _today.Month, 1);
 
         ResetQuantities();
+        DropStaleSelection();
+    }
+
+    /// <summary>
+    /// Bỏ ngày và khung giờ đang chọn nếu lịch vừa tải về không còn chúng.
+    /// <para>
+    /// Lịch được tải lại sau khi đặt hụt và sau khi hủy chỗ. Nếu buổi đang chọn
+    /// vừa bị quán hủy hoặc vừa trôi qua giờ, nó biến mất khỏi dữ liệu mới —
+    /// mà bước 2 thì tra thẳng <c>_byDate[_selectedDate]</c>, nên trang sẽ ném
+    /// KeyNotFoundException và trắng màn hình ngay giữa lúc khách đang đặt.
+    /// </para>
+    /// <para>
+    /// Phải thay cả <c>_slot</c> bằng bản MỚI chứ không giữ bản cũ: số chỗ còn
+    /// lại nằm trong đó, và <c>MaxSeats</c> dựa vào nó để chặn nút cộng. Giữ
+    /// bản cũ nghĩa là vẫn cho khách chọn số chỗ đã không còn.
+    /// </para>
+    /// </summary>
+    private void DropStaleSelection()
+    {
+        if (_selectedDate is null) return;
+
+        if (!_byDate.TryGetValue(_selectedDate, out var day))
+        {
+            _selectedDate = null;
+            _slot = null;
+            return;
+        }
+
+        if (_slot is null) return;
+
+        var fresh = day.Slots.FirstOrDefault(s => s.Id == _slot.Id);
+        if (fresh is null || fresh.UnavailableReason is not null)
+        {
+            _slot = null;
+            return;
+        }
+
+        _slot = fresh;
     }
 
     // ==========================================================================
