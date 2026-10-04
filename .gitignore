@@ -35,3 +35,6 @@ logs/
 
 # Ảnh món tải lên. Chạy lại scripts/ là có, không cần đưa vào lịch sử git.
 backend/QlyCoffee.Api/wwwroot/uploads/
+
+# File sao lưu do scripts/chay-lan.ps1 sinh ra khi sửa launchSettings
+*.bak
