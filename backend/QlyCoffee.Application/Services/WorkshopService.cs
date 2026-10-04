@@ -220,6 +220,29 @@ public class WorkshopService : IWorkshopService
         {
             await using var tx = await _db.Database.BeginTransactionAsync(ct);
 
+            // KHOÁ DÒNG BUỔI HỌC TRƯỚC KHI ĐẾM CHỖ.
+            //
+            // Không có dòng này thì toàn bộ phần kiểm tra chỗ trống bên dưới là
+            // vô nghĩa khi có hai người đặt cùng lúc. PostgreSQL chạy ở mức cô
+            // lập READ COMMITTED: giao dịch A không nhìn thấy dòng mà giao dịch
+            // B vừa ghi nhưng chưa commit. Nên cả hai cùng đếm ra "còn 1 chỗ",
+            // cả hai cùng ghi, cả hai cùng đếm lại và vẫn không thấy nhau, rồi
+            // cả hai cùng commit — buổi học thành ra bán quá chỗ.
+            //
+            // Phép đếm lại sau khi ghi ở cuối hàm KHÔNG bắt được trường hợp đó;
+            // nó chỉ bắt được khi giao dịch kia đã commit xong trước.
+            //
+            // FOR UPDATE giữ dòng buổi học cho tới khi giao dịch này kết thúc,
+            // nên người thứ hai phải xếp hàng chờ và khi tới lượt sẽ đếm ra số
+            // chỗ ĐÃ TRỪ người thứ nhất. Khoá theo từng buổi nên hai buổi khác
+            // nhau vẫn đặt song song bình thường.
+            //
+            // Chạy bằng câu lệnh riêng thay vì FromSql rồi ghép LINQ: EF sẽ bọc
+            // truy vấn FromSql vào một truy vấn con để áp bộ lọc xóa mềm, mà
+            // PostgreSQL không cho FOR UPDATE nằm trong truy vấn con.
+            await _db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT id FROM workshop_sessions WHERE id = {req.SessionId} FOR UPDATE", ct);
+
             var session = await _db.WorkshopSessions
                 .FirstOrDefaultAsync(s => s.Id == req.SessionId && s.StoreId == storeId, ct)
                 ?? throw new BusinessRuleException("Không tìm thấy buổi học này. Có thể lịch đã đổi, tải lại trang giúp.");
