@@ -160,7 +160,7 @@ public class PrepService : IPrepService
             StoreId      = cmd.StoreId,
             IngredientId = output.Id,
             PrepRecipeId = recipe.Id,
-            LotCode      = GenerateBatchCode(output.Sku),
+            LotCode      = await GenerateBatchCodeAsync(cmd.StoreId, output.Sku, ct),
             ReceivedQuantity  = outputQuantity,
             RemainingQuantity = outputQuantity,
             ReceivedAt   = DateTime.UtcNow,
@@ -228,7 +228,19 @@ public class PrepService : IPrepService
             OccurredAt     = lot.ReceivedAt
         });
 
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsDuplicateLotCode(ex))
+        {
+            // Hai máy cùng bấm nấu đúng một khoảnh khắc: bên chậm hơn đâm vào
+            // chỉ mục duy nhất. Dịch thành lỗi nghiệp vụ để quầy nhận câu tiếng
+            // Việt bấm-lại-là-xong, thay vì màn hình đỏ "lỗi máy chủ".
+            _logger.LogWarning(ex, "Trùng mã lô khi sơ chế {Recipe}", recipe.Name);
+            throw new BusinessRuleException(
+                "Vừa có mẻ khác được tạo cùng lúc. Bấm nấu lại lần nữa là được.");
+        }
 
         // Mẻ mới có giá khác mẻ cũ → giá vốn bình quân của bán thành phẩm đổi,
         // kéo theo giá vốn mọi món dùng nó. Nguyên liệu thô cũng phải tính lại
@@ -353,6 +365,43 @@ public class PrepService : IPrepService
     /// Mã mẻ: [SKU]-[YYMMDD]-[HHmm]. Có giờ phút chứ không phải ký tự ngẫu nhiên
     /// vì một ngày có nhiều mẻ, và câu nhân viên hỏi nhau luôn là "bình mấy giờ".
     /// </summary>
-    private static string GenerateBatchCode(string sku)
-        => $"{sku}-{VietnamTime.Now():yyMMdd-HHmm}";
+    /// <summary>Lỗi lưu có phải do đụng chỉ mục duy nhất trên mã lô không.</summary>
+    private static bool IsDuplicateLotCode(DbUpdateException ex)
+        => ex.InnerException is Npgsql.PostgresException { SqlState: "23505" } pg
+        && pg.Message.Contains("lot_code", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Mã lô cho một mẻ sơ chế, DUY NHẤT trong chi nhánh.
+    /// <para>
+    /// Bản đầu chỉ ghi tới PHÚT (<c>SKU-yyMMdd-HHmm</c>). Nấu hai mẻ cùng một
+    /// thứ trong cùng một phút là đâm vào chỉ mục duy nhất trên
+    /// <c>(store_id, lot_code)</c> và trả lỗi 500 — mà đó lại đúng là tình huống
+    /// hay xảy ra nhất: hết trân châu giữa giờ cao điểm, nhân viên bấm luôn hai
+    /// mẻ liền tay.
+    /// </para>
+    /// <para>
+    /// Mẻ đầu trong phút vẫn giữ mã ngắn dễ đọc; chỉ khi đụng mới thêm hậu tố.
+    /// Nhờ vậy mã dán lên bình vẫn nói được "ủ lúc mấy giờ" như cũ.
+    /// </para>
+    /// </summary>
+    private async Task<string> GenerateBatchCodeAsync(Guid storeId, string sku, CancellationToken ct)
+    {
+        var stamp = $"{sku}-{VietnamTime.Now():yyMMdd-HHmm}";
+
+        async Task<bool> Free(string code) => !await _db.InventoryLots
+            .IgnoreQueryFilters()
+            .AnyAsync(l => l.StoreId == storeId && l.LotCode == code, ct);
+
+        if (await Free(stamp)) return stamp;
+
+        for (var i = 0; i < 5; i++)
+        {
+            var code = $"{stamp}-{Guid.NewGuid().ToString("N")[..2].ToUpperInvariant()}";
+            if (await Free(code)) return code;
+        }
+
+        // Năm lần đụng liên tiếp thì không còn là xui nữa, nhưng vẫn phải nấu
+        // được mẻ: lấy hậu tố dài hơn, xấu mã còn hơn chặn nhân viên giữa ca.
+        return $"{stamp}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
+    }
 }
