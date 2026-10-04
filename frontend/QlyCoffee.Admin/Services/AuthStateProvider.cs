@@ -41,6 +41,48 @@ public class AuthStateProvider : AuthenticationStateProvider
     /// <summary>Người dùng đang đăng nhập, null nếu chưa.</summary>
     public UserDto? CurrentUser => _currentUser;
 
+    /// <summary>
+    /// Đọc token từ localStorage và gắn vào <see cref="HttpClient"/>. Gọi bao
+    /// nhiêu lần cũng được, trả về <c>true</c> nếu có token còn hạn.
+    /// <para>
+    /// VÌ SAO PHẢI CÓ HÀM NÀY RIÊNG
+    /// Trước đây token chỉ được gắn như TÁC DỤNG PHỤ của
+    /// <see cref="GetAuthenticationStateAsync"/>. Thành phần nào gọi API trong
+    /// <c>OnInitializedAsync</c> của mình mà chạy trước hàm đó thì gửi đi một
+    /// yêu cầu KHÔNG có token và nhận về 401 — đúng chuyện đã xảy ra với các
+    /// con số huy hiệu trên thanh điều hướng: mỗi lần tải lại trang quản lý là
+    /// một lần 401 trong console, và bốn con số đó im lặng không bao giờ hiện.
+    ///
+    /// Lỗi kiểu này không bao giờ lộ ra khi bấm chuyển trang trong app, chỉ lộ
+    /// khi tải lại trang bằng F5 — nên rất dễ sống sót qua mọi lần thử tay.
+    ///
+    /// Giờ việc gắn token là một hành động có tên, gọi được một cách tường
+    /// minh, và ai cần token trước khi gọi API thì chờ nó.
+    /// </para>
+    /// </summary>
+    public async Task<bool> EnsureAuthHeaderAsync()
+    {
+        try
+        {
+            var token = await _js.InvokeAsync<string?>("localStorage.getItem", TokenKey);
+
+            if (string.IsNullOrWhiteSpace(token) || IsTokenExpired(token))
+            {
+                _http.DefaultRequestHeaders.Authorization = null;
+                return false;
+            }
+
+            _http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            return true;
+        }
+        catch
+        {
+            // localStorage bị chặn (cửa sổ ẩn danh, trình duyệt khoá site data)
+            return false;
+        }
+    }
+
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
         try
@@ -61,9 +103,9 @@ public class AuthStateProvider : AuthenticationStateProvider
                 _currentUser = JsonSerializer.Deserialize<UserDto>(userJson,
                     new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            // Gắn token vào mọi lời gọi API sau này
-            _http.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            // Gắn token vào mọi lời gọi API sau này. Dùng chung đúng một đường
+            // đi với EnsureAuthHeaderAsync để hai nơi không bao giờ lệch nhau.
+            await EnsureAuthHeaderAsync();
 
             var identity = new ClaimsIdentity(ParseClaims(token), "jwt");
             return new AuthenticationState(new ClaimsPrincipal(identity));

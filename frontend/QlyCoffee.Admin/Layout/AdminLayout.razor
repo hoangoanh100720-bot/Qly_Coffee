@@ -13,6 +13,7 @@
 @inject AlertService Alerts
 @inject ThemeService Theme
 @inject ApiClient Api
+@inject AuthStateProvider Auth
 @implements IDisposable
 
 @*  Chặn lập chỉ mục cho TOÀN BỘ khối quản lý, khai báo một lần ở layout thay vì
@@ -212,6 +213,17 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // CHỜ TOKEN ĐƯỢC GẮN TRƯỚC KHI GỌI API.
+        //
+        // Layout khởi tạo sớm hơn thành phần trang bên trong, nên nếu gọi thẳng
+        // thì lời gọi đầu tiên đi ra khi HttpClient chưa có header Authorization
+        // và nhận về 401 — bốn con số huy hiệu im lặng không bao giờ hiện, mỗi
+        // lần tải lại trang lại một dòng 401 đỏ trong console.
+        //
+        // Chỉ lộ ra khi tải lại bằng F5; bấm chuyển trang trong app thì token đã
+        // gắn từ trước nên mọi thứ trông vẫn bình thường.
+        await Auth.EnsureAuthHeaderAsync();
+
         await LoadBadgesAsync();
 
         // 60 giây một lần. Đủ nhanh để nhân viên thấy đơn mới mà không biến
