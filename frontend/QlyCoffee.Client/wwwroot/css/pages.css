@@ -30,6 +30,71 @@
 /* =============================================================================
    §1  TRANG CHỦ
 ============================================================================= */
+/* --- Nền cà phê cho cả trang chủ -------------------------------------------
+   Nền kem phẳng cũ sạch nhưng không nói được gì — khách lướt qua không đoán
+   ra đây là quán cà phê. Giờ cả trang chủ nằm trên ẢNH HẠT CÀ PHÊ RANG phủ
+   một lớp nâu espresso, bố cục các khối giữ nguyên như cũ.
+
+   ĐỔI TOKEN, KHÔNG ĐỔI TỪNG KHỐI. .home-coffee định nghĩa lại bộ màu (nền,
+   bề mặt, chữ, viền, accent) theo tông nâu tối, nên thẻ món, chip, nút,
+   danh mục... bên trong tự ra đúng màu mà không phải viết đè từng class.
+   Giống hệt cách giao diện tối hoạt động, chỉ khác là tông nâu ấm hơn và
+   áp dụng ở cả hai giao diện — trang chủ luôn là "quán về đêm".
+
+   Lớp phủ .78–.86: hạt cà phê vẫn thấy rõ hình khối, nhưng chữ kem đặt
+   lên vẫn đạt trên 10:1 ở mọi chỗ. Chữ phụ --text-2 đạt trên 7:1.
+
+   background-attachment: fixed để hạt cà phê đứng yên khi nội dung trôi qua
+   — như nhìn qua lớp kính xuống bao hạt. Màn cảm ứng (iOS bỏ qua fixed và
+   phóng ảnh theo cả chiều dài trang) thì để cuộn bình thường.               */
+.home-coffee {
+  --bg:            hsl(20 34% 8%);
+  --bg-sunken:     hsl(20 36% 6%);
+  --surface:       hsl(22 26% 13%);
+  --surface-2:     hsl(22 24% 16%);
+  --surface-3:     hsl(22 22% 20%);
+  --border:        hsl(26 22% 23%);
+  --border-strong: hsl(26 20% 34%);
+  --text:          hsl(38 46% 94%);
+  --text-2:        hsl(34 24% 77%);
+  --muted:         hsl(30 15% 63%);
+  --accent:        hsl(30 95% 60%);
+  --accent-hover:  hsl(32 98% 68%);
+  --accent-bright: hsl(32 98% 64%);
+  --accent-fg:     hsl(22 60% 10%);
+  --accent-soft:   hsl(24 42% 19%);
+  --accent-border: hsl(26 48% 36%);
+  --fresh:         hsl(160 60% 55%);
+  --fresh-soft:    hsl(162 35% 16%);
+  --ok:            hsl(150 55% 55%);
+  --danger:        hsl(358 85% 68%);
+  --danger-soft:   hsl(358 32% 17%);
+  --danger-border: hsl(358 28% 32%);
+  --shadow:        0 1px 2px hsl(0 0% 0% / .35), 0 4px 12px -4px hsl(0 0% 0% / .5);
+  --shadow-lg:     0 2px 4px hsl(0 0% 0% / .4), 0 18px 36px -12px hsl(0 0% 0% / .7);
+
+  color: var(--text);
+  padding-bottom: 1px;  /* chặn margin của dải chốt tràn ra ngoài lớp nền */
+  background:
+    linear-gradient(180deg, hsl(20 40% 7% / .78), hsl(20 38% 8% / .86)),
+    url("../img/hat-ca-phe-rang.webp") center / cover fixed,
+    var(--bg);
+}
+@media (hover: none) {
+  .home-coffee { background-attachment: scroll; background-size: auto, 900px auto, auto; background-repeat: repeat; }
+}
+
+/* Chân trang của khung chung có margin-top 80px — trên trang chủ nó thành
+   một vạch kem lạc lõng giữa nền nâu và chân trang. */
+.shop-root:has(.home-coffee) .shop-footer { margin-top: 0; }
+
+/* Thẻ món, thẻ cam kết, banner khuyến mãi: nền hơi trong để hạt cà phê phía
+   sau thấp thoáng qua, viền sáng nhẹ để thẻ tách khỏi nền tối. */
+.home-coffee :is(.product-card, .feature-card, .promo-banner) {
+  background: hsl(22 26% 13% / .92);
+  backdrop-filter: blur(6px);
+}
+
 /* --- Dải nền hero ----------------------------------------------------------
    MỘT lớp chuyển sắc dọc duy nhất, rất nhạt, từ kem ấm về màu nền.
 
@@ -583,6 +648,218 @@
   box-shadow: 0 8px 24px -8px hsl(22 45% 12% / .4);
 }
 .cta-btn:hover { background: white; color: var(--accent-hover); }
+
+/* --- Trang chủ trên nền cà phê: ba chỗ chỉnh riêng --------------------------
+   1. HERO cho hạt cà phê lộ rõ nhất: lớp phủ đặc ở cột chữ, mỏng dần sang
+      phải — mắt gặp ngay một mảng hạt rang bóng dầu sau tấm ảnh vòm.
+   2. SLOGAN TO HƠN. "Ghé một chút, thơm cả ngày." là câu khách nhớ được, nên
+      nó phải là thứ to nhất trên màn hình đầu tiên: trần 84px thay vì 60px,
+      kèm bóng chữ để nét serif mảnh không bị hạt cà phê phía sau làm nhòe.
+   3. DẢI CHỐT bỏ gradient cam-hồng (đọc ra là app giao đồ ăn) — thay bằng
+      tông caramel phủ lên chính ảnh hạt rang, cùng họ với cả trang.          */
+.home-coffee .hero-band {
+  background:
+    linear-gradient(90deg,
+      hsl(20 40% 7% / .9)  0%,
+      hsl(20 40% 7% / .72) 45%,
+      hsl(20 40% 7% / .35) 100%),
+    url("../img/hat-ca-phe-rang.webp") center / cover;
+  border-bottom-color: var(--border);
+}
+.home-coffee .hero-title {
+  font-size: clamp(2.75rem, 1.5rem + 4.2vw, 5.25rem);
+  font-weight: 800;
+  line-height: 1.12;
+  text-shadow: 0 4px 30px hsl(20 40% 5% / .7);
+}
+.home-coffee .hero-photo {
+  box-shadow: 0 0 0 1px hsl(38 46% 94% / .14),
+              0 30px 60px -20px hsl(0 0% 0% / .7),
+              0 0 90px -10px hsl(30 95% 55% / .35);
+}
+
+.home-coffee .hero-band { overflow: hidden; }
+
+/* --- Vòm ảnh động (kiểu ảnh GIF) ---------------------------------------------
+   Mọi ô xếp chồng kín khung. Mỗi ô chạy cùng một vòng 20 giây nhưng lệch pha
+   d × 4s, nên tại mỗi thời điểm chỉ một ô hiện:
+
+     0–3%    hiện dần lên (chồng lên ô trước đang mờ đi → chuyển cảnh mềm)
+     3–20%   đứng yên, ảnh phóng chậm từ 1.12 về 1.02 (hiệu ứng Ken Burns)
+     20–23%  mờ dần đi, đúng lúc ô kế tiếp hiện lên
+
+   20 giây / 5 món = 4 giây một món. Thêm bớt món trong HeroSlides thì đổi
+   20s và 4s cho khớp (thời lượng = số món × 4s), keyframes giữ nguyên chỉ
+   khi đúng 5 món — với n món, mốc 20% thành 100/n %.
+
+   Lớp tối ở đáy chuyển từ ::after của khung vào từng ô, để chú thích của ô
+   nào nằm trên lớp tối của ô đó.
+
+   KHÔNG CÓ CHUYỂN ĐỘNG (giảm chuyển động, hoặc CSS chưa tải xong) thì chỉ ô
+   đầu hiện — các ô sau mặc định trong suốt, không bao giờ xếp chồng lộ ra. */
+.hero-slider::after { content: none; }
+.slider-stage { position: absolute; inset: 0; }
+.slide {
+  position: absolute; inset: 0;
+  overflow: hidden;
+  opacity: 0;
+  animation: hero-fade 20s linear infinite;
+  animation-delay: calc(var(--d) * 4s - 20s);
+}
+.slide:first-child { opacity: 1; }
+.slide img {
+  animation: hero-zoom 20s linear infinite;
+  animation-delay: inherit;
+}
+.slide::after {
+  content: "";
+  position: absolute; inset: auto 0 0 0; z-index: 1;
+  height: 46%;
+  background: linear-gradient(to top, hsl(22 45% 8% / .8) 0%, hsl(22 45% 8% / .45) 42%, transparent 100%);
+  pointer-events: none;
+}
+.slide .hero-caption { animation: hero-caption 20s var(--ease-out) infinite; animation-delay: inherit; }
+
+.hero-slider:hover :is(.slide, .slide img, .slide .hero-caption, .slider-dots span) {
+  animation-play-state: paused;
+}
+
+@keyframes hero-fade {
+  0%       { opacity: 0; }
+  3%, 20%  { opacity: 1; }
+  23%, 100% { opacity: 0; }
+}
+@keyframes hero-zoom {
+  0%        { transform: scale(1.12); }
+  23%, 100% { transform: scale(1.02); }
+}
+@keyframes hero-caption {
+  0%, 2%    { opacity: 0; translate: 0 16px; }
+  6%, 20%   { opacity: 1; translate: 0 0; }
+  22%, 100% { opacity: 0; translate: 0 0; }
+}
+
+/* Chấm vị trí: chấm của món đang hiện dài ra thành vạch, cùng nhịp với ảnh. */
+.slider-dots {
+  position: absolute; z-index: 3;
+  right: clamp(var(--space-5), 6%, var(--space-8));
+  bottom: clamp(var(--space-5), 6%, var(--space-8));
+  display: flex; gap: 6px;
+}
+.slider-dots span {
+  width: 8px; height: 8px;
+  border-radius: var(--radius-full);
+  background: hsl(40 60% 97% / .45);
+  animation: hero-dot 20s infinite;
+  animation-delay: calc(var(--d) * 4s - 20s);
+}
+@keyframes hero-dot {
+  0%, 20%   { width: 22px; background: hsl(40 60% 97%); }
+  23%, 100% { width: 8px;  background: hsl(40 60% 97% / .45); }
+}
+
+/* --- Hạt cà phê trang trí ------------------------------------------------------
+   Hạt thường: bầu dục nâu bóng, rãnh giữa cong vẽ bằng viền trái của một
+   hình elip hẹp. Hạt "bé cưng" (.bean-cute): to hơn, sáng màu hơn, có hai
+   mắt long lanh, má hồng và miệng cười — tất cả vẽ bằng radial-gradient.
+
+   Bay bằng transform (animation), lệch theo chuột bằng translate (--dx/--dy
+   do script đặt), xoay bằng rotate, to nhỏ bằng scale — bốn thuộc tính tách
+   rời nên cộng dồn với nhau, không cái nào đè cái nào.                       */
+.hero-beans { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.bean {
+  position: absolute;
+  width: 36px; aspect-ratio: 3 / 4;
+  border-radius: 50%;
+  background: radial-gradient(120% 90% at 30% 25%, hsl(26 55% 44%), hsl(20 55% 16%) 70%);
+  box-shadow: inset -3px -4px 6px hsl(20 60% 8% / .55),
+              0 12px 22px -8px hsl(0 0% 0% / .65);
+  translate: var(--dx, 0px) var(--dy, 0px);
+  transition: translate 700ms var(--ease-out);
+  animation: bean-float 6s ease-in-out infinite;
+  /* Quầng sáng ấm quanh hạt: không có nó, hạt trang trí lẫn mất vào ảnh hạt
+     rang làm nền — cùng màu, cùng hình. */
+  filter: drop-shadow(0 0 10px hsl(32 95% 60% / .35));
+}
+.bean::after {
+  content: "";
+  position: absolute; left: 40%; top: 12%; bottom: 12%;
+  width: 26%;
+  border-left: 2.5px solid hsl(20 60% 8% / .8);
+  border-radius: 50%;
+}
+@keyframes bean-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(-16px) rotate(12deg); }
+}
+
+.bean-cute {
+  width: 52px;
+  background: radial-gradient(120% 90% at 32% 25%, hsl(30 62% 56%), hsl(22 56% 30%) 75%);
+  animation: bean-bounce 3.2s ease-in-out infinite;
+}
+.bean-cute::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 39% 43%, white 0 1.4px, transparent 1.8px),
+    radial-gradient(circle at 67% 43%, white 0 1.4px, transparent 1.8px),
+    radial-gradient(circle at 37% 46%, hsl(20 60% 8%) 0 3.4px, transparent 3.9px),
+    radial-gradient(circle at 65% 46%, hsl(20 60% 8%) 0 3.4px, transparent 3.9px),
+    radial-gradient(ellipse 6px 3.5px at 24% 60%, hsl(350 85% 72% / .9), transparent),
+    radial-gradient(ellipse 6px 3.5px at 78% 60%, hsl(350 85% 72% / .9), transparent);
+}
+/* Miệng cười thay cho rãnh hạt */
+.bean-cute::after {
+  left: 50%; top: 55%; bottom: auto;
+  width: 12px; height: 7px;
+  translate: -50% 0;
+  border: 0;
+  border-bottom: 2.5px solid hsl(20 60% 8%);
+  border-radius: 0 0 12px 12px;
+}
+/* Hạt bé cưng nảy kiểu bóng cao su: lún xuống, bật lên, hơi nghiêng đầu. */
+@keyframes bean-bounce {
+  0%, 100% { transform: translateY(0) scale(1, 1) rotate(-6deg); }
+  15%      { transform: translateY(2px) scale(1.08, .92) rotate(-6deg); }
+  50%      { transform: translateY(-18px) scale(.96, 1.05) rotate(8deg); }
+}
+
+/* Vị trí rải quanh mép và quanh vòm, tránh giữa cột chữ để không chen vào
+   tiêu đề. Mỗi hạt một nhịp (duration/delay) nên không bao giờ bay đồng bộ. */
+.bean:nth-child(1)  { left: 4%;  top: 10%; rotate: -20deg; }
+.bean:nth-child(2)  { left: 11%; top: 84%; rotate: 35deg;  scale: .8;  animation-delay: -1s; animation-duration: 7s; }
+.bean:nth-child(3)  { left: 1%;  top: 50%; rotate: 60deg;  scale: .6;  animation-delay: -3s; }
+.bean:nth-child(4)  { left: 31%; top: 92%; rotate: -40deg; scale: .7;  animation-delay: -2s; animation-duration: 8s; }
+.bean:nth-child(5)  { left: 47%; top: 6%;  rotate: 10deg;  animation-delay: -1.2s; }
+.bean:nth-child(6)  { left: 54%; top: 76%; rotate: 80deg;  scale: 1.1; animation-delay: -4s; }
+.bean:nth-child(7)  { left: 58%; top: 28%; rotate: -15deg; scale: .55; animation-delay: -5s; animation-duration: 9s; }
+.bean:nth-child(8)  { left: 95%; top: 18%; rotate: 45deg;  scale: .9;  animation-delay: -2.5s; }
+.bean:nth-child(9)  { left: 91%; top: 80%; rotate: -12deg; animation-delay: -.6s; }
+.bean:nth-child(10) { left: 71%; top: 93%; rotate: 20deg;  scale: .75; animation-delay: -3.5s; animation-duration: 7.5s; }
+.bean:nth-child(11) { left: 84%; top: 4%;  rotate: -60deg; scale: .65; animation-delay: -1.8s; }
+.bean:nth-child(12) { left: 97%; top: 50%; rotate: 15deg;  scale: .8;  animation-delay: -4.4s; }
+.bean:nth-child(13) { left: 39%; top: 86%; rotate: 8deg;   scale: .85; animation-delay: -2.2s; }
+.bean:nth-child(14) { left: 23%; top: 3%;  rotate: 50deg;  scale: .7;  animation-delay: -6s; }
+
+@media (max-width: 900px) {
+  /* Màn hẹp: chữ chiếm gần hết bề ngang, bớt hạt cho đỡ rối. */
+  .bean:nth-child(n + 10) { display: none; }
+  .bean-cute { width: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide, .slide img, .slide .hero-caption, .slider-dots span, .bean { animation: none; }
+}
+
+.home-coffee .cta-band {
+  background:
+    linear-gradient(135deg, hsl(28 75% 34% / .9), hsl(16 65% 20% / .94)),
+    url("../img/hat-ca-phe-rang.webp") center / cover;
+}
+.home-coffee .cta-btn { color: hsl(20 50% 18%); }
+.home-coffee .cta-btn:hover { color: hsl(16 70% 30%); }
 
 /* Tôn trọng cấu hình giảm chuyển động của hệ điều hành.
    Trang chủ chỉ còn một hiệu ứng lặp vô hạn duy nhất — chấm nhấp nháy trên chip

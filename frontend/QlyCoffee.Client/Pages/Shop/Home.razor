@@ -37,7 +37,25 @@
      Hai cột: chữ bên trái, ảnh cắt hình vòm bên phải.
      Ranh giới giữa hai cột cố tình bị phá bằng quầng sáng và một chip gác lên
      mép vòm — xem lý do trong pages.css §1 ở khối .hero-visual.              *@
-<section class="hero-band">
+@*  NỀN CÀ PHÊ — cả trang chủ nằm trong một lớp nền nâu espresso phủ lên ảnh
+    hạt cà phê rang. Lớp này đổi luôn bộ token màu bên trong (xem .home-coffee
+    trong pages.css §1), nên mọi khối bên dưới tự ra chữ kem trên nền nâu mà
+    không phải sửa từng khối.                                                 *@
+<div class="home-coffee">
+
+<section class="hero-band" data-spotlight>
+
+    @*  HẠT CÀ PHÊ TRANG TRÍ — vẽ hoàn toàn bằng CSS, không tốn file ảnh nào.
+        Mỗi hạt bay lên xuống với nhịp riêng; vài hạt "bé cưng" có mắt và má
+        hồng cho trang bớt nghiêm, hợp gu khách trẻ. data-depth: rê chuột thì
+        hạt lệch theo với biên độ khác nhau, hạt gần lệch nhiều, hạt xa lệch ít
+        — xem window.qlyFx trong index.html. Toàn bộ là trang trí: aria-hidden. *@
+    <div class="hero-beans" aria-hidden="true">
+        @for (int i = 0; i < 14; i++)
+        {
+            <span class="bean @(i % 4 == 0 ? "bean-cute" : "")" data-depth="@((i % 3 + 1) * 12)"></span>
+        }
+    </div>
     <div class="container hero">
 
         <div class="hero-text">
@@ -153,17 +171,44 @@
             fetchpriority="high" vì đây là phần tử LCP — chỉ số Google dùng để
             chấm tốc độ hiển thị. Không đặt loading="lazy": ảnh nằm ngay trong
             màn hình đầu tiên, hoãn tải nó chỉ làm trang chậm hơn.              *@
-        <div class="hero-visual">
-            <figure class="hero-photo">
-                <img src="@DrinkPhoto.HeroCaPhe"
-                     alt="Ly cà phê sữa đá pha phin tại Một Chút Coffee"
-                     fetchpriority="high" decoding="async"
-                     width="900" height="675" />
+        @*  VÒM ẢNH ĐỘNG — các món lần lượt hiện ra NGAY TẠI CHỖ như một ảnh GIF:
+            ảnh cũ mờ đi, ảnh mới hiện lên và phóng nhẹ, tên món trượt lên theo.
 
-                <figcaption class="hero-caption">
-                    <span class="hero-caption-name">Cà phê sữa đá</span>
-                    <span class="hero-caption-note">Rang mộc mỗi sáng</span>
-                </figcaption>
+            Chạy hoàn toàn bằng CSS (keyframes hero-fade trong pages.css §1),
+            không cần JS hay bộ đếm giờ ở C#: Blazor không phải vẽ lại gì cả.
+            Mọi ô xếp chồng trong khung, ô thứ d lệch pha d × 4 giây.
+            Rê chuột vào vòm thì dừng lại cho khách kịp đọc tên món.
+
+            Ảnh đầu tiên vẫn là cà phê sữa đá và vẫn tải ưu tiên (phần tử LCP);
+            nó cũng là ô duy nhất hiện sẵn khi không có chuyển động.          *@
+        <div class="hero-visual" data-reveal="zoom">
+            <figure class="hero-photo hero-slider" data-tilt aria-label="Một số món của quán">
+                <div class="slider-stage">
+                    @for (int i = 0; i < HeroSlides.Length; i++)
+                    {
+                        var s = HeroSlides[i];
+                        var first = i == 0;
+                        <div class="slide" style="--d: @i">
+                            <img src="@s.Src" alt="@s.Alt"
+                                 loading="@(first ? "eager" : "lazy")"
+                                 fetchpriority="@(first ? "high" : "auto")"
+                                 decoding="async" width="900" height="900"
+                                 style="object-position: @s.Focus" />
+                            <span class="hero-caption">
+                                <span class="hero-caption-name">@s.Name</span>
+                                <span class="hero-caption-note">@s.Note</span>
+                            </span>
+                        </div>
+                    }
+                </div>
+
+                @* Chấm chỉ vị trí — chạy cùng nhịp với dải ảnh *@
+                <span class="slider-dots" aria-hidden="true">
+                    @for (int i = 0; i < HeroSlides.Length; i++)
+                    {
+                        <span style="--d: @i"></span>
+                    }
+                </span>
             </figure>
         </div>
     </div>
@@ -178,7 +223,7 @@
          thay vì dựng khung xương, vì nó không phải nội dung chính của trang.  *@
     @if (_categories.Count > 0)
     {
-        <nav class="cat-rail" aria-label="Nhóm món">
+        <nav class="cat-rail" aria-label="Nhóm món" data-reveal-group>
             @foreach (var c in _categories)
             {
                 <a href="/menu/danh-muc/@c.Slug" class="cat-item" style="--cat: @c.ColorHex">
@@ -198,10 +243,10 @@
          cảm giác "ưu đãi hiếm" và đẩy lưới món xuống quá sâu.                 *@
     @if (_promoProducts.Count > 0)
     {
-        <section class="promo-stack" aria-label="Đang giảm giá">
+        <section class="promo-stack" aria-label="Đang giảm giá" data-reveal-group>
             @foreach (var p in _promoProducts.Take(2))
             {
-                <div class="promo-banner" style="--drink: @p.ColorPrimaryHex">
+                <div class="promo-banner" style="--drink: @p.ColorPrimaryHex" data-tilt="soft">
                     <img class="promo-photo"
                          src="@DrinkPhoto.PhotoFor(p.ImageUrl, p.CategoryName, p.Name)"
                          alt="@DrinkPhoto.AltFor(p.ImageUrl, p.Name, p.CategoryName)"
@@ -224,7 +269,7 @@
 
     @* ═══ 4. MÓN NỔI BẬT ════════════════════════════════════════════════════ *@
     <section class="section" id="mon-noi-bat">
-        <div class="row row-between section-head">
+        <div class="row row-between section-head" data-reveal>
             <div class="stack stack-2">
                 <span class="label">Khách gọi nhiều nhất</span>
                 <h2>Món <span class="text-mark">bán chạy</span> tuần này</h2>
@@ -255,7 +300,7 @@
         }
         else
         {
-            <div class="grid grid-cards">
+            <div class="grid grid-cards" data-reveal-group>
                 @foreach (var p in _featured)
                 {
                     <ProductCard Product="p" @key="p.Id" />
@@ -280,15 +325,15 @@
          Nội dung ba trang nằm trong Pages/Shop/Story.razor, kể cả các số liệu
          còn phải thay trước khi đăng. *@
     <section class="section">
-        <div class="stack stack-2 section-head">
+        <div class="stack stack-2 section-head" data-reveal>
             <span class="label">Vì sao chọn Một Chút</span>
             <h2>Không phải ly nào cũng giống nhau</h2>
         </div>
 
-        <div class="grid grid-3">
+        <div class="grid grid-3" data-reveal-group>
 
             @* ── Thẻ 1: workshop — thứ đối thủ sao chép chậm nhất ───────── *@
-            <a href="/cau-chuyen/workshop-pha-che" class="feature-card">
+            <a href="/cau-chuyen/workshop-pha-che" class="feature-card" data-tilt>
                 <img src="@DrinkPhoto.LatteArt"
                      alt="Người pha rót sữa tạo hình latte art trên ly cà phê tại quầy"
                      loading="lazy" decoding="async" width="800" height="500" />
@@ -303,7 +348,7 @@
             </a>
 
             @* ── Thẻ 2: hạt và nguyên liệu — chỗ vị giác kiểm chứng được ── *@
-            <a href="/cau-chuyen/hat-rang-moc" class="feature-card">
+            <a href="/cau-chuyen/hat-rang-moc" class="feature-card" data-tilt>
                 <img src="@DrinkPhoto.HatCaPhe" alt="Hạt cà phê rang mộc còn nguyên hạt"
                      loading="lazy" decoding="async" width="800" height="500" />
                 <div class="feature-body">
@@ -317,7 +362,7 @@
             </a>
 
             @* ── Thẻ 3: không gian — lý do người ta ngồi lại thay vì mang đi *@
-            <a href="/cau-chuyen/khong-gian-quan" class="feature-card">
+            <a href="/cau-chuyen/khong-gian-quan" class="feature-card" data-tilt>
                 <img src="@DrinkPhoto.KhongGian" alt="Không gian quán với bàn gỗ và nhiều cây xanh"
                      loading="lazy" decoding="async" width="800" height="500" />
                 <div class="feature-body">
@@ -337,13 +382,13 @@
          media query trong pages.css) — vì trên màn hẹp, chữ đọc trước có ích
          hơn là phải cuộn qua một tấm ảnh cao mới tới nội dung.                *@
     <section class="section split-section" id="ghe-quan">
-        <figure class="split-photo">
+        <figure class="split-photo" data-reveal="left">
             <img src="@DrinkPhoto.KhongGian"
                  alt="Không gian quán Một Chút Coffee với bàn gỗ và nhiều cây xanh"
                  loading="lazy" decoding="async" width="1000" height="700" />
         </figure>
 
-        <div class="stack stack-5 split-text">
+        <div class="stack stack-5 split-text" data-reveal="right">
             <span class="label">Ghé quán</span>
             <h2>Chỗ ngồi mát, wifi khỏe, ổ cắm khắp bàn</h2>
             <p class="lead">
@@ -377,7 +422,23 @@
     </div>
 </section>
 
+</div> @* /.home-coffee *@
+
 @code {
+    // --- Vòm ảnh trượt ở hero --------------------------------------------------
+    // Focus là object-position: ảnh hero gốc là ảnh ngang, ly nằm lệch trái (23%),
+    // các ảnh món còn lại là ảnh vuông, ly nằm giữa.
+    private sealed record HeroSlide(string Src, string Alt, string Name, string Note, string Focus);
+
+    private static readonly HeroSlide[] HeroSlides =
+    {
+        new(DrinkPhoto.HeroCaPhe,  "Ly cà phê sữa đá pha phin tại Một Chút Coffee", "Cà phê sữa đá", "Rang mộc mỗi sáng",       "23% 52%"),
+        new(DrinkPhoto.TraSua,     "Ly trà sữa trân châu",                          "Trà sữa trân châu", "Trân châu nấu mỗi ngày", "50% 50%"),
+        new(DrinkPhoto.TraTraiCay, "Ly trà trái cây nhiều màu",                     "Trà trái cây",  "Trái cây tươi pha khi gọi",  "50% 50%"),
+        new(DrinkPhoto.Matcha,     "Ly matcha latte xanh mát",                      "Matcha latte",  "Đánh tay từng ly",           "50% 50%"),
+        new(DrinkPhoto.DaXay,      "Ly đá xay phủ kem",                             "Đá xay",        "Mát lạnh cả ngày",           "50% 50%"),
+    };
+
     private List<ProductCardDto> _featured = new();
     private List<ProductCardDto> _promoProducts = new();
     private List<CategoryDto> _categories = new();

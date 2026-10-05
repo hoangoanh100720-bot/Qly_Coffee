@@ -131,3 +131,147 @@
 }
 
 
+
+/* =============================================================================
+   §3  NỀN HOA VĂN CÀ PHÊ
+=============================================================================
+   Toàn bộ khối bán hàng nằm trên một lớp hoa văn vẽ tay: hạt cà phê, ly, lá
+   trà, sợi khói. Nền màu phẳng trước đây không nói được gì; giờ cuộn tới đâu
+   cũng thấp thoáng hình cà phê, như giấy gói ly mang đi của quán.
+
+   Vẽ bằng mask chứ không phải background-image: màu của hoa văn lấy từ
+   --accent nên tự đổi theo giao diện sáng/tối, còn SVG trong data URI thì
+   không đọc được biến CSS. Độ đậm .07 — đủ để thấy khi nhìn vào khoảng trống,
+   không đủ để tranh với chữ (chữ luôn nằm trên thẻ có nền --surface hoặc
+   trên vùng hoa văn mờ tới mức tương phản giảm không đáng kể).
+
+   position: fixed — hoa văn đứng yên trong khi nội dung trôi qua, tạo cảm
+   giác nội dung là một lớp riêng đặt trên mặt bàn.                           */
+/* overflow-x: clip cắt hai mép dải chữ chạy nghiêng (rộng 104%) mà KHÔNG biến
+   khung thành vùng cuộn — dùng hidden thì thanh điều hướng sticky hỏng. */
+.shop-root { position: relative; isolation: isolate; overflow-x: clip; }
+.shop-root::before {
+  content: "";
+  position: fixed; inset: 0; z-index: -1;
+  pointer-events: none;
+  background: var(--accent);
+  opacity: .07;
+  -webkit-mask: var(--coffee-pattern) 0 0 / 220px 220px repeat;
+          mask: var(--coffee-pattern) 0 0 / 220px 220px repeat;
+}
+:root {
+  --coffee-pattern: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(30 30) rotate(-25)'%3E%3Cellipse cx='0' cy='0' rx='13' ry='18' fill='black' stroke='none'/%3E%3C/g%3E%3Cg transform='translate(130 40)'%3E%3Cpath d='M0 20h40v22a16 16 0 0 1-16 16h-8A16 16 0 0 1 0 42z'/%3E%3Cpath d='M40 26h6a8 8 0 0 1 0 16h-6'/%3E%3Cpath d='M12 12c-4-6 4-8 0-14M26 12c-4-6 4-8 0-14'/%3E%3C/g%3E%3Cg transform='translate(60 150) rotate(30)'%3E%3Cpath d='M0 0c14-18 34-18 44 0c-10 18-30 18-44 0z'/%3E%3Cpath d='M0 0h44'/%3E%3C/g%3E%3Cg transform='translate(175 165) rotate(40)'%3E%3Cellipse cx='0' cy='0' rx='10' ry='14' fill='black' stroke='none'/%3E%3C/g%3E%3Cg transform='translate(150 120) rotate(-60)'%3E%3Cellipse cx='0' cy='0' rx='7' ry='10' fill='black' stroke='none'/%3E%3C/g%3E%3Ccircle cx='100' cy='105' r='3' fill='black' stroke='none'/%3E%3Ccircle cx='20' cy='200' r='2.5' fill='black' stroke='none'/%3E%3C/svg%3E");
+}
+
+/* =============================================================================
+   §4  HIỆN DẦN KHI CUỘN & NGHIÊNG THEO CHUỘT
+=============================================================================
+   Script window.qlyFx trong index.html làm hai việc:
+     · gắn data-in lên phần tử có [data-reveal] (hoặc con của
+       [data-reveal-group]) khi nó lọt vào khung nhìn;
+     · cập nhật --rx/--ry/--gx/--gy trên phần tử [data-tilt] theo con trỏ.
+
+   CHỈ ẨN KHI CHẮC CHẮN SẼ HIỆN LẠI. Trạng thái ẩn ban đầu chỉ áp dụng khi thẻ
+   <html> có class .fx — class mà chính script đó gắn vào sau khi xác nhận
+   trình duyệt có IntersectionObserver và người dùng không bật giảm chuyển
+   động. Script lỗi hay bị chặn thì không có .fx, mọi thứ hiện bình thường —
+   không bao giờ có chuyện nội dung biến mất vì hiệu ứng.
+
+   Dùng thuộc tính data-in thay vì class: Blazor ghi đè nguyên thuộc tính
+   class mỗi lần vẽ lại (vd. chip mở/đóng cửa), class do script gắn sẽ mất.
+   Thuộc tính lạ thì Blazor để yên.                                           */
+.fx [data-reveal]:not([data-in]),
+.fx [data-reveal-group] > :not([data-in]) {
+  opacity: 0;
+  translate: 0 28px;
+}
+.fx [data-reveal="left"]:not([data-in])  { translate: -40px 0; }
+.fx [data-reveal="right"]:not([data-in]) { translate: 40px 0; }
+.fx [data-reveal="zoom"]:not([data-in])  { translate: 0 0; scale: .92; }
+
+/* NHÁT LAU — dùng cho các ô ảnh tràn mép của trang chủ. Nội dung hiện ra như
+   bị kéo tấm màn từ trên xuống (ô chẵn: từ trái sang), thay vì mờ dần — ảnh
+   lớn mà mờ dần thì trông như đang tải chậm, còn lau thì rõ ràng là chủ ý.
+
+   CHE CÁC PHẦN TỬ CON, KHÔNG CHE CHÍNH Ô. Chrome tính clip-path của phần tử
+   khi xét nó có nằm trong khung nhìn không: che kín chính ô thì vùng giao
+   bằng 0, IntersectionObserver không bao giờ báo, và ô ẩn vĩnh viễn. Che các
+   con thì ô vẫn "nhìn thấy được" (nền màu của nó hiện trước), nội dung lau
+   vào sau — hiệu ứng còn đẹp hơn.
+
+   Transition khai báo lại đủ các thuộc tính mà phần tử con vốn có (phóng
+   ảnh, mở mô tả, xoay tờ thực đơn) — khai báo ở đây đè cả danh sách cũ. */
+html.fx [data-reveal="wipe"] {
+  transition: flex-grow 700ms var(--ease-out);
+}
+html.fx [data-reveal="wipe"]:not([data-in]) { opacity: 1; translate: 0 0; }
+html.fx [data-reveal="wipe"] > * {
+  /* Âm 80px: sau khi lau xong, vùng cắt rộng hơn ô nên bóng đổ của tờ thực
+     đơn và nhãn dán không bị xén. */
+  clip-path: inset(-80px);
+  transition: clip-path 1100ms cubic-bezier(.77, 0, .18, 1) calc(var(--i, 0) * 110ms),
+              scale 800ms var(--ease-out), rotate 500ms var(--ease-bounce),
+              filter 500ms var(--ease-out), opacity 400ms var(--ease-out),
+              translate 400ms var(--ease-out), grid-template-rows 600ms var(--ease-out),
+              background-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+}
+html.fx [data-reveal="wipe"]:not([data-in]) > * { clip-path: inset(0 0 100% 0); }
+html.fx [data-reveal="wipe"]:nth-child(2n):not([data-in]) > * { clip-path: inset(0 100% 0 0); }
+
+.fx [data-reveal],
+.fx [data-reveal-group] > * {
+  /* Ba thuộc tính cuối là hiệu ứng hover sẵn có của thẻ món/thẻ cam kết.
+     Khai báo transition ở đây ĐÈ cả danh sách cũ, nên phải chép lại chúng,
+     nếu không thẻ sẽ giật cục khi rê chuột. */
+  transition: opacity 700ms var(--ease-out),
+              translate 700ms var(--ease-out),
+              scale 700ms var(--ease-out),
+              transform var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out);
+  /* Con thứ i của nhóm trễ i × 70ms — lưới món hiện lần lượt như được bày
+     ra từng ly, chứ không bật lên cùng lúc. --i do script gắn. Độ trễ chỉ áp
+     cho ba thuộc tính xuất hiện; hover thì phải phản hồi ngay. */
+  --reveal-delay: calc(var(--i, 0) * 70ms);
+  transition-delay: var(--reveal-delay), var(--reveal-delay), var(--reveal-delay), 0s, 0s, 0s;
+}
+
+/* NGHIÊNG 3D. Dùng thuộc tính rotate/translate riêng lẻ của phần tử cha thì
+   đụng với hiệu ứng hover sẵn có của thẻ (transform: translateY), nên ở đây
+   ghép tất cả vào MỘT transform. Chỉ áp dụng cho thiết bị có chuột thật —
+   trên màn cảm ứng, ngón tay chạm vào thẻ là để bấm, không phải để ngắm.   */
+@media (hover: hover) and (pointer: fine) {
+  [data-tilt], .product-card {
+    position: relative;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  html [data-tilt].is-tilting, html .product-card.is-tilting {
+    transform: perspective(900px)
+               rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+               translateY(-6px);
+    transition: transform 120ms linear, box-shadow var(--dur) var(--ease-out);
+  }
+  html [data-tilt="soft"].is-tilting {
+    transform: perspective(1400px)
+               rotateX(calc(var(--rx, 0deg) * .4)) rotateY(calc(var(--ry, 0deg) * .4))
+               translateY(-3px);
+  }
+  /* Vệt sáng lướt theo con trỏ — như ánh đèn quầy phản chiếu trên mặt ảnh. */
+  [data-tilt]::before, .product-card::before {
+    content: "";
+    position: absolute; inset: 0; z-index: 3;
+    border-radius: inherit;
+    background: radial-gradient(circle at var(--gx, 50%) var(--gy, 50%),
+                  hsl(40 100% 96% / .28), transparent 55%);
+    opacity: 0;
+    transition: opacity var(--dur-slow) var(--ease-out);
+    pointer-events: none;
+  }
+  [data-tilt].is-tilting::before, .product-card.is-tilting::before { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-root::before { opacity: .05; }
+  html [data-tilt].is-tilting, html .product-card.is-tilting { transform: none; }
+}

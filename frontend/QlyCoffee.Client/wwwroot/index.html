@@ -241,6 +241,157 @@
         } catch (e) { /* chế độ riêng tư chặn localStorage — dùng theo hệ thống */ }
 
         // --------------------------------------------------------------------
+        //  HIỆU ỨNG CUỘN & CHUỘT CỦA TRANG BÁN HÀNG
+        // --------------------------------------------------------------------
+        //  Bốn việc, tất cả điều khiển bằng thuộc tính data-* trong markup nên
+        //  các trang .razor không phải gọi JS interop:
+        //
+        //    [data-reveal] / [data-reveal-group]  hiện dần khi cuộn tới
+        //    [data-tilt], .product-card           nghiêng 3D theo con trỏ
+        //    [data-spotlight]                     đèn soi theo con trỏ (--mx/--my)
+        //    [data-parallax="hệ số"]              trôi chậm/nhanh hơn nhịp cuộn
+        //    [data-depth] trong vùng spotlight    lệch theo chuột (hạt cà phê)
+        //
+        //  Blazor dựng trang SAU khi file này chạy và còn dựng lại khi đổi
+        //  trang, nên phần tử được tìm bằng MutationObserver chứ không quét một
+        //  lần lúc tải. Mọi cập nhật vị trí đều gom vào requestAnimationFrame:
+        //  sự kiện chuột bắn hàng trăm lần mỗi giây, khung hình thì chỉ 60.
+        //
+        //  Người dùng bật "giảm chuyển động" thì cả khối này không chạy, thẻ
+        //  <html> không có class .fx, và CSS hiển thị mọi thứ ở trạng thái tĩnh.
+        // --------------------------------------------------------------------
+        (function () {
+            var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce || !('IntersectionObserver' in window)) return;
+
+            var finePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+            document.documentElement.classList.add('fx');
+
+            // --- Hiện dần ----------------------------------------------------
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    if (!e.isIntersecting) return;
+                    e.target.setAttribute('data-in', '');
+                    io.unobserve(e.target);
+                });
+            }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
+
+            var parallaxEls = [];
+
+            function bind() {
+                document.querySelectorAll('[data-reveal]:not([data-fx])').forEach(function (el) {
+                    el.setAttribute('data-fx', '');
+                    io.observe(el);
+                });
+                document.querySelectorAll('[data-reveal-group]').forEach(function (group) {
+                    var i = 0;
+                    Array.prototype.forEach.call(group.children, function (el) {
+                        if (el.hasAttribute('data-fx')) { i++; return; }
+                        el.setAttribute('data-fx', '');
+                        // Trễ tối đa 8 bậc: lưới 40 món mà trễ theo thứ tự thật
+                        // thì món cuối phải chờ gần 3 giây mới hiện.
+                        el.style.setProperty('--i', Math.min(i++, 8));
+                        io.observe(el);
+                    });
+                });
+                parallaxEls = Array.prototype.slice.call(document.querySelectorAll('[data-parallax]'));
+                onScroll();
+            }
+
+            var queued = false;
+            function schedule() {
+                if (queued) return;
+                queued = true;
+                requestAnimationFrame(function () { queued = false; bind(); });
+            }
+
+            // --- Parallax theo cuộn ------------------------------------------
+            // Chỉ tính cho phần tử đang nằm trong khung nhìn, dịch theo khoảng
+            // cách từ tâm phần tử tới tâm màn hình — nên ảnh nằm đúng chỗ khi
+            // nó ở giữa màn hình, bất kể nó nằm sâu bao nhiêu trong trang.
+            var scrollQueued = false;
+            function onScroll() {
+                if (scrollQueued) return;
+                scrollQueued = true;
+                requestAnimationFrame(function () {
+                    scrollQueued = false;
+                    var vh = window.innerHeight;
+                    parallaxEls.forEach(function (el) {
+                        var host = el.parentElement || el;
+                        var r = host.getBoundingClientRect();
+                        if (r.bottom < 0 || r.top > vh) return;
+                        var k = parseFloat(el.getAttribute('data-parallax')) || 0;
+                        var offset = (r.top + r.height / 2 - vh / 2) * k;
+                        el.style.transform = 'translate3d(0,' + offset.toFixed(1) + 'px,0)';
+                    });
+                });
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('resize', onScroll, { passive: true });
+
+            // --- Chuột: nghiêng thẻ + đèn soi --------------------------------
+            if (finePointer) {
+                var pending = null, tilted = null, moveQueued = false;
+
+                document.addEventListener('pointermove', function (e) {
+                    pending = e;
+                    if (moveQueued) return;
+                    moveQueued = true;
+                    requestAnimationFrame(function () {
+                        moveQueued = false;
+                        var ev = pending; pending = null;
+                        if (!ev) return;
+
+                        var card = ev.target.closest && ev.target.closest('[data-tilt], .product-card');
+                        if (tilted && tilted !== card) {
+                            tilted.classList.remove('is-tilting');
+                            tilted = null;
+                        }
+                        if (card) {
+                            var r = card.getBoundingClientRect();
+                            var x = (ev.clientX - r.left) / r.width;
+                            var y = (ev.clientY - r.top) / r.height;
+                            card.style.setProperty('--ry', ((x - 0.5) * 12).toFixed(2) + 'deg');
+                            card.style.setProperty('--rx', ((0.5 - y) * 10).toFixed(2) + 'deg');
+                            card.style.setProperty('--gx', (x * 100).toFixed(1) + '%');
+                            card.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+                            card.classList.add('is-tilting');
+                            tilted = card;
+                        }
+
+                        var spot = ev.target.closest && ev.target.closest('[data-spotlight]');
+                        if (spot) {
+                            var s = spot.getBoundingClientRect();
+                            var px = (ev.clientX - s.left) / s.width - 0.5;
+                            var py = (ev.clientY - s.top) / s.height - 0.5;
+                            spot.style.setProperty('--mx', (ev.clientX - s.left) + 'px');
+                            spot.style.setProperty('--my', (ev.clientY - s.top) + 'px');
+                            spot.style.setProperty('--px', (px * 2).toFixed(3));
+                            spot.style.setProperty('--py', (py * 2).toFixed(3));
+                            spot.querySelectorAll('[data-depth]').forEach(function (b) {
+                                var d = parseFloat(b.getAttribute('data-depth')) || 0;
+                                b.style.setProperty('--dx', (px * d * 2).toFixed(1) + 'px');
+                                b.style.setProperty('--dy', (py * d * 2).toFixed(1) + 'px');
+                            });
+                        }
+                    });
+                }, { passive: true });
+
+                // Rời cửa sổ thì trả thẻ về phẳng, không để nó nghiêng mãi.
+                document.addEventListener('pointerleave', function () {
+                    if (tilted) { tilted.classList.remove('is-tilting'); tilted = null; }
+                });
+            }
+
+            function start() {
+                bind();
+                new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+            else start();
+        })();
+
+        // --------------------------------------------------------------------
         //  GỠ BỘ THẺ SEO MẶC ĐỊNH
         // --------------------------------------------------------------------
         //  Component SeoHead THÊM thẻ mới vào <head> chứ không thay thế thẻ có
@@ -293,7 +444,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
+          href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;0,900;1,500;1,600;1,700&family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" />
 
     <!-- Ảnh hero là phần tử LCP (Largest Contentful Paint) — chỉ số Google dùng
          để chấm tốc độ. preload để nó bắt đầu tải song song với WebAssembly
@@ -306,8 +457,12 @@
          admin.css KHÔNG còn ở đây: 47KB đó chỉ phục vụ màn hình quản lý, khách
          mua cà phê không bao giờ chạm tới. -->
     <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css" />
-    <link rel="stylesheet" href="css/app.css" />
-    <link rel="stylesheet" href="css/pages.css" />
+    <!-- ?v=… ép trình duyệt tải lại CSS khi giao diện đổi. Máy chủ phát triển
+         không gửi Cache-Control, trình duyệt tự đoán và giữ bản cũ — kết quả là
+         trang mới (HTML do Blazor dựng) chạy với CSS cũ, vỡ bố cục. Sửa CSS
+         trang bán hàng thì tăng số này lên. -->
+    <link rel="stylesheet" href="css/app.css?v=20261005b" />
+    <link rel="stylesheet" href="css/pages.css?v=20261005b" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="img/og-cover.jpg" />
     <link rel="manifest" href="manifest.json" />
