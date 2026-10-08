@@ -18,6 +18,9 @@
 
 <PageTitle>Nguyên liệu — Một Chút Coffee</PageTitle>
 
+@* Tồn kho trừ theo từng đơn bán — tự cập nhật, không cần bấm làm mới *@
+<LiveRefresh Seconds="30" OnRefresh="() => LoadAsync(silent: true)" />
+
 <div class="stack stack-6">
 
     @* ── HÀNG TIÊU ĐỀ ────────────────────────────────────────────────────── *@
@@ -30,9 +33,11 @@
         </div>
 
         <div class="row row-2">
-            <a href="/nhap-kho" class="btn btn-primary btn-sm">
-                <TruckIcon Size="14" /> Nhập kho
-            </a>
+            <AuthorizeView Roles="Manager,Owner">
+                <a href="/nhap-kho" class="btn btn-primary btn-sm">
+                    <TruckIcon Size="14" /> Nhập kho
+                </a>
+            </AuthorizeView>
             <a href="/lo-hang" class="btn btn-secondary btn-sm">
                 <ClockIcon Size="14" /> Xem theo lô
             </a>
@@ -270,12 +275,20 @@
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync()
+    /// <param name="silent">
+    /// true khi <see cref="LiveRefresh"/> gọi: không bật khung xương, gọi hỏng
+    /// thì giữ nguyên bảng tồn kho đang hiện thay vì xoá trắng.
+    /// </param>
+    private async Task LoadAsync(bool silent = false)
     {
-        _loading = true;
-        StateHasChanged();
+        if (!silent)
+        {
+            _loading = true;
+            StateHasChanged();
+        }
 
         var res = await Api.GetIngredientsAsync();
+        if (silent && (!res.Success || res.Data is null)) return;
         _items = res.Success && res.Data is not null ? res.Data : new();
 
         _totalValue   = _items.Sum(i => i.StockValue);

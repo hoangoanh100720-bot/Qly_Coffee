@@ -426,9 +426,18 @@ public class OrderService : IOrderService
             order.CostTotal     = costTotal;
             order.UpdatedAt     = DateTime.UtcNow;
 
-            // Khách nhận hàng thì coi như đã trả tiền (tiền mặt tại quầy)
+            // Khách nhận hàng thì coi như đã trả tiền (tiền mặt tại quầy).
+            //
+            // Ghi luôn THỜI ĐIỂM và SỐ TIỀN thu, như webhook chuyển khoản vẫn làm.
+            // Trước đây đơn tiền mặt chỉ đổi trạng thái — PaidAt/PaidAmount bỏ
+            // trống — nên không có cách nào biết tiền vào két lúc nào, và đối
+            // soát két theo ca (CashShift) không cộng được tiền mặt.
             if (order.PaymentStatus == PaymentStatus.Unpaid)
+            {
                 order.PaymentStatus = PaymentStatus.Paid;
+                order.PaidAt      ??= order.CompletedAt;
+                if (order.PaidAmount == 0) order.PaidAmount = order.GrandTotal;
+            }
 
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);

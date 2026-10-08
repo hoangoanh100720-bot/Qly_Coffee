@@ -1,0 +1,96 @@
+@*
+    =============================================================================
+    LIVE REFRESH — Tự lấy số liệu mới theo chu kỳ, không cần bấm làm mới
+    =============================================================================
+    Đặt một dòng trong trang:
+
+        <LiveRefresh Seconds="30" OnRefresh="RefreshAsync" />
+
+    và trang tự gọi RefreshAsync mỗi 30 giây. Component không vẽ ra gì cả.
+
+    QUY ƯỚC CHO HÀM OnRefresh CỦA TRANG — đây là phần dễ làm sai:
+      · KHÔNG bật cờ _loading / khung xương. Làm vậy thì cứ 30 giây cả bảng lại
+        nhấp nháy thành khung xương rồi hiện lại — tệ hơn là không làm mới.
+      · Gọi API hỏng (rớt mạng, máy chủ khởi động lại) thì GIỮ NGUYÊN số liệu
+        cũ, không thay bằng danh sách rỗng. Lần sau gọi được thì tự đúng lại.
+      · Không đụng vào thứ người dùng đang nhập (ô tìm kiếm, bộ lọc, form).
+
+    TIẾT KIỆM: tab bị ẩn (chuyển tab khác, khóa màn hình điện thoại) thì bỏ qua
+    lượt đó — không ai nhìn thì không cần gọi API. Quay lại tab thì làm mới
+    NGAY, không chờ hết chu kỳ — người dùng quay lại chính là lúc họ muốn thấy
+    số mới nhất. Trạng thái tab đọc qua window.qlyLive trong index.html.
+
+    Lượt trước chưa xong thì lượt sau không chồng lên (PeriodicTimer chờ tuần
+    tự). Lỗi trong OnRefresh bị nuốt ở đây: một lần làm mới hỏng không được
+    phép kéo sập cả ứng dụng — đó chính là thứ hiện ra thanh "Đã có lỗi xảy ra".
+    =============================================================================
+*@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@code {
+    /// <summary>Chu kỳ làm mới, tính bằng giây. Tối thiểu 5.</summary>
+    [Parameter] public int Seconds { get; set; } = 30;
+
+    /// <summary>Hàm lấy số liệu mới của trang. Xem quy ước ở đầu file.</summary>
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    private readonly CancellationTokenSource _cts = new();
+    private DotNetObjectReference<LiveRefresh>? _self;
+    private bool _busy;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        _self = DotNetObjectReference.Create(this);
+        try { await JS.InvokeVoidAsync("qlyLive.onVisible", _self); }
+        catch (JSException) { /* index.html cũ chưa có qlyLive — vẫn chạy theo chu kỳ */ }
+
+        _ = LoopAsync();
+    }
+
+    private async Task LoopAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(5, Seconds)));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_cts.Token))
+            {
+                if (await IsHiddenAsync()) continue;
+                await RefreshNowAsync();
+            }
+        }
+        catch (OperationCanceledException) { /* rời trang */ }
+    }
+
+    /// <summary>Gọi từ JS khi người dùng quay lại tab.</summary>
+    [JSInvokable]
+    public Task OnTabVisible() => RefreshNowAsync();
+
+    private async Task RefreshNowAsync()
+    {
+        if (_busy || _cts.IsCancellationRequested) return;
+        _busy = true;
+        try { await InvokeAsync(() => OnRefresh.InvokeAsync()); }
+        catch (Exception ex) { Console.WriteLine($"[LiveRefresh] bỏ qua lượt lỗi: {ex.Message}"); }
+        finally { _busy = false; }
+    }
+
+    private async Task<bool> IsHiddenAsync()
+    {
+        try { return await JS.InvokeAsync<bool>("qlyLive.isHidden"); }
+        catch { return false; }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+        if (_self is not null)
+        {
+            try { await JS.InvokeVoidAsync("qlyLive.offVisible", _self); } catch { /* trang đã đóng */ }
+            _self.Dispose();
+        }
+        _cts.Dispose();
+    }
+}

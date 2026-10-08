@@ -121,8 +121,11 @@
             await Auth.LoginAsync(res.Data);
 
             // Quay lại đúng trang đang xem dở trước khi bị chặn.
-            // Không có thì về "/" — bảng điều khiển, gốc của app quản lý.
-            var target = string.IsNullOrEmpty(ReturnUrl) ? "/" : Uri.UnescapeDataString(ReturnUrl);
+            // Không có thì về trang gốc THEO VAI TRÒ: quản lý vào bảng điều khiển,
+            // nhân viên vào Ca làm việc — việc đầu tiên của họ là nhận két, và
+            // bảng điều khiển vốn không dành cho họ (bấm vào chỉ gặp "không có quyền").
+            var home = res.Data.User.Role is 2 or 3 ? "/" : "/ca-lam-viec";
+            var target = string.IsNullOrEmpty(ReturnUrl) ? home : Uri.UnescapeDataString(ReturnUrl);
             Nav.NavigateTo(target, forceLoad: false);
         }
         else

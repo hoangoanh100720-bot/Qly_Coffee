@@ -26,6 +26,21 @@
 
 <PageTitle>Bán hàng tại quầy — Một Chút Coffee</PageTitle>
 
+@* CHƯA AI NHẬN CA — nhắc ngay trên màn bán hàng. Không chặn bán: khách đang
+   đứng chờ thì không được bắt họ đợi nhân viên đếm két. Nhưng tiền thu lúc
+   này sẽ hiện là "thu ngoài ca" trong đối soát, không ai chịu trách nhiệm.
+   Tự kiểm tra lại mỗi 30 giây, nên vừa nhận ca xong là dải này tự biến mất. *@
+<LiveRefresh Seconds="30" OnRefresh="CheckShiftAsync" />
+@if (_noShift)
+{
+    <div class="alert alert-warn" style="margin-bottom: var(--space-4);">
+        <span>
+            <strong>Chưa có ai nhận ca.</strong> Tiền bán ra lúc này sẽ không thuộc ca nào khi đối soát két.
+            <a href="/ca-lam-viec">Nhận ca ngay →</a>
+        </span>
+    </div>
+}
+
 <div class="pos-layout">
 
     @* ══════════════════════════════════════════════════════════════════════
@@ -128,7 +143,14 @@
                                 aria-pressed="@onTarget"
                                 title="@(!accepts && target is not null ? "Ly đang chọn không nhận topping này" : null)"
                                 @onclick="() => ToggleToppingOnTarget(t)">
-                            <span class="pos-topping-swatch" aria-hidden="true">
+                            @* Ảnh chụp thật của topping nếu có — nhân viên mới nhận ra
+                               "củ năng", "sương sáo" ngay mà không phải đọc kỹ tên.
+                               Đường dẫn PHẢI bắt đầu bằng "/": url() nằm trong biến CSS
+                               được trình duyệt phân giải theo vị trí file css/admin.css
+                               nơi biến được dùng, đường dẫn tương đối sẽ thành
+                               css/_content/… và ảnh không bao giờ tải được. *@
+                            <span class="pos-topping-swatch @(ToppingPhoto.For(t.Name) is null ? "" : "has-photo")" aria-hidden="true"
+                                  style="@(ToppingPhoto.For(t.Name) is { } p ? $"--photo: url('/{p}')" : null)">
                                 @if (onTarget) { <CheckIcon Size="18" /> }
                             </span>
                             <span class="pos-tile-name">@t.Name</span>
@@ -816,7 +838,20 @@
         _payment = method;
     }
 
-    protected override async Task OnInitializedAsync() => await LoadMenuAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckShiftAsync();
+        await LoadMenuAsync();
+    }
+
+    /// <summary>Có ai đang đứng ca không. Lỗi mạng thì không báo sai là "chưa nhận ca".</summary>
+    private bool _noShift;
+
+    private async Task CheckShiftAsync()
+    {
+        var res = await Api.GetCurrentShiftAsync();
+        if (res.Success && res.Data is not null) _noShift = res.Data.Open is null;
+    }
 
     private async Task LoadMenuAsync()
     {

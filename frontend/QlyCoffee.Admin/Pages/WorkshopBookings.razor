@@ -26,6 +26,9 @@
 
 <PageTitle>Đặt chỗ workshop — Một Chút Coffee</PageTitle>
 
+@* Khách vừa đặt chỗ trên web là hiện ngay, không cần bấm làm mới *@
+<LiveRefresh Seconds="30" OnRefresh="() => LoadAsync(silent: true)" />
+
 <div class="stack stack-6">
 
     <div class="row row-between row-wrap" style="gap: var(--space-4);">
@@ -87,7 +90,7 @@
                 <label class="field-label" for="den">Đến ngày</label>
                 <input id="den" class="input input-sm" type="date" @bind="_to" @bind:format="yyyy-MM-dd" />
             </div>
-            <button type="button" class="btn btn-secondary btn-sm" @onclick="LoadAsync">Lọc</button>
+            <button type="button" class="btn btn-secondary btn-sm" @onclick="() => LoadAsync()">Lọc</button>
         </div>
     </div>
 
@@ -275,10 +278,17 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    /// <param name="silent">
+    /// true khi <see cref="LiveRefresh"/> gọi: không bật khung xương, không báo
+    /// lỗi mỗi 30 giây, gọi hỏng thì giữ nguyên danh sách đang hiện.
+    /// </param>
+    private async Task LoadAsync(bool silent = false)
     {
-        _loading = true;
-        StateHasChanged();
+        if (!silent)
+        {
+            _loading = true;
+            StateHasChanged();
+        }
 
         var res = await Api.GetWorkshopBookingsAsync(
             _from.ToString("yyyy-MM-dd"), _to.ToString("yyyy-MM-dd"), _status);
@@ -286,6 +296,7 @@
 
         if (!res.Success || res.Data is null)
         {
+            if (silent) return;
             Alerts.Error(res.Error?.Message ?? "Chưa tải được danh sách đặt chỗ.");
             _bookings = new();
             return;

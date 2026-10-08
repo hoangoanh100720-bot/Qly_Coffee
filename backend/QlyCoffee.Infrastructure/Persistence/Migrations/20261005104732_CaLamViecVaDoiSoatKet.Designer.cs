@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using QlyCoffee.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using QlyCoffee.Infrastructure.Persistence;
 namespace QlyCoffee.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261005104732_CaLamViecVaDoiSoatKet")]
+    partial class CaLamViecVaDoiSoatKet
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,123 +24,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("QlyCoffee.Domain.Entities.Attendance", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("CashShiftId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("cash_shift_id");
-
-                    b.Property<DateTime>("CheckInAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("check_in_at");
-
-                    b.Property<DateTime?>("CheckOutAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("check_out_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<int>("EarlyLeaveMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("early_leave_minutes");
-
-                    b.Property<string>("EmployeeCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("employee_code");
-
-                    b.Property<Guid>("EmployeeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("employee_id");
-
-                    b.Property<string>("EmployeeName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("employee_name");
-
-                    b.Property<int>("HourlyWage")
-                        .HasColumnType("integer")
-                        .HasColumnName("hourly_wage")
-                        .HasComment("Lương giờ chụp lại lúc chấm vào.");
-
-                    b.Property<int>("LateMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("late_minutes")
-                        .HasComment("Phút trễ so với giờ bắt đầu ca. 0 nếu đúng giờ.");
-
-                    b.Property<int>("Pay")
-                        .HasColumnType("integer")
-                        .HasColumnName("pay")
-                        .HasComment("Tiền công lần này, đồng. Tính lúc chấm ra.");
-
-                    b.Property<DateTime>("SlotEndAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("slot_end_at");
-
-                    b.Property<Guid>("SlotId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("slot_id");
-
-                    b.Property<string>("SlotName")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)")
-                        .HasColumnName("slot_name");
-
-                    b.Property<DateTime>("SlotStartAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("slot_start_at");
-
-                    b.Property<Guid>("StoreId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("store_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<DateOnly>("WorkDate")
-                        .HasColumnType("date")
-                        .HasColumnName("work_date");
-
-                    b.Property<int>("WorkedMinutes")
-                        .HasColumnType("integer")
-                        .HasColumnName("worked_minutes")
-                        .HasComment("Phút được tính lương = giao giữa [vào, ra] và khung ca.");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmployeeId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_attendances_mot_lan_dang_lam")
-                        .HasFilter("check_out_at IS NULL AND deleted_at IS NULL");
-
-                    b.HasIndex("StoreId", "WorkDate")
-                        .HasDatabaseName("ix_attendances_bang_cong");
-
-                    b.ToTable("attendances", null, t =>
-                        {
-                            t.HasComment("Một lần chấm công vào/ra. Giờ ca, lương giờ và tiền công được CHỤP LẠI — đổi giờ ca hay tăng lương sau này không làm đổi bảng công đã chốt.");
-                        });
-                });
 
             modelBuilder.Entity("QlyCoffee.Domain.Entities.CashShift", b =>
                 {
@@ -158,10 +44,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("ClosedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("closed_at");
-
-                    b.Property<Guid?>("ClosedByEmployeeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("closed_by_employee_id");
 
                     b.Property<Guid?>("ClosedById")
                         .HasColumnType("uuid")
@@ -209,10 +91,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         .HasColumnName("expected_opening_cash")
                         .HasComment("Số ca trước bàn giao lại. Khác opening_cash = két lệch giữa hai ca.");
 
-                    b.Property<Guid?>("HandedOverToEmployeeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("handed_over_to_employee_id");
-
                     b.Property<Guid?>("HandedOverToId")
                         .HasColumnType("uuid")
                         .HasColumnName("handed_over_to_id");
@@ -230,10 +108,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("OpenedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at");
-
-                    b.Property<Guid?>("OpenedByEmployeeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("opened_by_employee_id");
 
                     b.Property<Guid>("OpenedById")
                         .HasColumnType("uuid")
@@ -591,102 +465,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                     b.ToTable("daily_sales", null, t =>
                         {
                             t.HasComment("Doanh số theo món theo ngày. Dùng tính số ly bán TB/ngày khi sinh phương án khuyến mãi.");
-                        });
-                });
-
-            modelBuilder.Entity("QlyCoffee.Domain.Entities.Employee", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<int>("FailedPinAttempts")
-                        .HasColumnType("integer")
-                        .HasColumnName("failed_pin_attempts");
-
-                    b.Property<string>("FullName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)")
-                        .HasColumnName("full_name");
-
-                    b.Property<DateOnly?>("HiredOn")
-                        .HasColumnType("date")
-                        .HasColumnName("hired_on");
-
-                    b.Property<int>("HourlyWage")
-                        .HasColumnType("integer")
-                        .HasColumnName("hourly_wage")
-                        .HasComment("Lương theo giờ, đồng.");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("note");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("phone");
-
-                    b.Property<string>("PinHash")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("pin_hash")
-                        .HasComment("PIN chấm công băm BCrypt. Không bao giờ lưu PIN gốc.");
-
-                    b.Property<DateTime?>("PinLockedUntil")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("pin_locked_until")
-                        .HasComment("Sai PIN 5 lần thì khoá tới mốc này — chống dò PIN ở quầy.");
-
-                    b.Property<string>("Position")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)")
-                        .HasColumnName("position");
-
-                    b.Property<Guid>("StoreId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("store_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StoreId", "Code")
-                        .IsUnique()
-                        .HasDatabaseName("ux_employees_ma_nv");
-
-                    b.ToTable("employees", null, t =>
-                        {
-                            t.HasComment("Hồ sơ nhân viên — KHÁC tài khoản đăng nhập. Chấm công bằng mã NV + PIN riêng trên máy quầy dùng chung.");
                         });
                 });
 
@@ -2957,62 +2735,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("QlyCoffee.Domain.Entities.WorkSlot", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deleted_by_user_id");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_active");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)")
-                        .HasColumnName("name");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("sort_order");
-
-                    b.Property<TimeOnly>("StartTime")
-                        .HasColumnType("time without time zone")
-                        .HasColumnName("start_time")
-                        .HasComment("Giờ bắt đầu theo giờ Việt Nam.");
-
-                    b.Property<Guid>("StoreId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("store_id");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StoreId", "SortOrder");
-
-                    b.ToTable("work_slots", null, t =>
-                        {
-                            t.HasComment("Khung ca 4 tiếng. Quản lý đặt tên và giờ bắt đầu; độ dài cố định.");
-                        });
-                });
-
             modelBuilder.Entity("QlyCoffee.Domain.Entities.WorkshopBooking", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3371,17 +3093,6 @@ namespace QlyCoffee.Infrastructure.Persistence.Migrations
                         {
                             t.HasComment("Một BUỔI workshop cụ thể trên lịch. Lịch lặp hằng tuần được sinh thành từng bản ghi rời chứ không lưu quy tắc lặp — buổi nào cũng có thể dời giờ, đổi chủ đề, hạ giá hoặc hủy riêng nó.");
                         });
-                });
-
-            modelBuilder.Entity("QlyCoffee.Domain.Entities.Attendance", b =>
-                {
-                    b.HasOne("QlyCoffee.Domain.Entities.Employee", "Employee")
-                        .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Employee");
                 });
 
             modelBuilder.Entity("QlyCoffee.Domain.Entities.Category", b =>

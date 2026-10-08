@@ -57,9 +57,11 @@
             <div class="row row-2 row-wrap">
                 @if (raw.Count > 0)
                 {
-                    <a href="/nhap-kho" class="btn btn-secondary btn-sm">
-                        <TruckIcon Size="14" /> Nhập kho theo danh sách
-                    </a>
+                    <AuthorizeView Roles="Manager,Owner">
+                        <a href="/nhap-kho" class="btn btn-secondary btn-sm">
+                            <TruckIcon Size="14" /> Nhập kho theo danh sách
+                        </a>
+                    </AuthorizeView>
                 }
                 @if (prep.Count > 0)
                 {

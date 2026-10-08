@@ -1119,6 +1119,11 @@
   border: 1px solid color-mix(in srgb, var(--drink, var(--accent)) 60%, var(--border));
   color: white;
 }
+/* Có ảnh chụp: ảnh phủ kín ô, khối màu chỉ còn là nền lúc ảnh đang tải. */
+.pos-topping-swatch.has-photo {
+  background: var(--photo) center / cover, var(--drink, var(--accent));
+}
+.pos-topping-tile.is-out .pos-topping-swatch.has-photo { filter: grayscale(.85); }
 .pos-topping-tile.is-selected {
   outline: 3px solid var(--accent);
   outline-offset: -3px;
@@ -1553,3 +1558,123 @@
   display: flex; align-items: center; gap: var(--space-3);
 }
 
+
+/* =============================================================================
+   CA LÀM VIỆC & ĐỐI SOÁT KÉT  (/ca-lam-viec, /doi-soat-ca)
+============================================================================= */
+.shift-layout { max-width: 560px; }
+
+.shift-who { display: flex; flex-direction: column; gap: var(--space-1); }
+.shift-who strong { font-size: var(--text-lg); }
+
+/* Dải "ai đang đứng ca" — viền trái màu accent khi chính mình đứng ca, để
+   nhân viên liếc qua là biết két đang nằm trong tay ai. */
+.shift-banner { border-left: 4px solid var(--border-strong); }
+.shift-banner.is-mine { border-left-color: var(--accent); background: var(--accent-soft); }
+.shift-name { font-size: var(--text-xl); line-height: 1.2; }
+
+/* Bảng đối chiếu ngay khi gõ: lẽ ra có / thực đếm / chênh lệch / nộp. */
+.shift-recon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.shift-recon > div { display: flex; flex-direction: column; gap: 2px; }
+.shift-recon span { font-size: var(--text-xs); color: var(--muted); font-weight: 600; }
+.shift-recon strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+.shift-recon .is-ok strong  { color: var(--ok); }
+.shift-recon .is-bad strong { color: var(--danger); }
+
+/* Báo cáo đối soát: dòng ca lệch két tô nền đỏ nhạt để nhìn là thấy. */
+.shift-row-bad td { background: var(--danger-soft); }
+.diff-neg { color: var(--danger); font-weight: 700; }
+.diff-pos { color: var(--warn); font-weight: 700; }
+.diff-ok  { color: var(--ok); }
+
+/* --- Quầy chấm công --------------------------------------------------------
+   Máy quầy thường là màn cảm ứng: mọi nút tối thiểu 48px cao, tên bấm được
+   bằng cả ô chứ không phải một radio bé xíu. */
+.kiosk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 960px) { .kiosk-layout { grid-template-columns: 1fr; } }
+
+.kiosk-clock {
+  font-size: var(--text-2xl); font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.kiosk-clock small { font-size: var(--text-lg); color: var(--muted); font-weight: 600; }
+
+.kiosk-modes .choice { min-height: 44px; padding-inline: var(--space-6); font-weight: 700; }
+
+.kiosk-names {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+.kiosk-name {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease-out), background var(--dur) var(--ease-out);
+}
+.kiosk-name:hover:not(:disabled) { border-color: var(--accent-border); }
+.kiosk-name.is-selected { border: 2px solid var(--accent); background: var(--accent-soft); }
+.kiosk-name:disabled { opacity: .5; cursor: not-allowed; }
+.kiosk-name:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.kiosk-avatar {
+  display: grid; place-items: center; flex: none;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--surface-3); color: var(--text-2);
+  font-weight: 800;
+}
+.kiosk-name.is-selected .kiosk-avatar { background: var(--accent); color: var(--accent-fg); }
+
+.kiosk-preview {
+  display: inline-block; margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm); font-weight: 700;
+}
+.kiosk-preview.is-ok   { background: var(--ok-soft);   color: var(--ok); }
+.kiosk-preview.is-late { background: var(--warn-soft); color: var(--warn); }
+
+.kiosk-check {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: 44px; font-weight: 600; cursor: pointer;
+}
+.kiosk-check input { width: 20px; height: 20px; accent-color: var(--accent); }
+
+/* Dải kết quả — câu trả lời "đúng giờ / trễ X phút" phải đọc được từ xa. */
+.kiosk-result {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+.kiosk-result.is-ok   { background: var(--ok-soft);     border-color: var(--ok-border); }
+.kiosk-result.is-late { background: var(--warn-soft);   border-color: var(--warn-border); }
+.kiosk-result.is-bad  { background: var(--danger-soft); border-color: var(--danger-border); }
+.kiosk-result-icon {
+  display: grid; place-items: center; flex: none;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--surface); font-size: var(--text-lg); font-weight: 800;
+}
+.kiosk-result-title { font-size: var(--text-lg); }
+.kiosk-result .btn { margin-left: auto; }
+
+.kiosk-duty { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.kiosk-duty li { display: flex; align-items: center; gap: var(--space-3); }

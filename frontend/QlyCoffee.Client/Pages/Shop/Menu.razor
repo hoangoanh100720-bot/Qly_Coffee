@@ -21,6 +21,9 @@
          Path="@SeoPath"
          Image="@SeoImage" />
 
+@* Món hết / còn, giá giảm tự cập nhật mỗi phút — bộ lọc khách đang chọn giữ nguyên *@
+<LiveRefresh Seconds="60" OnRefresh="RefreshAsync" />
+
 <div class="container section-sm">
 
     @* ── TIÊU ĐỀ TRANG ─────────────────────────────────────────────────────
@@ -225,6 +228,21 @@
         }
 
         _loading = false;
+    }
+
+    /// <summary>
+    /// Làm mới lặng lẽ cho <see cref="LiveRefresh"/>: không bật khung xương,
+    /// gọi hỏng thì giữ nguyên thực đơn đang hiện, bộ lọc danh mục giữ nguyên.
+    /// </summary>
+    private async Task RefreshAsync()
+    {
+        var result = await Api.GetMenuAsync();
+        if (!result.Success || result.Data is null) return;
+
+        _categories = result.Data.Categories.ToList();
+        _allProducts = result.Data.Products.ToList();
+        _error = null;
+        ApplyFilter();
     }
 
     private void SelectCategory(string? slug)

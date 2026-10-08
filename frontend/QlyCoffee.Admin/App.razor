@@ -11,6 +11,8 @@
     từng controller. Xem backend/QlyCoffee.Api/Controllers/AdminControllers.cs.
     =============================================================================
 *@
+@inject NavigationManager Nav
+
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
 
@@ -24,6 +26,11 @@
                     {
                         <RedirectToLogin />
                     }
+                    else if (StaffHomeRedirect.IsRoot(Nav))
+                    {
+                        @* Nhân viên mở trang gốc: đưa sang Ca làm việc, không hiện lỗi *@
+                        <StaffHomeRedirect />
+                    }
                     else
                     {
                         <div class="container section">
@@ -34,7 +41,7 @@
                                     Trang này dành cho quản lý. Nếu bạn cần truy cập,
                                     hãy liên hệ chủ quán để được cấp quyền.
                                 </span>
-                                <a href="/" class="btn btn-secondary">Về bảng điều khiển</a>
+                                <a href="/ca-lam-viec" class="btn btn-secondary">Về ca làm việc</a>
                             </div>
                         </div>
                     }

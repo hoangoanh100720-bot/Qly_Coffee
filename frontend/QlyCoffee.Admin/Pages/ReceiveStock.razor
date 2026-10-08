@@ -15,7 +15,8 @@
 *@
 @page "/nhap-kho"
 @layout AdminLayout
-@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@* Chỉ quản lý: nhập kho quyết định giá vốn — xem AdminControllers.cs, action "receive". *@
+@attribute [Authorize(Roles = "Manager,Owner")]
 @inject ApiClient Api
 @inject AlertService Alerts
 

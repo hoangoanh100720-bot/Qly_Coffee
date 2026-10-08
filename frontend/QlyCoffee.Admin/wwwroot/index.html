@@ -110,12 +110,15 @@
     <!-- design-system.css nằm trong thư viện dùng chung QlyCoffee.Ui nên có
          tiền tố _content/ theo quy ước Razor Class Library.
          admin.css là phần riêng của app này. -->
-    <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css" />
-    <link rel="stylesheet" href="css/admin.css" />
+    <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css?v=20261005c" />
+    <link rel="stylesheet" href="css/admin.css?v=20261005c" />
+    <!-- Đặt trong <head> để có hiệu lực TRƯỚC khi thân trang kịp vẽ: !important
+         thắng style="display:block" mà Blazor gắn khi có lỗi — thẻ chỉ còn là
+         tín hiệu cho qly-live.js, không bao giờ hiện ra. -->
+    <style>#blazor-error-ui { display: none !important; }</style>
 </head>
 
 <body>
-    <a href="#main-content" class="skip-link">Bỏ qua, tới nội dung chính</a>
 
     <div id="app">
         <!-- Màn hình chờ trong lúc tải WebAssembly. Khung xương chứ không phải
@@ -141,11 +144,12 @@
         </div>
     </noscript>
 
-    <div id="blazor-error-ui">
-        <span>Đã có lỗi xảy ra. Ứng dụng có thể không hoạt động đúng cho tới khi tải lại.</span>
-        <a href="" class="reload">Tải lại</a>
-        <a class="dismiss" aria-label="Đóng thông báo">×</a>
-    </div>
+    <!-- Blazor bật thẻ này lên khi gặp lỗi chưa xử lý. Nó RỖNG và luôn ẩn (xem
+         style cuối trang): thay vì bắt nhân viên đọc "Đã có lỗi xảy ra… Tải lại"
+         rồi tự bấm, qly-live.js canh lúc Blazor bật nó và tự tải lại trang,
+         đồng thời tự nhận bản cập nhật mới. Phải giữ đúng id này. -->
+    <div id="blazor-error-ui" aria-hidden="true"></div>
+    <script src="_content/QlyCoffee.Ui/js/qly-live.js"></script>
 
     <script src="_framework/blazor.webassembly.js"></script>
 

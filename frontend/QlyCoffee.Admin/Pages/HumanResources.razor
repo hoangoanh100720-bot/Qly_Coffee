@@ -1,0 +1,271 @@
+@*
+    =============================================================================
+    NHÂN SỰ — /nhan-su  (Manager, Owner)
+    =============================================================================
+    Ba việc của quản lý:
+      1. Thêm nhân viên — hệ thống cấp mã NV tự động (NV001, NV002…), quản lý
+         đặt PIN chấm công rồi đưa tận tay. PIN không bao giờ hiện lại được:
+         quên thì đặt PIN mới (cũng là cách mở khoá khi gõ sai 5 lần).
+      2. Chỉnh lương giờ, vị trí, cho nghỉ việc. Đổi lương chỉ áp cho những
+         lần chấm công SAU đó — bảng công cũ đã chụp lại lương lúc làm.
+      3. Đặt giờ bắt đầu các khung ca. Mỗi ca cố định 4 tiếng.
+    =============================================================================
+*@
+@page "/nhan-su"
+@attribute [Authorize(Roles = "Manager,Owner")]
+@inject ApiClient Api
+@inject AlertService Alerts
+
+<PageTitle>Nhân sự — Một Chút Coffee</PageTitle>
+
+<div class="stack stack-6">
+
+    <div class="row row-between row-wrap" style="gap: var(--space-4); align-items: flex-end;">
+        <div class="stack stack-1">
+            <h2>Nhân sự</h2>
+            <span class="xs muted">Nhân viên, lương theo giờ, mã PIN chấm công và khung ca 4 tiếng</span>
+        </div>
+        <button class="btn btn-primary" @onclick="StartCreate">+ Thêm nhân viên</button>
+    </div>
+
+    @if (_editing is not null)
+    {
+        @* ══ FORM THÊM / SỬA ════════════════════════════════════════════════ *@
+        <section class="card">
+            <h3 class="card-title">@(_editingId is null ? "Thêm nhân viên" : $"Sửa {_editingCode} — {_editing.FullName}")</h3>
+            <div class="stack stack-5">
+                <div class="grid grid-2" style="gap: var(--space-4);">
+                    <div class="field">
+                        <label class="field-label" for="name">Họ tên <span class="req" aria-hidden="true">*</span></label>
+                        <input id="name" class="input" @bind="_editing.FullName" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="phone">Số điện thoại</label>
+                        <input id="phone" class="input" inputmode="tel" @bind="_editing.Phone" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="position">Vị trí</label>
+                        <input id="position" class="input" list="positions" @bind="_editing.Position" />
+                        <datalist id="positions">
+                            <option value="Pha chế"></option>
+                            <option value="Thu ngân"></option>
+                            <option value="Phục vụ"></option>
+                            <option value="Ca trưởng"></option>
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="wage">Lương theo giờ <span class="req" aria-hidden="true">*</span></label>
+                        <div class="input-group">
+                            <input id="wage" type="number" class="input input-num" min="0" step="1000" @bind="_editing.HourlyWage" />
+                            <span class="input-suffix">đ/giờ</span>
+                        </div>
+                        <span class="field-hint">Một ca 4 tiếng = <strong class="num">@Money.Format(_editing.HourlyWage * 4)</strong></span>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="pin">
+                            @(_editingId is null ? "Mã PIN chấm công" : "Đặt PIN mới")
+                            @if (_editingId is null) { <span class="req" aria-hidden="true">*</span> }
+                        </label>
+                        <input id="pin" class="input" inputmode="numeric" maxlength="6" autocomplete="off"
+                               placeholder="@(_editingId is null ? "4–6 chữ số" : "Để trống nếu giữ PIN cũ")" @bind="_editing.Pin" />
+                        <span class="field-hint">Đưa tận tay nhân viên — PIN không xem lại được sau khi lưu.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="hired">Ngày vào làm</label>
+                        <input id="hired" type="date" class="input" @bind="_hiredOn" />
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="field-label" for="enote">Ghi chú</label>
+                    <textarea id="enote" class="input" rows="2" @bind="_editing.Note"></textarea>
+                </div>
+
+                <label class="kiosk-check">
+                    <input type="checkbox" @bind="_editing.IsActive" />
+                    <span>Đang làm việc (bỏ chọn khi nghỉ việc — tên sẽ không hiện ở quầy chấm công)</span>
+                </label>
+
+                <div class="row row-3">
+                    <button class="btn btn-primary" @onclick="SaveEmployeeAsync" disabled="@_busy">@(_busy ? "Đang lưu…" : "Lưu")</button>
+                    <button class="btn btn-secondary" @onclick="() => _editing = null">Huỷ</button>
+                </div>
+            </div>
+        </section>
+    }
+
+    @* ══ DANH SÁCH NHÂN VIÊN ═══════════════════════════════════════════════ *@
+    @if (_loading)
+    {
+        <div class="skeleton" style="height: 240px; border-radius: var(--radius-lg);"></div>
+    }
+    else if (_employees.Count == 0)
+    {
+        <div class="empty">
+            <WarnIcon Size="40" CssClass="empty-icon" />
+            <span class="empty-title">Chưa có nhân viên nào</span>
+            <span class="empty-text">Thêm nhân viên để họ chấm công ở mục "Chấm công & két".</span>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Mã NV</th>
+                        <th>Họ tên</th>
+                        <th>Vị trí</th>
+                        <th class="num">Lương giờ</th>
+                        <th class="num">Một ca 4 tiếng</th>
+                        <th>Trạng thái</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in _employees)
+                    {
+                        <tr @key="e.Id" style="@(e.IsActive ? "" : "opacity: .55;")">
+                            <td><strong class="num">@e.Code</strong></td>
+                            <td>
+                                @e.FullName
+                                @if (!string.IsNullOrEmpty(e.Phone)) { <div class="xs muted">@e.Phone</div> }
+                            </td>
+                            <td>@e.Position</td>
+                            <td class="num">@Money.Format(e.HourlyWage)</td>
+                            <td class="num">@Money.Format(e.HourlyWage * 4)</td>
+                            <td>
+                                @if (!e.IsActive) { <span class="badge badge-neutral">Đã nghỉ</span> }
+                                else if (e.IsLocked) { <span class="badge badge-danger">Khoá PIN</span> }
+                                else { <span class="badge badge-ok">Đang làm</span> }
+                            </td>
+                            <td style="text-align: right;">
+                                <button class="btn btn-ghost btn-sm" @onclick="() => StartEdit(e)">Sửa</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @* ══ KHUNG CA ══════════════════════════════════════════════════════════ *@
+    <section class="card">
+        <h3 class="card-title">Khung ca làm việc</h3>
+        <p class="small muted" style="margin-top: 0;">
+            Mỗi ca dài cố định 4 tiếng. Giờ bắt đầu là mốc tính đi trễ khi nhân viên chấm công.
+        </p>
+        <div class="stack stack-3">
+            @foreach (var s in _slots)
+            {
+                <div class="row row-3 row-wrap" style="align-items: center;">
+                    <input class="input" style="max-width: 200px;" @bind="s.Name" aria-label="Tên ca" />
+                    @* Gán tay thay vì @bind: Blazor ép type="time" thành TimeOnly, còn API nhận chuỗi "HH:mm". *@
+                    <input class="input" type="time" style="max-width: 140px;" value="@s.Start"
+                           @onchange="e => s.Start = e.Value?.ToString() ?? s.Start" aria-label="Giờ bắt đầu" />
+                    <span class="small muted num">→ @EndOf(s.Start)</span>
+                    <label class="kiosk-check" style="min-height: 0;">
+                        <input type="checkbox" @bind="s.IsActive" /> <span>Đang dùng</span>
+                    </label>
+                    <button class="btn btn-ghost btn-sm" @onclick="() => _slots.Remove(s)" aria-label="Xoá ca">Xoá</button>
+                </div>
+            }
+            <div class="row row-3">
+                <button class="btn btn-secondary btn-sm" @onclick="AddSlot">+ Thêm ca</button>
+                <button class="btn btn-primary btn-sm" @onclick="SaveSlotsAsync" disabled="@_busy">Lưu khung ca</button>
+            </div>
+        </div>
+    </section>
+</div>
+
+@code {
+    private List<EmployeeDto> _employees = new();
+    private List<SaveWorkSlotRequest> _slots = new();
+    private bool _loading = true;
+    private bool _busy;
+
+    private SaveEmployeeRequest? _editing;
+    private Guid? _editingId;
+    private string? _editingCode;
+    private DateOnly? _hiredOn;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadEmployeesAsync(), LoadSlotsAsync());
+        _loading = false;
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        var res = await Api.GetEmployeesAsync();
+        if (res.Success && res.Data is not null) _employees = res.Data;
+        else Alerts.Error(res.Error?.Message ?? "Không tải được danh sách nhân viên.");
+    }
+
+    private async Task LoadSlotsAsync()
+    {
+        var res = await Api.GetWorkSlotsAsync();
+        if (res.Success && res.Data is not null)
+            _slots = res.Data.Select(s => new SaveWorkSlotRequest { Id = s.Id, Name = s.Name, Start = s.Start, IsActive = s.IsActive }).ToList();
+    }
+
+    private void StartCreate()
+    {
+        _editingId = null; _editingCode = null; _hiredOn = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
+        _editing = new SaveEmployeeRequest { Position = "Pha chế", HourlyWage = 25000, IsActive = true };
+    }
+
+    private void StartEdit(EmployeeDto e)
+    {
+        _editingId = e.Id; _editingCode = e.Code;
+        _hiredOn = DateOnly.TryParse(e.HiredOn, out var d) ? d : null;
+        _editing = new SaveEmployeeRequest
+        {
+            FullName = e.FullName, Phone = e.Phone, Position = e.Position, HourlyWage = e.HourlyWage,
+            IsActive = e.IsActive, Note = e.Note,
+        };
+    }
+
+    private async Task SaveEmployeeAsync()
+    {
+        if (_editing is null) return;
+        _editing.HiredOn = _hiredOn?.ToString("yyyy-MM-dd");
+        _busy = true;
+
+        var res = _editingId is Guid id
+            ? await Api.UpdateEmployeeAsync(id, _editing)
+            : await Api.CreateEmployeeAsync(_editing);
+
+        _busy = false;
+        if (!res.Success || res.Data is null)
+        {
+            Alerts.Error(res.Error?.Message ?? "Không lưu được.");
+            return;
+        }
+
+        Alerts.Success(_editingId is null
+            ? $"Đã thêm {res.Data.FullName} — mã nhân viên {res.Data.Code}."
+            : $"Đã lưu {res.Data.FullName}.");
+        _editing = null;
+        await LoadEmployeesAsync();
+    }
+
+    private void AddSlot()
+    {
+        var lastStart = _slots.Select(s => TimeOnly.TryParse(s.Start, out var t) ? t : new TimeOnly(6, 0))
+                              .DefaultIfEmpty(new TimeOnly(2, 0)).Max();
+        _slots.Add(new SaveWorkSlotRequest { Name = $"Ca {_slots.Count + 1}", Start = lastStart.AddHours(4).ToString("HH:mm") });
+    }
+
+    private async Task SaveSlotsAsync()
+    {
+        _busy = true;
+        var res = await Api.SaveWorkSlotsAsync(_slots);
+        _busy = false;
+        if (res.Success) { Alerts.Success("Đã lưu khung ca."); await LoadSlotsAsync(); }
+        else Alerts.Error(res.Error?.Message ?? "Không lưu được khung ca.");
+    }
+
+    private static string EndOf(string start)
+        => TimeOnly.TryParse(start, out var t) ? t.AddHours(4).ToString("HH:mm") : "—";
+}

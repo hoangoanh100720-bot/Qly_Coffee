@@ -461,3 +461,17 @@ public enum WorkshopDiscountScope
     /// <summary>Hệ thống tự áp cho cả lượt khi đủ điều kiện. VD: nhóm đông, đặt sớm.</summary>
     Booking = 1
 }
+
+// ------------------------------------------------------------------------------
+//  CA LÀM VIỆC
+// ------------------------------------------------------------------------------
+
+/// <summary>Trạng thái một ca đứng két.</summary>
+public enum ShiftStatus
+{
+    /// <summary>Đang có người đứng két. Mỗi chi nhánh tối đa MỘT ca ở trạng thái này.</summary>
+    Open = 0,
+
+    /// <summary>Đã đếm két và bàn giao. Số liệu đã chụp lại, không đổi nữa.</summary>
+    Closed = 1
+}

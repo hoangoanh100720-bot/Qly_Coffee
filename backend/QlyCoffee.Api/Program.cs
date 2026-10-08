@@ -134,6 +134,8 @@ builder.Services.AddScoped<IPromotionPlanner, PromotionPlanner>();
 builder.Services.AddScoped<IAiNarrator, ClaudeNarrator>();
 builder.Services.AddScoped<IDailyPlanService, DailyPlanService>();
 builder.Services.AddScoped<IWorkshopService, WorkshopService>();
+builder.Services.AddScoped<IShiftService, ShiftService>();
+builder.Services.AddScoped<IStaffService, StaffService>();
 
 // ---- Xác thực JWT -----------------------------------------------------------
 var jwtSecret = Cfg("JWT_SECRET", "");

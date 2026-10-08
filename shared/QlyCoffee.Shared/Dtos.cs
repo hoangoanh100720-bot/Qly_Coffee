@@ -1232,7 +1232,9 @@ public record NavBadgesDto(
     int CupsInQueue,
     int CriticalLots,
     int UndecidedSuggestions,
-    int PrepNeeded = 0);
+    int PrepNeeded = 0,
+    /// <summary>Sự cố nhân sự HÔM NAY: số lần đi trễ + số ca két lệch (lúc nhận hoặc lúc giao).</summary>
+    int StaffIssuesToday = 0);
 
 // ------------------------------------------------------------------------------
 //  THANH TOÁN CHUYỂN KHOẢN (SePay)
@@ -1682,3 +1684,295 @@ public class CancelWorkshopBookingRequest
     public string Phone { get; set; } = string.Empty;
     public string? Reason { get; set; }
 }
+
+// ==============================================================================
+//  CA LÀM VIỆC & ĐỐI SOÁT KÉT
+// ==============================================================================
+
+/// <summary>
+/// Một ca đứng két. Với ca ĐANG MỞ, các con số thu trong ca được tính tại thời
+/// điểm gọi; với ca đã đóng, chúng là số chụp lại lúc đóng ca.
+/// Mọi mốc thời gian là UTC — giao diện tự đổi sang giờ Việt Nam.
+/// </summary>
+public record ShiftDto(
+    Guid Id,
+    /// <summary>0 đang mở, 1 đã đóng.</summary>
+    int Status,
+
+    string OpenedByName,
+    DateTime OpenedAt,
+    int OpeningCash,
+    /// <summary>Ca trước bàn giao bao nhiêu. Null nếu là ca đầu tiên.</summary>
+    int? ExpectedOpeningCash,
+    string? ReceivedFromName,
+    string? OpeningNote,
+
+    string? ClosedByName,
+    DateTime? ClosedAt,
+    string? HandedOverToName,
+    int? CountedCash,
+    int? HandoverCash,
+    int? DepositedCash,
+    string? ClosingNote,
+
+    int CashSales,
+    int TransferSales,
+    int PaidOrderCount,
+    /// <summary>Tiền mặt lẽ ra có trong két = tiền đầu ca + tiền mặt thu trong ca.</summary>
+    int ExpectedCash,
+    /// <summary>Thực đếm − lẽ ra có. Âm là hụt két. Null khi ca chưa đóng.</summary>
+    int? CashDifference,
+
+    /// <summary>Người đang đăng nhập có phải người đứng ca này không.</summary>
+    bool IsMine);
+
+/// <summary>Lần bàn giao gần nhất — để người nhận ca biết phải nhận bao nhiêu, từ ai.</summary>
+public record ShiftHandoverDto(
+    string ClosedByName,
+    DateTime ClosedAt,
+    int HandoverCash,
+    string? HandedOverToName);
+
+/// <summary>Trạng thái két hiện tại của chi nhánh.</summary>
+public record CurrentShiftDto(
+    /// <summary>Ca đang mở. Null nếu chưa ai nhận ca.</summary>
+    ShiftDto? Open,
+    /// <summary>Ca vừa đóng gần nhất. Null nếu chưa có ca nào.</summary>
+    ShiftHandoverDto? LastHandover);
+
+/// <summary>Nhận ca.</summary>
+public class OpenShiftRequest
+{
+    /// <summary>Tiền mặt đếm được trong két lúc nhận, đồng.</summary>
+    public int OpeningCash { get; set; }
+    public string? Note { get; set; }
+}
+
+/// <summary>Đếm két và giao ca.</summary>
+public class CloseShiftRequest
+{
+    /// <summary>Tiền mặt thực đếm trong két, đồng.</summary>
+    public int CountedCash { get; set; }
+
+    /// <summary>Để lại trong két cho ca sau, đồng. Phần còn lại là tiền nộp quản lý.</summary>
+    public int HandoverCash { get; set; }
+
+    /// <summary>Nhân viên nhận két tiếp theo. Null nếu đóng cửa cuối ngày.</summary>
+    public Guid? HandOverToEmployeeId { get; set; }
+
+    /// <summary>Bắt buộc khi két lệch — giải thích vì sao hụt/dư.</summary>
+    public string? Note { get; set; }
+}
+
+/// <summary>Một nhân viên có thể nhận ca.</summary>
+public record StaffOptionDto(Guid Id, string FullName, string RoleLabel);
+
+/// <summary>Báo cáo đối soát két theo ca trong một khoảng ngày.</summary>
+public record ShiftReportDto(
+    IReadOnlyList<ShiftDto> Shifts,
+    int TotalCashSales,
+    int TotalTransferSales,
+    int TotalDeposited,
+    /// <summary>Tổng chênh lệch két của các ca đã đóng. Âm là tổng hụt.</summary>
+    int TotalDifference,
+    /// <summary>Số ca két lệch (khác 0).</summary>
+    int ShiftsWithDifference,
+
+    /// <summary>
+    /// Tiền thu lúc KHÔNG có ca nào mở — không ai chịu trách nhiệm số tiền này.
+    /// Khác 0 nghĩa là có người bán hàng mà chưa nhận ca.
+    /// </summary>
+    int OutsideShiftCash,
+    int OutsideShiftTransfer,
+    int OutsideShiftOrders);
+
+// ==============================================================================
+//  NHÂN SỰ & CHẤM CÔNG
+// ==============================================================================
+
+/// <summary>Khung ca 4 tiếng. Giờ dạng "HH:mm", giờ Việt Nam.</summary>
+public record WorkSlotDto(Guid Id, string Name, string Start, string End, bool IsActive);
+
+/// <summary>
+/// Một dòng trong danh sách chọn tên ở quầy chấm công. CỐ Ý KHÔNG có mã nhân
+/// viên: mã là một nửa "mật khẩu" — để lộ trên màn hình chung thì vô nghĩa.
+/// </summary>
+public record KioskEmployeeDto(Guid Id, string FullName, string Position, bool IsOnDuty, bool IsLocked);
+
+/// <summary>Một người đang trong ca.</summary>
+public record OnDutyDto(
+    Guid AttendanceId,
+    Guid EmployeeId,
+    string FullName,
+    string SlotName,
+    DateTime SlotEndAt,
+    DateTime CheckInAt,
+    int LateMinutes,
+    bool HoldsDrawer);
+
+/// <summary>Mọi thứ màn hình quầy chấm công cần trong một lần gọi.</summary>
+public record KioskDto(
+    IReadOnlyList<KioskEmployeeDto> Employees,
+    IReadOnlyList<WorkSlotDto> Slots,
+    /// <summary>Khung ca hợp với giờ hiện tại — chọn sẵn cho nhân viên.</summary>
+    Guid? SuggestedSlotId,
+    IReadOnlyList<OnDutyDto> OnDuty,
+    CurrentShiftDto Drawer);
+
+/// <summary>Xác minh nhân viên ở quầy: chọn tên + gõ mã NV + PIN.</summary>
+public class EmployeeCredential
+{
+    public Guid EmployeeId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string Pin { get; set; } = string.Empty;
+}
+
+/// <summary>Chấm công vào ca, và (tuỳ chọn) nhận két.</summary>
+public class CheckInRequest : EmployeeCredential
+{
+    public Guid SlotId { get; set; }
+
+    /// <summary>Người này giữ két ca này. Chỉ được khi chưa có ai giữ két.</summary>
+    public bool TakeDrawer { get; set; }
+
+    /// <summary>Tiền đếm được trong két lúc nhận — so với số ca trước bàn giao.</summary>
+    public int? CountedCash { get; set; }
+
+    public string? Note { get; set; }
+}
+
+/// <summary>Nhận két khi đang trong ca (người giữ két trước đã giao).</summary>
+public class TakeDrawerRequest : EmployeeCredential
+{
+    public int CountedCash { get; set; }
+    public string? Note { get; set; }
+}
+
+/// <summary>Chấm công ra. Người đang giữ két phải đếm két và giao luôn.</summary>
+public class CheckOutRequest : EmployeeCredential
+{
+    public int? CountedCash { get; set; }
+    public int? HandoverCash { get; set; }
+    public Guid? HandOverToEmployeeId { get; set; }
+    public string? Note { get; set; }
+}
+
+/// <summary>Kết quả chấm công vào — câu báo "đúng giờ / trễ X phút" hiện cho nhân viên.</summary>
+public record CheckInResultDto(
+    string EmployeeName,
+    string SlotName,
+    DateTime SlotStartAt,
+    DateTime SlotEndAt,
+    DateTime CheckInAt,
+    /// <summary>Dương = trễ, âm = tới sớm, 0 = đúng phút.</summary>
+    int MinutesFromStart,
+    int LateMinutes,
+    ShiftDto? Drawer);
+
+/// <summary>Kết quả chấm công ra.</summary>
+public record CheckOutResultDto(
+    string EmployeeName,
+    string SlotName,
+    DateTime CheckInAt,
+    DateTime CheckOutAt,
+    int LateMinutes,
+    int EarlyLeaveMinutes,
+    int WorkedMinutes,
+    int Pay,
+    ShiftDto? Drawer);
+
+// --- Quản lý nhân sự (Manager, Owner) -------------------------------------------
+
+public record EmployeeDto(
+    Guid Id,
+    string Code,
+    string FullName,
+    string? Phone,
+    string Position,
+    int HourlyWage,
+    bool IsActive,
+    string? HiredOn,
+    string? Note,
+    bool IsLocked);
+
+/// <summary>Thêm/sửa nhân viên. PIN bắt buộc khi thêm; khi sửa, để trống là giữ PIN cũ.</summary>
+public class SaveEmployeeRequest
+{
+    public string FullName { get; set; } = string.Empty;
+    public string? Phone { get; set; }
+    public string Position { get; set; } = "Nhân viên";
+    public int HourlyWage { get; set; }
+    /// <summary>4–6 chữ số.</summary>
+    public string? Pin { get; set; }
+    public bool IsActive { get; set; } = true;
+    /// <summary>yyyy-MM-dd</summary>
+    public string? HiredOn { get; set; }
+    public string? Note { get; set; }
+}
+
+public class SaveWorkSlotRequest
+{
+    public Guid? Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    /// <summary>"HH:mm"</summary>
+    public string Start { get; set; } = "06:00";
+    public bool IsActive { get; set; } = true;
+}
+
+/// <summary>Một lần chấm công trong bảng công.</summary>
+public record AttendanceDto(
+    Guid Id,
+    Guid EmployeeId,
+    string EmployeeCode,
+    string EmployeeName,
+    string WorkDate,
+    string SlotName,
+    DateTime SlotStartAt,
+    DateTime SlotEndAt,
+    DateTime CheckInAt,
+    int LateMinutes,
+    DateTime? CheckOutAt,
+    int EarlyLeaveMinutes,
+    int WorkedMinutes,
+    int HourlyWage,
+    int Pay,
+    /// <summary>Người này giữ két trong ca, và két lệch bao nhiêu (âm là hụt).</summary>
+    bool HeldDrawer,
+    int? DrawerDifference,
+    /// <summary>
+    /// Lệch lúc NHẬN két = đếm được − số ca trước giao. Âm là âm két giữa hai ca:
+    /// tiền mất trong lúc két không ai giữ. Null nếu không nhận két hoặc ca đầu tiên.
+    /// </summary>
+    int? ReceiveDifference,
+    /// <summary>Đang làm (chưa chấm ra, ca chưa kết thúc).</summary>
+    bool IsOpen,
+    /// <summary>Hết ca mà chưa chấm ra — công tạm tính tới giờ kết thúc ca.</summary>
+    bool MissingCheckout);
+
+/// <summary>Tổng hợp một nhân viên trong khoảng ngày — dùng để trả lương.</summary>
+public record EmployeeTimesheetDto(
+    Guid EmployeeId,
+    string Code,
+    string FullName,
+    int HourlyWage,
+    int Shifts,
+    int LateCount,
+    int LateMinutes,
+    int EarlyLeaveMinutes,
+    int WorkedMinutes,
+    int Pay,
+    int MissingCheckouts,
+    int DrawerShifts,
+    /// <summary>Tổng hụt két (số âm) của các ca người này giữ — gồm cả lệch lúc nhận và lúc giao.</summary>
+    int DrawerShortage,
+    int DrawerSurplus,
+    /// <summary>Riêng phần âm két phát hiện lúc NHẬN két (số âm).</summary>
+    int ReceiveShortage);
+
+public record TimesheetDto(
+    IReadOnlyList<EmployeeTimesheetDto> Employees,
+    IReadOnlyList<AttendanceDto> Rows,
+    int TotalPay,
+    int TotalWorkedMinutes,
+    int TotalLateMinutes,
+    int TotalDrawerShortage);

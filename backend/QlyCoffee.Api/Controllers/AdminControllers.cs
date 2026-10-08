@@ -165,8 +165,17 @@ public class InventoryController : BaseApiController
         return Ok(result);
     }
 
-    /// <summary>Nhập kho — tạo lô mới và cập nhật giá vốn bình quân.</summary>
+    /// <summary>
+    /// Nhập kho — tạo lô mới và cập nhật giá vốn bình quân.
+    /// <para>
+    /// CHỈ QUẢN LÝ VÀ CHỦ QUÁN. Nhập kho quyết định giá vốn của mọi ly bán ra
+    /// và là chỗ dễ khai khống nhất (nhập 10kg, thực nhận 8kg). Để nhân viên tự
+    /// nhập thì quản lý không còn kiểm soát được tiền hàng — controller vẫn cho
+    /// nhân viên XEM kho, chỉ hành động ghi này bị chặn.
+    /// </para>
+    /// </summary>
     [HttpPost("receive")]
+    [Authorize(Roles = "Manager,Owner")]
     public async Task<IActionResult> Receive(
         [FromBody] ReceiveStockRequest req,
         [FromServices] IRestockService restock,
@@ -747,7 +756,12 @@ public class PlansController : BaseApiController
 // ==============================================================================
 
 [Route("api/admin")]
-[Authorize(Roles = "Manager,Owner")]
+// Mức LỚP chỉ chặn người ngoài (khách hàng, chưa đăng nhập). Quyền chi tiết
+// đặt trên TỪNG ACTION, vì ASP.NET Core CỘNG DỒN các [Authorize] theo kiểu "VÀ":
+// trước đây lớp ghi Manager,Owner nên dù action badges/orders ghi thêm Staff,
+// nhân viên vẫn nhận 403 — trang Đơn hàng của nhân viên trống trơn và huy hiệu
+// trên thanh điều hướng không bao giờ hiện. Thêm action mới thì PHẢI tự ghi quyền.
+[Authorize(Roles = "Staff,Manager,Owner")]
 public class DashboardController : BaseApiController
 {
     private readonly AppDbContext _db;
@@ -834,10 +848,23 @@ public class DashboardController : BaseApiController
 
         var prepNeeded = prepared.Count(p => p.Stock <= 0 || p.Stock < p.MinStockLevel);
 
-        return Ok(new NavBadgesDto(pendingOrders, cupsInQueue, criticalLots, undecided, prepNeeded));
+        // Sự cố nhân sự hôm nay — "báo về" cho quản lý ngay trên thanh điều hướng,
+        // không phải đợi ai mở bảng công mới biết có người đi trễ hay két bị âm.
+        var todayVn = DateOnly.FromDateTime(VietnamTime.Now().Date);
+        var dayStartUtc = VietnamTime.ToUtc(VietnamTime.Now().Date);
+        var lateToday = await _db.Attendances.CountAsync(
+            a => a.StoreId == CurrentStoreId && a.WorkDate == todayVn && a.LateMinutes > 0, ct);
+        var drawerIssuesToday = await _db.CashShifts.CountAsync(
+            s => s.StoreId == CurrentStoreId && s.OpenedAt >= dayStartUtc
+                 && ((s.CashDifference != null && s.CashDifference != 0)
+                     || (s.ExpectedOpeningCash != null && s.ExpectedOpeningCash != s.OpeningCash)), ct);
+
+        return Ok(new NavBadgesDto(pendingOrders, cupsInQueue, criticalLots, undecided, prepNeeded,
+                                   lateToday + drawerIssuesToday));
     }
 
     [HttpGet("dashboard")]
+    [Authorize(Roles = "Manager,Owner")]
     public async Task<IActionResult> Get(CancellationToken ct)
     {
         var today = VietnamTime.Now().Date;

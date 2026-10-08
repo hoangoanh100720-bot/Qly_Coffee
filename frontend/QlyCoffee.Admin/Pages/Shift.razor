@@ -1,0 +1,511 @@
+@*
+    =============================================================================
+    QUẦY CHẤM CÔNG & KÉT — /ca-lam-viec
+    =============================================================================
+    Máy quầy dùng chung (đăng nhập tài khoản nhân viên). Từng người:
+
+      VÀO CA   chọn tên → mã NV + PIN → chọn ca (gợi ý sẵn ca đang tới) →
+               [giữ két? đếm két, so với số ca trước giao] → "Chấm công vào".
+               Màn hình báo NGAY: đúng giờ / tới sớm / trễ X phút.
+      NHẬN KÉT người đang trong ca nhận két sau khi người trước đã giao.
+      RA CA    chọn tên → mã NV + PIN → [đang giữ két? đếm két, để lại bao
+               nhiêu, giao cho ai] → "Chấm công ra". Báo giờ công và tiền công.
+
+    Vì sao bấm tên thay vì gõ tên: máy quầy thường là màn cảm ứng, gõ tên có
+    dấu trên bàn phím ảo chậm và hay sai. Danh sách tên KHÔNG kèm mã nhân viên
+    — mã là một nửa "mật khẩu", hiện trên màn chung thì mất tác dụng.
+
+    Mọi phép tính trễ/lệch két trên trang chỉ để XEM TRƯỚC. Số chốt là số máy
+    chủ trả về sau khi bấm.
+    =============================================================================
+*@
+@page "/ca-lam-viec"
+@attribute [Authorize(Roles = "Staff,Manager,Owner")]
+@implements IDisposable
+@inject ApiClient Api
+@inject AlertService Alerts
+@inject AuthStateProvider Auth
+
+<PageTitle>Chấm công — Một Chút Coffee</PageTitle>
+
+@* Ai vào/ra ca, ai giữ két, tiền bán trong ca — cập nhật mỗi 20 giây *@
+<LiveRefresh Seconds="20" OnRefresh="() => LoadAsync(silent: true)" />
+
+<div class="stack stack-6">
+
+    <div class="row row-between row-wrap" style="gap: var(--space-4); align-items: flex-end;">
+        <div class="stack stack-1">
+            <h2>Chấm công &amp; két tiền</h2>
+            <span class="xs muted">Chọn tên, nhập mã nhân viên và PIN của bạn — mỗi ca 4 tiếng</span>
+        </div>
+        <div class="kiosk-clock num" aria-live="off">@Vn(_now).ToString("HH:mm")<small>@Vn(_now).ToString(":ss")</small></div>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="skeleton" style="height: 420px; border-radius: var(--radius-lg);"></div>
+    }
+    else if (_kiosk is { } k)
+    {
+        @* ══ KẾT QUẢ VỪA CHẤM ═══════════════════════════════════════════════ *@
+        @if (_result is { } r)
+        {
+            <section class="kiosk-result @r.Tone" role="status" aria-live="polite">
+                <span class="kiosk-result-icon" aria-hidden="true">@r.Icon</span>
+                <div class="stack stack-1">
+                    <strong class="kiosk-result-title">@r.Title</strong>
+                    <span>@r.Detail</span>
+                </div>
+                <button class="btn btn-ghost btn-sm" @onclick="() => _result = null" aria-label="Đóng">✕</button>
+            </section>
+        }
+
+        <div class="kiosk-layout">
+
+            @* ══ CỘT TRÁI — THAO TÁC ══════════════════════════════════════════ *@
+            <section class="card">
+                <div class="choice-group kiosk-modes" role="tablist">
+                    <button class="choice @(_mode == Mode.In ? "is-selected" : "")" role="tab"
+                            aria-selected="@(_mode == Mode.In)" @onclick="() => SetMode(Mode.In)">Vào ca</button>
+                    @if (k.Drawer.Open is null)
+                    {
+                        <button class="choice @(_mode == Mode.Drawer ? "is-selected" : "")" role="tab"
+                                aria-selected="@(_mode == Mode.Drawer)" @onclick="() => SetMode(Mode.Drawer)">Nhận két</button>
+                    }
+                    <button class="choice @(_mode == Mode.Out ? "is-selected" : "")" role="tab"
+                            aria-selected="@(_mode == Mode.Out)" @onclick="() => SetMode(Mode.Out)">Ra ca</button>
+                </div>
+
+                <div class="stack stack-5" style="margin-top: var(--space-5);">
+
+                    @* ── 1. Chọn tên ───────────────────────────────────────── *@
+                    <fieldset class="field">
+                        <legend class="field-label">Bạn là ai? <span class="req" aria-hidden="true">*</span></legend>
+                        @if (Candidates.Count == 0)
+                        {
+                            <span class="field-hint">
+                                @(_mode == Mode.In ? "Chưa có nhân viên nào — quản lý thêm ở mục Nhân sự." : "Chưa có ai đang trong ca.")
+                            </span>
+                        }
+                        <div class="kiosk-names">
+                            @foreach (var e in Candidates)
+                            {
+                                <button type="button" class="kiosk-name @(_employeeId == e.Id ? "is-selected" : "")"
+                                        aria-pressed="@(_employeeId == e.Id)" disabled="@e.IsLocked"
+                                        @onclick="() => SelectEmployee(e.Id)">
+                                    <span class="kiosk-avatar" aria-hidden="true">@Initial(e.FullName)</span>
+                                    <span class="stack" style="gap: 0; text-align: left;">
+                                        <strong>@e.FullName</strong>
+                                        <span class="xs muted">@(e.IsLocked ? "Tạm khoá PIN" : e.Position)</span>
+                                    </span>
+                                </button>
+                            }
+                        </div>
+                    </fieldset>
+
+                    @if (_employeeId is not null)
+                    {
+                        @* ── 2. Mã NV + PIN ──────────────────────────────────── *@
+                        <div class="grid grid-2" style="gap: var(--space-4);">
+                            <div class="field">
+                                <label class="field-label" for="code">Mã nhân viên</label>
+                                <input id="code" class="input" autocomplete="off" placeholder="VD: NV001"
+                                       @bind="_code" @bind:event="oninput" style="text-transform: uppercase;" />
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="pin">Mã PIN</label>
+                                <input id="pin" class="input" type="password" inputmode="numeric" autocomplete="off"
+                                       maxlength="6" placeholder="••••" @bind="_pin" @bind:event="oninput" />
+                            </div>
+                        </div>
+
+                        @if (_mode == Mode.In)
+                        {
+                            @* ── 3. Chọn ca + xem trước trễ/đúng giờ ──────────── *@
+                            <fieldset class="field">
+                                <legend class="field-label">Ca làm việc</legend>
+                                <div class="choice-group">
+                                    @foreach (var s in k.Slots)
+                                    {
+                                        <button type="button" class="choice @(_slotId == s.Id ? "is-selected" : "")"
+                                                aria-pressed="@(_slotId == s.Id)" @onclick="() => _slotId = s.Id">
+                                            @s.Name <span class="xs muted">@s.Start–@s.End</span>
+                                        </button>
+                                    }
+                                </div>
+                                @if (PunctualityPreview is { } p)
+                                {
+                                    <span class="kiosk-preview @(p.Late > 0 ? "is-late" : "is-ok")">@p.Text</span>
+                                }
+                            </fieldset>
+
+                            @if (k.Drawer.Open is null)
+                            {
+                                <label class="kiosk-check">
+                                    <input type="checkbox" @bind="_takeDrawer" />
+                                    <span>Tôi giữ két ca này — đếm két ngay bây giờ</span>
+                                </label>
+                            }
+                            else
+                            {
+                                <span class="field-hint">Két đang do <strong>@k.Drawer.Open.OpenedByName</strong> giữ.</span>
+                            }
+                        }
+
+                        @if (NeedsOpeningCount)
+                        {
+                            @* ── Đếm két lúc nhận ─────────────────────────────── *@
+                            <div class="field">
+                                <label class="field-label" for="opening">Tiền mặt đếm được trong két</label>
+                                <div class="input-group" style="max-width: 280px;">
+                                    <input id="opening" type="number" class="input input-num" min="0" step="1000"
+                                           @bind="_counted" @bind:event="oninput" />
+                                    <span class="input-suffix">đ</span>
+                                </div>
+                                @if (k.Drawer.LastHandover is { } h)
+                                {
+                                    <span class="field-hint">
+                                        @h.ClosedByName giao lại <strong class="num">@Money.Format(h.HandoverCash)</strong>
+                                        lúc @Vn(h.ClosedAt).ToString("HH:mm dd/MM").
+                                    </span>
+                                    @if (_counted is int c && c != h.HandoverCash)
+                                    {
+                                        <span class="field-error">
+                                            <WarnIcon Size="12" />
+                                            @(c < h.HandoverCash ? "Âm két" : "Dư két") @Money.Format(Math.Abs(c - h.HandoverCash)) so với số được giao — ghi chú lý do.
+                                        </span>
+                                    }
+                                }
+                            </div>
+                        }
+
+                        @if (NeedsClosingCount && k.Drawer.Open is { } open)
+                        {
+                            @* ── Đếm két lúc giao ─────────────────────────────── *@
+                            <div class="alert alert-info"><span>Bạn đang giữ két — đếm két và giao trước khi ra ca.</span></div>
+                            <div class="grid grid-2" style="gap: var(--space-4);">
+                                <div class="field">
+                                    <label class="field-label" for="counted">Tiền mặt thực đếm</label>
+                                    <div class="input-group">
+                                        <input id="counted" type="number" class="input input-num" min="0" step="1000"
+                                               @bind="_counted" @bind:event="oninput" />
+                                        <span class="input-suffix">đ</span>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="handover">Để lại két cho ca sau</label>
+                                    <div class="input-group">
+                                        <input id="handover" type="number" class="input input-num" min="0" step="1000"
+                                               @bind="_handover" @bind:event="oninput" />
+                                        <span class="input-suffix">đ</span>
+                                    </div>
+                                </div>
+                            </div>
+                            @if (_counted is int counted)
+                            {
+                                var diff = counted - open.ExpectedCash;
+                                <div class="shift-recon">
+                                    <div><span>Két lẽ ra có</span><strong class="num">@Money.Format(open.ExpectedCash)</strong></div>
+                                    <div><span>Thực đếm</span><strong class="num">@Money.Format(counted)</strong></div>
+                                    <div class="@(diff == 0 ? "is-ok" : "is-bad")">
+                                        <span>Chênh lệch</span>
+                                        <strong class="num">@(diff == 0 ? "Khớp" : Money.FormatSigned(diff))</strong>
+                                    </div>
+                                    <div><span>Nộp quản lý</span><strong class="num">@Money.Format(Math.Max(0, counted - (_handover ?? 0)))</strong></div>
+                                </div>
+                            }
+                            <div class="field">
+                                <label class="field-label" for="next">Giao két cho</label>
+                                <select id="next" class="select" @bind="_handOverTo">
+                                    <option value="">— Đóng cửa, không ai nhận —</option>
+                                    @foreach (var e in k.Employees.Where(e => e.Id != _employeeId))
+                                    {
+                                        <option value="@e.Id">@e.FullName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        @if (NeedsOpeningCount || NeedsClosingCount)
+                        {
+                            <div class="field">
+                                <label class="field-label" for="note">Ghi chú</label>
+                                <textarea id="note" class="input" rows="2" @bind="_note" @bind:event="oninput"
+                                          placeholder="Bắt buộc khi két lệch — VD: thối nhầm 10.000đ cho khách bàn 4"></textarea>
+                            </div>
+                        }
+
+                        <button class="btn btn-primary btn-lg" @onclick="SubmitAsync" disabled="@(_busy || !CanSubmit)">
+                            @(_busy ? "Đang xử lý…" : _mode switch
+                            {
+                                Mode.In => "Chấm công vào",
+                                Mode.Drawer => "Nhận két",
+                                _ => "Chấm công ra",
+                            })
+                        </button>
+                    }
+                </div>
+            </section>
+
+            @* ══ CỘT PHẢI — ĐANG TRONG CA & KÉT ═══════════════════════════════ *@
+            <aside class="stack stack-5">
+                <section class="card">
+                    <h3 class="card-title">Đang trong ca (@k.OnDuty.Count)</h3>
+                    @if (k.OnDuty.Count == 0)
+                    {
+                        <span class="small muted">Chưa ai chấm công vào.</span>
+                    }
+                    <ul class="kiosk-duty">
+                        @foreach (var d in k.OnDuty)
+                        {
+                            <li @key="d.AttendanceId">
+                                <span class="kiosk-avatar" aria-hidden="true">@Initial(d.FullName)</span>
+                                <span class="stack" style="gap: 0;">
+                                    <strong>@d.FullName</strong>
+                                    <span class="xs muted">@d.SlotName · vào @Vn(d.CheckInAt).ToString("HH:mm") · hết ca @Vn(d.SlotEndAt).ToString("HH:mm")</span>
+                                </span>
+                                <span class="row row-1" style="margin-left: auto;">
+                                    @if (d.HoldsDrawer) { <span class="badge badge-accent">Giữ két</span> }
+                                    @if (d.LateMinutes > 0) { <span class="badge badge-warn">Trễ @Duration(d.LateMinutes)</span> }
+                                    else { <span class="badge badge-ok">Đúng giờ</span> }
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                </section>
+
+                <section class="card">
+                    <h3 class="card-title">Két tiền</h3>
+                    @if (k.Drawer.Open is { } o)
+                    {
+                        <div class="stack stack-3">
+                            <span class="small">Đang giữ: <strong>@o.OpenedByName</strong> từ @Vn(o.OpenedAt).ToString("HH:mm")</span>
+                            <div class="shift-recon">
+                                <div><span>Đầu ca</span><strong class="num">@Money.Format(o.OpeningCash)</strong></div>
+                                <div><span>Tiền mặt thu</span><strong class="num">@Money.Format(o.CashSales)</strong></div>
+                                <div><span>Chuyển khoản</span><strong class="num">@Money.Format(o.TransferSales)</strong></div>
+                                <div><span>Lẽ ra có</span><strong class="num">@Money.Format(o.ExpectedCash)</strong></div>
+                            </div>
+                            @if (o.ExpectedOpeningCash is int exp && exp != o.OpeningCash)
+                            {
+                                <span class="field-error"><WarnIcon Size="12" /> Lúc nhận két lệch @Money.FormatSigned(o.OpeningCash - exp) so với số được giao.</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <span class="small muted">
+                            Chưa ai giữ két.
+                            @if (k.Drawer.LastHandover is { } lh)
+                            {
+                                <span> @lh.ClosedByName giao lại <strong class="num">@Money.Format(lh.HandoverCash)</strong> lúc @Vn(lh.ClosedAt).ToString("HH:mm").</span>
+                            }
+                        </span>
+                    }
+                </section>
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    private enum Mode { In, Drawer, Out }
+
+    private sealed record Result(string Tone, string Icon, string Title, string Detail);
+
+    private KioskDto? _kiosk;
+    private bool _loading = true;
+    private bool _busy;
+    private Mode _mode = Mode.In;
+    private Result? _result;
+    private DateTime _now = DateTime.UtcNow;
+    private System.Threading.Timer? _clock;
+
+    // Form
+    private Guid? _employeeId;
+    private string _code = "";
+    private string _pin = "";
+    private Guid? _slotId;
+    private bool _takeDrawer;
+    private int? _counted;
+    private int? _handover;
+    private Guid? _handOverTo;
+    private string? _note;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        // Đồng hồ trên đầu trang + phần "xem trước trễ bao nhiêu" chạy theo giây.
+        _clock = new System.Threading.Timer(_ => InvokeAsync(() => { _now = DateTime.UtcNow; StateHasChanged(); }),
+                                            null, 1000, 1000);
+    }
+
+    public void Dispose() => _clock?.Dispose();
+
+    private async Task LoadAsync(bool silent = false)
+    {
+        var res = await Api.GetKioskAsync();
+        if (res.Success && res.Data is not null)
+        {
+            _kiosk = res.Data;
+            // Gợi ý ca CHỈ khi người dùng chưa tự chọn, để tự làm mới không đè lựa chọn.
+            _slotId ??= _kiosk.SuggestedSlotId ?? _kiosk.Slots.FirstOrDefault()?.Id;
+            if (_mode == Mode.Drawer && _kiosk.Drawer.Open is not null) _mode = Mode.In;
+        }
+        else if (!silent)
+        {
+            Alerts.Error(res.Error?.Message ?? "Không tải được màn hình chấm công.");
+        }
+        _loading = false;
+    }
+
+    // ---- Danh sách tên theo chế độ --------------------------------------------
+    private List<KioskEmployeeDto> Candidates => _kiosk is null ? new() : _mode switch
+    {
+        Mode.In => _kiosk.Employees.Where(e => !e.IsOnDuty).ToList(),
+        _       => _kiosk.Employees.Where(e => e.IsOnDuty).ToList(),
+    };
+
+    private OnDutyDto? SelectedDuty => _kiosk?.OnDuty.FirstOrDefault(d => d.EmployeeId == _employeeId);
+
+    private bool NeedsOpeningCount => (_mode == Mode.In && _takeDrawer) || _mode == Mode.Drawer;
+    private bool NeedsClosingCount => _mode == Mode.Out && SelectedDuty?.HoldsDrawer == true;
+
+    private bool CanSubmit =>
+        _employeeId is not null && _code.Trim().Length > 0 && _pin.Length >= 4
+        && (_mode != Mode.In || _slotId is not null)
+        && (!NeedsOpeningCount || _counted is not null)
+        && (!NeedsClosingCount || (_counted is not null && _handover is not null));
+
+    /// <summary>Xem trước "đúng giờ / trễ X phút" nếu bấm ngay bây giờ.</summary>
+    private (int Late, string Text)? PunctualityPreview
+    {
+        get
+        {
+            var slot = _kiosk?.Slots.FirstOrDefault(s => s.Id == _slotId);
+            if (slot is null || !TimeOnly.TryParse(slot.Start, out var start)) return null;
+
+            var vnNow = Vn(_now);
+            var startVn = vnNow.Date + start.ToTimeSpan();
+            if (startVn - vnNow > TimeSpan.FromHours(12)) startVn = startVn.AddDays(-1);
+
+            var mins = (int)Math.Floor((vnNow - startVn).TotalMinutes);
+            return mins switch
+            {
+                > 0  => (mins, $"Bấm bây giờ: trễ {Duration(mins)} so với {slot.Start}"),
+                0    => (0, $"Bấm bây giờ: đúng giờ ({slot.Start})"),
+                _    => (0, $"Bấm bây giờ: sớm {Duration(-mins)} — đúng giờ"),
+            };
+        }
+    }
+
+    private void SetMode(Mode m)
+    {
+        _mode = m;
+        ResetForm(keepResult: true);
+    }
+
+    private void SelectEmployee(Guid id)
+    {
+        _employeeId = id;
+        _code = ""; _pin = "";
+        _counted = null; _handover = null; _handOverTo = null; _note = null;
+
+        // Nhận két: điền sẵn số ca trước giao, nhân viên đếm lại rồi sửa nếu lệch.
+        if (_mode == Mode.Drawer) _counted = _kiosk?.Drawer.LastHandover?.HandoverCash;
+    }
+
+    private void ResetForm(bool keepResult = false)
+    {
+        _employeeId = null; _code = ""; _pin = "";
+        _takeDrawer = false; _counted = null; _handover = null; _handOverTo = null; _note = null;
+        if (!keepResult) _result = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_employeeId is not Guid empId) return;
+        _busy = true;
+
+        switch (_mode)
+        {
+            case Mode.In:
+            {
+                var res = await Api.CheckInAsync(new CheckInRequest
+                {
+                    EmployeeId = empId, Code = _code.Trim(), Pin = _pin, SlotId = _slotId ?? Guid.Empty,
+                    TakeDrawer = _takeDrawer, CountedCash = _takeDrawer ? _counted : null, Note = _note,
+                });
+                if (res.Success && res.Data is { } d)
+                {
+                    var t = d.MinutesFromStart;
+                    _result = t > 0
+                        ? new Result("is-late", "⏰", $"{d.EmployeeName}: trễ {Duration(t)}",
+                            $"{d.SlotName} bắt đầu {Vn(d.SlotStartAt):HH:mm}, bạn chấm công lúc {Vn(d.CheckInAt):HH:mm}.{DrawerText(d.Drawer)}")
+                        : new Result("is-ok", "✓", $"{d.EmployeeName}: đúng giờ",
+                            $"{d.SlotName} {Vn(d.SlotStartAt):HH:mm}–{Vn(d.SlotEndAt):HH:mm}" +
+                            (t < 0 ? $", tới sớm {Duration(-t)}." : ".") + DrawerText(d.Drawer));
+                    ResetForm(keepResult: true);
+                }
+                else Fail(res.Error?.Message);
+                break;
+            }
+            case Mode.Drawer:
+            {
+                var res = await Api.TakeDrawerAsync(new TakeDrawerRequest
+                {
+                    EmployeeId = empId, Code = _code.Trim(), Pin = _pin, CountedCash = _counted ?? 0, Note = _note,
+                });
+                if (res.Success && res.Data is { } d)
+                {
+                    _result = new Result("is-ok", "✓", $"{d.OpenedByName} đã nhận két", $"Két đầu ca {Money.Format(d.OpeningCash)}.");
+                    ResetForm(keepResult: true);
+                    _mode = Mode.In;
+                }
+                else Fail(res.Error?.Message);
+                break;
+            }
+            case Mode.Out:
+            {
+                var res = await Api.CheckOutAsync(new CheckOutRequest
+                {
+                    EmployeeId = empId, Code = _code.Trim(), Pin = _pin,
+                    CountedCash = NeedsClosingCount ? _counted : null,
+                    HandoverCash = NeedsClosingCount ? _handover : null,
+                    HandOverToEmployeeId = NeedsClosingCount ? _handOverTo : null,
+                    Note = _note,
+                });
+                if (res.Success && res.Data is { } d)
+                {
+                    var parts = new List<string> { $"Làm {Duration(d.WorkedMinutes)}, tiền công {Money.Format(d.Pay)}" };
+                    if (d.LateMinutes > 0) parts.Add($"vào trễ {Duration(d.LateMinutes)}");
+                    if (d.EarlyLeaveMinutes > 0) parts.Add($"về sớm {Duration(d.EarlyLeaveMinutes)}");
+                    if (d.Drawer?.CashDifference is int diff)
+                        parts.Add(diff == 0 ? "két khớp" : $"két lệch {Money.FormatSigned(diff)}");
+                    _result = new Result(d.LateMinutes > 0 || d.EarlyLeaveMinutes > 0 ? "is-late" : "is-ok", "👋",
+                        $"{d.EmployeeName} đã ra ca", string.Join(" · ", parts) + ".");
+                    ResetForm(keepResult: true);
+                }
+                else Fail(res.Error?.Message);
+                break;
+            }
+        }
+
+        _busy = false;
+        _pin = "";   // PIN không bao giờ nằm lại trên màn hình chung
+        await LoadAsync(silent: true);
+    }
+
+    private void Fail(string? message)
+        => _result = new Result("is-bad", "!", "Chưa chấm được", message ?? "Có lỗi xảy ra, thử lại.");
+
+    private static string DrawerText(ShiftDto? d) => d is null ? "" : $" Đã nhận két {Money.Format(d.OpeningCash)}.";
+
+    private static string Duration(int minutes)
+        => minutes >= 60 ? $"{minutes / 60} giờ {minutes % 60} phút" : $"{minutes} phút";
+
+    private static string Initial(string name)
+        => string.IsNullOrWhiteSpace(name) ? "?" : name.Trim().Split(' ').Last()[..1].ToUpperInvariant();
+
+    private static DateTime Vn(DateTime utc) => utc.AddHours(7);
+}

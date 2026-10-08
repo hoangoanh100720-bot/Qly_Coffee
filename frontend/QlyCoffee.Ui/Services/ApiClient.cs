@@ -399,6 +399,58 @@ public class ApiClient
         => PostAsync<WorkshopBookingDto>(
             $"api/admin/workshop/dat-cho/{id}/trang-thai", new { Status = status, Reason = reason });
 
+    // --- Ca làm việc & két tiền ----------------------------------------------
+
+    /// <summary>Ca đang mở (nếu có) và lần giao ca gần nhất.</summary>
+    public Task<ApiResponse<CurrentShiftDto>> GetCurrentShiftAsync()
+        => GetAsync<CurrentShiftDto>("api/shifts/current");
+
+    public Task<ApiResponse<ShiftDto>> OpenShiftAsync(OpenShiftRequest req)
+        => PostAsync<ShiftDto>("api/shifts/open", req);
+
+    public Task<ApiResponse<ShiftDto>> CloseShiftAsync(CloseShiftRequest req)
+        => PostAsync<ShiftDto>("api/shifts/close", req);
+
+    // --- Quầy chấm công -------------------------------------------------------
+
+    /// <summary>Tên nhân viên, khung ca, ai đang trong ca, két đang ở đâu.</summary>
+    public Task<ApiResponse<KioskDto>> GetKioskAsync()
+        => GetAsync<KioskDto>("api/attendance/kiosk");
+
+    public Task<ApiResponse<CheckInResultDto>> CheckInAsync(CheckInRequest req)
+        => PostAsync<CheckInResultDto>("api/attendance/check-in", req);
+
+    public Task<ApiResponse<ShiftDto>> TakeDrawerAsync(TakeDrawerRequest req)
+        => PostAsync<ShiftDto>("api/attendance/take-drawer", req);
+
+    public Task<ApiResponse<CheckOutResultDto>> CheckOutAsync(CheckOutRequest req)
+        => PostAsync<CheckOutResultDto>("api/attendance/check-out", req);
+
+    // --- Quản lý nhân sự (Manager, Owner) ------------------------------------
+
+    public Task<ApiResponse<List<EmployeeDto>>> GetEmployeesAsync()
+        => GetAsync<List<EmployeeDto>>("api/hr/employees");
+
+    public Task<ApiResponse<EmployeeDto>> CreateEmployeeAsync(SaveEmployeeRequest req)
+        => PostAsync<EmployeeDto>("api/hr/employees", req);
+
+    public Task<ApiResponse<EmployeeDto>> UpdateEmployeeAsync(Guid id, SaveEmployeeRequest req)
+        => PutAsync<EmployeeDto>($"api/hr/employees/{id}", req);
+
+    public Task<ApiResponse<List<WorkSlotDto>>> GetWorkSlotsAsync()
+        => GetAsync<List<WorkSlotDto>>("api/hr/slots");
+
+    public Task<ApiResponse<List<WorkSlotDto>>> SaveWorkSlotsAsync(List<SaveWorkSlotRequest> slots)
+        => PutAsync<List<WorkSlotDto>>("api/hr/slots", slots);
+
+    /// <summary>Bảng công. Ngày dạng yyyy-MM-dd, giờ Việt Nam.</summary>
+    public Task<ApiResponse<TimesheetDto>> GetTimesheetAsync(string from, string to)
+        => GetAsync<TimesheetDto>($"api/hr/timesheet?tu={from}&den={to}");
+
+    /// <summary>Đối soát két theo ca. Ngày dạng yyyy-MM-dd, giờ Việt Nam. Chỉ quản lý.</summary>
+    public Task<ApiResponse<ShiftReportDto>> GetShiftReportAsync(string from, string to)
+        => GetAsync<ShiftReportDto>($"api/shifts/report?tu={from}&den={to}");
+
     /// <summary>Lịch workshop phía quán — cùng dữ liệu với trang khách, kèm cả buổi đã kín chỗ.</summary>
     public Task<ApiResponse<WorkshopCalendarDto>> GetAdminWorkshopCalendarAsync(
         string? from = null, string? to = null)

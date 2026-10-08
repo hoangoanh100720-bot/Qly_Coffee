@@ -23,6 +23,9 @@
 
 <PageTitle>Lô hàng &amp; hạn dùng — Một Chút Coffee</PageTitle>
 
+@* Lô bị trừ dần theo đơn bán, hạn dùng đếm ngược — tự cập nhật *@
+<LiveRefresh Seconds="30" OnRefresh="() => LoadAsync(silent: true)" />
+
 <div class="stack stack-6">
 
     @* ── HÀNG TIÊU ĐỀ ────────────────────────────────────────────────────── *@
@@ -35,10 +38,12 @@
         </div>
 
         <div class="row row-2">
-            <a href="/nhap-kho" class="btn btn-primary btn-sm">
-                <PlusIcon Size="14" /> Nhập kho
-            </a>
-            <button class="btn btn-secondary btn-sm" @onclick="LoadAsync">
+            <AuthorizeView Roles="Manager,Owner">
+                <a href="/nhap-kho" class="btn btn-primary btn-sm">
+                    <PlusIcon Size="14" /> Nhập kho
+                </a>
+            </AuthorizeView>
+            <button class="btn btn-secondary btn-sm" @onclick="() => LoadAsync()">
                 <RefreshIcon Size="14" /> Làm mới
             </button>
         </div>
@@ -121,9 +126,11 @@
             </span>
             @if (_allLots.Count == 0)
             {
-                <a href="/nhap-kho" class="btn btn-primary">
-                    <PlusIcon Size="16" /> Nhập kho
-                </a>
+                <AuthorizeView Roles="Manager,Owner">
+                    <a href="/nhap-kho" class="btn btn-primary">
+                        <PlusIcon Size="16" /> Nhập kho
+                    </a>
+                </AuthorizeView>
             }
         </div>
     }
@@ -273,12 +280,20 @@
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
-    private async Task LoadAsync()
+    /// <param name="silent">
+    /// true khi <see cref="LiveRefresh"/> gọi: không bật khung xương, gọi hỏng
+    /// thì giữ nguyên danh sách lô đang hiện, bộ lọc giữ nguyên.
+    /// </param>
+    private async Task LoadAsync(bool silent = false)
     {
-        _loading = true;
-        StateHasChanged();
+        if (!silent)
+        {
+            _loading = true;
+            StateHasChanged();
+        }
 
         var res = await Api.GetInventoryLotsAsync();
+        if (silent && (!res.Success || res.Data is null)) return;
         _allLots = res.Success && res.Data is not null
             ? res.Data.OrderBy(l => l.ExpiryDate ?? DateTime.MaxValue).ToList()
             : new();

@@ -33,6 +33,9 @@
          Image="@DrinkPhoto.OgCover"
          ImageAlt="Ly cà phê sữa đá pha phin của Một Chút Coffee" />
 
+@* Món hết hàng / vừa giảm giá tự cập nhật mỗi phút, không cần bấm làm mới *@
+<LiveRefresh Seconds="60" OnRefresh="LoadMenuAsync" />
+
 @* ═══ 1. HERO ══════════════════════════════════════════════════════════════
      Hai cột: chữ bên trái, ảnh cắt hình vòm bên phải.
      Ranh giới giữa hai cột cố tình bị phá bằng quầng sáng và một chip gác lên
@@ -461,39 +464,46 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var res = await Api.GetMenuAsync();
-
-        if (res.Success && res.Data is not null)
-        {
-            // Chỉ lấy món còn bán được — trang chủ là nơi gây ấn tượng đầu tiên,
-            // không phải chỗ trưng bày món hết hàng.
-            var all = res.Data.Products.Where(p => p.IsAvailable).ToList();
-
-            _totalProducts = res.Data.Products.Count;
-
-            // Danh mục có món mới hiện lên dải — danh mục rỗng bấm vào chỉ thấy
-            // trang trắng, tệ hơn là không hiện.
-            _categories = res.Data.Categories.Where(c => c.ProductCount > 0).ToList();
-
-            _featured = all.Where(p => p.Tags.Contains("best-seller")).Take(8).ToList();
-
-            // Quán mới chưa gắn nhãn bán chạy thì lấy tạm 8 món đầu
-            if (_featured.Count == 0) _featured = all.Take(8).ToList();
-
-            // Món đang giảm giá — thường do kế hoạch AI đề xuất xả hàng cận hạn.
-            // Giảm sâu nhất lên trước.
-            _promoProducts = all
-                .Where(p => p.DiscountPercent > 0)
-                .OrderByDescending(p => p.DiscountPercent)
-                .ToList();
-        }
-
+        await LoadMenuAsync();
         _loading = false;
 
         // Đặt sau khi tải xong dữ liệu: lúc này component chắc chắn đã gắn vào
         // cây, InvokeAsync mới có chỗ để đẩy việc vẽ lại về đúng luồng UI.
         _clock = new System.Threading.Timer(_ => InvokeAsync(RefreshOpenState), null,
                            TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    /// <summary>
+    /// Lấy thực đơn. Dùng cho cả lần tải đầu lẫn <see cref="LiveRefresh"/> mỗi
+    /// phút — món vừa hết hàng tự rời trang chủ, món vừa giảm giá tự hiện banner,
+    /// khách không phải bấm làm mới. Gọi hỏng thì GIỮ NGUYÊN số liệu đang hiện.
+    /// </summary>
+    private async Task LoadMenuAsync()
+    {
+        var res = await Api.GetMenuAsync();
+        if (!res.Success || res.Data is null) return;
+
+        // Chỉ lấy món còn bán được — trang chủ là nơi gây ấn tượng đầu tiên,
+        // không phải chỗ trưng bày món hết hàng.
+        var all = res.Data.Products.Where(p => p.IsAvailable).ToList();
+
+        _totalProducts = res.Data.Products.Count;
+
+        // Danh mục có món mới hiện lên dải — danh mục rỗng bấm vào chỉ thấy
+        // trang trắng, tệ hơn là không hiện.
+        _categories = res.Data.Categories.Where(c => c.ProductCount > 0).ToList();
+
+        _featured = all.Where(p => p.Tags.Contains("best-seller")).Take(8).ToList();
+
+        // Quán mới chưa gắn nhãn bán chạy thì lấy tạm 8 món đầu
+        if (_featured.Count == 0) _featured = all.Take(8).ToList();
+
+        // Món đang giảm giá — thường do kế hoạch AI đề xuất xả hàng cận hạn.
+        // Giảm sâu nhất lên trước.
+        _promoProducts = all
+            .Where(p => p.DiscountPercent > 0)
+            .OrderByDescending(p => p.DiscountPercent)
+            .ToList();
     }
 
     /// <summary>

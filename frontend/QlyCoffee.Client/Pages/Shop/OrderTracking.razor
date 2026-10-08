@@ -247,11 +247,17 @@
 
     private async Task LoadAsync(string code)
     {
+        // Chuẩn hoá MỘT lần rồi dùng cho cả lần tải đầu lẫn bộ tự làm mới.
+        // Trước đây bộ tự làm mới nhận mã thô khách gõ ("ab12cd") trong khi lần
+        // tải đầu dùng mã viết hoa — trạng thái đơn không bao giờ tự cập nhật
+        // với ai gõ chữ thường.
+        code = code.Trim().ToUpperInvariant();
+
         _loading = true;
         _notFound = false;
         StateHasChanged();
 
-        var res = await Api.GetOrderByCodeAsync(code.Trim().ToUpperInvariant());
+        var res = await Api.GetOrderByCodeAsync(code);
         _order = res.Success ? res.Data : null;
         _notFound = !res.Success;
         _loading = false;
@@ -277,7 +283,7 @@
                 await InvokeAsync(StateHasChanged);
                 if (_order.Status >= 4) StopAutoRefresh();
             }
-        }, null, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20));
+        }, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
     }
 
     private void StopAutoRefresh()

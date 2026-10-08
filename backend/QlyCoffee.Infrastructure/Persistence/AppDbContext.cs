@@ -73,6 +73,14 @@ public class AppDbContext : DbContext
     public DbSet<WorkshopBooking> WorkshopBookings => Set<WorkshopBooking>();
     public DbSet<WorkshopBookingLine> WorkshopBookingLines => Set<WorkshopBookingLine>();
 
+    // --- Ca làm việc & két tiền -------------------------------------------------
+    public DbSet<CashShift> CashShifts => Set<CashShift>();
+
+    // --- Nhân sự & chấm công -----------------------------------------------------
+    public DbSet<Employee> Employees => Set<Employee>();
+    public DbSet<WorkSlot> WorkSlots => Set<WorkSlot>();
+    public DbSet<Attendance> Attendances => Set<Attendance>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -888,6 +896,121 @@ public class AppDbContext : DbContext
 
             e.HasOne(x => x.Booking).WithMany(bk => bk.Lines)
                 .HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ======================================================================
+        //  CA LÀM VIỆC & KÉT TIỀN
+        // ======================================================================
+        b.Entity<CashShift>(e =>
+        {
+            e.ToTable("cash_shifts", t => t.HasComment(
+                "Một ca đứng két: ai nhận, nhận bao nhiêu, thu được bao nhiêu, đếm lại còn bao " +
+                "nhiêu, giao cho ai. Số liệu chụp lại lúc đóng ca, không tính lại khi đọc."));
+
+            // MỖI CHI NHÁNH TỐI ĐA MỘT CA ĐANG MỞ — chặn ở database chứ không
+            // chỉ ở code: hai nhân viên bấm "Mở ca" cùng lúc thì một người nhận
+            // lỗi trùng khoá. Doanh thu theo ca tính theo khoảng thời gian, nên
+            // hai ca chồng nhau là hai ca cùng nhận một khoản tiền.
+            // Tên cột viết snake_case vì bộ lọc là SQL thô, chạy sau quy ước đặt tên.
+            e.HasIndex(x => x.StoreId).IsUnique()
+                .HasFilter("status = 0 AND deleted_at IS NULL")
+                .HasDatabaseName("ux_cash_shifts_mot_ca_dang_mo");
+
+            // Báo cáo đối soát: các ca của chi nhánh trong một khoảng ngày.
+            e.HasIndex(x => new { x.StoreId, x.OpenedAt })
+                .HasDatabaseName("ix_cash_shifts_bao_cao");
+
+            e.Property(x => x.OpenedByName).HasMaxLength(120).IsRequired();
+            e.Property(x => x.ClosedByName).HasMaxLength(120);
+            e.Property(x => x.HandedOverToName).HasMaxLength(120);
+            e.Property(x => x.ReceivedFromName).HasMaxLength(120);
+            e.Property(x => x.OpeningNote).HasMaxLength(500);
+            e.Property(x => x.ClosingNote).HasMaxLength(500);
+
+            e.Property(x => x.OpeningCash)
+                .HasComment("Tiền mặt đếm được trong két lúc nhận ca, đồng.");
+            e.Property(x => x.ExpectedOpeningCash)
+                .HasComment("Số ca trước bàn giao lại. Khác opening_cash = két lệch giữa hai ca.");
+            e.Property(x => x.CountedCash)
+                .HasComment("Tiền mặt thực đếm lúc đóng ca, đồng.");
+            e.Property(x => x.HandoverCash)
+                .HasComment("Để lại trong két cho ca sau, đồng.");
+            e.Property(x => x.DepositedCash)
+                .HasComment("Rút ra nộp quản lý = counted_cash − handover_cash.");
+            e.Property(x => x.ExpectedCash)
+                .HasComment("Tiền mặt lẽ ra có trong két = opening_cash + cash_sales.");
+            e.Property(x => x.CashDifference)
+                .HasComment("counted_cash − expected_cash. Âm là hụt két.");
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        // ======================================================================
+        //  NHÂN SỰ & CHẤM CÔNG
+        // ======================================================================
+        b.Entity<Employee>(e =>
+        {
+            e.ToTable("employees", t => t.HasComment(
+                "Hồ sơ nhân viên — KHÁC tài khoản đăng nhập. Chấm công bằng mã NV + PIN riêng " +
+                "trên máy quầy dùng chung."));
+
+            e.HasIndex(x => new { x.StoreId, x.Code }).IsUnique()
+                .HasDatabaseName("ux_employees_ma_nv");
+
+            e.Property(x => x.Code).HasMaxLength(20).IsRequired();
+            e.Property(x => x.FullName).HasMaxLength(120).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(20);
+            e.Property(x => x.Position).HasMaxLength(60).IsRequired();
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.Property(x => x.HourlyWage).HasComment("Lương theo giờ, đồng.");
+            e.Property(x => x.PinHash).HasMaxLength(100).IsRequired()
+                .HasComment("PIN chấm công băm BCrypt. Không bao giờ lưu PIN gốc.");
+            e.Property(x => x.PinLockedUntil)
+                .HasComment("Sai PIN 5 lần thì khoá tới mốc này — chống dò PIN ở quầy.");
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        b.Entity<WorkSlot>(e =>
+        {
+            e.ToTable("work_slots", t => t.HasComment(
+                "Khung ca 4 tiếng. Quản lý đặt tên và giờ bắt đầu; độ dài cố định."));
+
+            e.HasIndex(x => new { x.StoreId, x.SortOrder });
+            e.Property(x => x.Name).HasMaxLength(60).IsRequired();
+            e.Property(x => x.StartTime).HasComment("Giờ bắt đầu theo giờ Việt Nam.");
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
+        });
+
+        b.Entity<Attendance>(e =>
+        {
+            e.ToTable("attendances", t => t.HasComment(
+                "Một lần chấm công vào/ra. Giờ ca, lương giờ và tiền công được CHỤP LẠI — đổi " +
+                "giờ ca hay tăng lương sau này không làm đổi bảng công đã chốt."));
+
+            // MỖI NHÂN VIÊN TỐI ĐA MỘT LẦN CHẤM CÔNG ĐANG MỞ (chưa chấm ra).
+            // Chặn ở database: bấm "Chấm công" hai lần liền không tạo hai bản ghi.
+            e.HasIndex(x => x.EmployeeId).IsUnique()
+                .HasFilter("check_out_at IS NULL AND deleted_at IS NULL")
+                .HasDatabaseName("ux_attendances_mot_lan_dang_lam");
+
+            // Bảng công theo khoảng ngày.
+            e.HasIndex(x => new { x.StoreId, x.WorkDate })
+                .HasDatabaseName("ix_attendances_bang_cong");
+
+            e.Property(x => x.EmployeeCode).HasMaxLength(20).IsRequired();
+            e.Property(x => x.EmployeeName).HasMaxLength(120).IsRequired();
+            e.Property(x => x.SlotName).HasMaxLength(60).IsRequired();
+            e.Property(x => x.LateMinutes).HasComment("Phút trễ so với giờ bắt đầu ca. 0 nếu đúng giờ.");
+            e.Property(x => x.WorkedMinutes).HasComment("Phút được tính lương = giao giữa [vào, ra] và khung ca.");
+            e.Property(x => x.HourlyWage).HasComment("Lương giờ chụp lại lúc chấm vào.");
+            e.Property(x => x.Pay).HasComment("Tiền công lần này, đồng. Tính lúc chấm ra.");
+
+            e.HasOne(x => x.Employee).WithMany()
+                .HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+
+            e.HasQueryFilter(x => x.DeletedAt == null);
         });
 
         // ======================================================================

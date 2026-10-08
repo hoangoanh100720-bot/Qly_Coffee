@@ -456,22 +456,23 @@
          nguyên tĩnh của Razor Class Library, không phải thư mục thật trên đĩa.
          admin.css KHÔNG còn ở đây: 47KB đó chỉ phục vụ màn hình quản lý, khách
          mua cà phê không bao giờ chạm tới. -->
-    <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css" />
+    <link rel="stylesheet" href="_content/QlyCoffee.Ui/css/design-system.css?v=20261005c" />
     <!-- ?v=… ép trình duyệt tải lại CSS khi giao diện đổi. Máy chủ phát triển
          không gửi Cache-Control, trình duyệt tự đoán và giữ bản cũ — kết quả là
          trang mới (HTML do Blazor dựng) chạy với CSS cũ, vỡ bố cục. Sửa CSS
          trang bán hàng thì tăng số này lên. -->
-    <link rel="stylesheet" href="css/app.css?v=20261005b" />
-    <link rel="stylesheet" href="css/pages.css?v=20261005b" />
+    <link rel="stylesheet" href="css/app.css?v=20261005c" />
+    <link rel="stylesheet" href="css/pages.css?v=20261005c" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="apple-touch-icon" href="img/og-cover.jpg" />
     <link rel="manifest" href="manifest.json" />
+    <!-- Đặt trong <head> để có hiệu lực TRƯỚC khi thân trang kịp vẽ: !important
+         thắng style="display:block" mà Blazor gắn khi có lỗi — thẻ chỉ còn là
+         tín hiệu cho qly-live.js, không bao giờ hiện ra. -->
+    <style>#blazor-error-ui { display: none !important; }</style>
 </head>
 
 <body>
-    <!-- Liên kết bỏ qua điều hướng — người dùng bàn phím nhấn Tab một lần là tới nội dung -->
-    <a href="#main-content" class="skip-link">Bỏ qua, tới nội dung chính</a>
-
     <div id="app">
         <!-- Màn hình chờ trong lúc tải WebAssembly.
              Dùng khung xương thay vì vòng xoay để trang không nhảy khi nội dung
@@ -512,12 +513,12 @@
         </div>
     </noscript>
 
-    <!-- Thông báo lỗi cấp ứng dụng của Blazor, dịch sang tiếng Việt -->
-    <div id="blazor-error-ui">
-        <span>Đã có lỗi xảy ra. Ứng dụng có thể không hoạt động đúng cho tới khi tải lại.</span>
-        <a href="" class="reload">Tải lại</a>
-        <a class="dismiss" aria-label="Đóng thông báo">×</a>
-    </div>
+    <!-- Blazor bật thẻ này lên khi gặp lỗi chưa xử lý. Nó RỖNG và luôn ẩn: thay
+         vì bắt khách đọc "Đã có lỗi xảy ra… Tải lại" rồi tự bấm, qly-live.js canh
+         lúc Blazor bật nó và tự tải lại trang. Phải giữ đúng id này — Blazor
+         tìm thẻ theo id, và script dưới cần nó để biết lúc nào có lỗi. -->
+    <div id="blazor-error-ui" aria-hidden="true"></div>
+    <script src="_content/QlyCoffee.Ui/js/qly-live.js"></script>
 
     <script src="_framework/blazor.webassembly.js"></script>
 
@@ -552,26 +553,6 @@
             font-family: system-ui, "Segoe UI", sans-serif; line-height: 1.6;
         }
         .noscript-content h1 { font-size: 32px; line-height: 1.2; margin: 0 0 16px; }
-        .noscript-content p  { margin: 0 0 12px; }
-
-        /* Liên kết bỏ qua — ẩn cho tới khi nhận focus bằng bàn phím */
-        .skip-link {
-            position: absolute; left: -9999px; z-index: 999;
-            padding: 12px 20px; background: #CB3E0B; color: white;
-            border-radius: 0 0 8px 0; text-decoration: none; font-weight: 600;
-        }
-        .skip-link:focus { left: 0; top: 0; }
-
-        #blazor-error-ui {
-            display: none;
-            position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
-            padding: 14px 20px;
-            background: #C11F2A; color: white;
-            font-family: system-ui, sans-serif; font-size: 15px;
-            box-shadow: 0 -2px 12px rgba(0,0,0,.25);
-        }
-        #blazor-error-ui a { color: white; text-decoration: underline; margin-left: 12px; cursor: pointer; }
-        #blazor-error-ui .dismiss { float: right; font-size: 20px; text-decoration: none; }
-    </style>
+        .noscript-content p  { margin: 0 0 12px; }    </style>
 </body>
 </html>

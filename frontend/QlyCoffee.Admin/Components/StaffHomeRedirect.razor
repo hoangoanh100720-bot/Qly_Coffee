@@ -1,0 +1,17 @@
+@*
+    Nhân viên mở trang gốc "/" (bảng điều khiển — chỉ dành cho quản lý) thì
+    đưa thẳng sang Ca làm việc thay vì dừng ở thông báo "không có quyền".
+    Trang khác thì không làm gì: để thông báo hiện ra cho người đó biết vì sao.
+*@
+@inject NavigationManager Nav
+
+@code {
+    /// <summary>true nếu vừa chuyển hướng — App.razor dùng để không vẽ thông báo chớp qua.</summary>
+    public static bool IsRoot(NavigationManager nav)
+        => string.IsNullOrEmpty(nav.ToBaseRelativePath(nav.Uri).Split('?', '#')[0]);
+
+    protected override void OnInitialized()
+    {
+        if (IsRoot(Nav)) Nav.NavigateTo("/ca-lam-viec", replace: true);
+    }
+}

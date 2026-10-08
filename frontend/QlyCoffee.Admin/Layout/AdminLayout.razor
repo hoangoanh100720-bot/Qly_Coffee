@@ -48,24 +48,41 @@
             </div>
         </div>
 
+        @*  MENU THEO VAI TRÒ.
+            Mục nào API chỉ cho Manager/Owner thì bọc trong AuthorizeView — nhân
+            viên không còn thấy những mục bấm vào chỉ để gặp "Bạn không có quyền".
+            Đây chỉ là chuyện GỌN MẮT: quyền thật vẫn chặn ở [Authorize] của trang
+            và của API, giấu menu không phải là bảo mật.
+
+            Nhân viên còn: Chấm công & két · Bán tại quầy · Pha chế · Đơn hàng ·
+            Đặt chỗ workshop · Sơ chế · Nguyên liệu · Lô hàng · Hao hụt.
+            Nhập kho chỉ quản lý (quyết định giá vốn). *@
         <nav class="nav">
 
-            <span class="label nav-group-label">Tổng quan</span>
-            <NavLink href="/" Match="NavLinkMatch.All" class="nav-link">
-                <DashboardIcon Size="17" /> Bảng điều khiển
-            </NavLink>
+            <AuthorizeView Roles="Manager,Owner">
+                <span class="label nav-group-label">Tổng quan</span>
+                <NavLink href="/" Match="NavLinkMatch.All" class="nav-link">
+                    <DashboardIcon Size="17" /> Bảng điều khiển
+                </NavLink>
 
-            @* Kế hoạch AI là tính năng lõi nên đặt ngay dưới bảng điều khiển,
-               kèm huy hiệu số đề xuất chưa xử lý. *@
-            <NavLink href="/ke-hoach" class="nav-link">
-                <SparkIcon Size="17" /> Kế hoạch hằng ngày
-                @if (UndecidedSuggestions > 0)
-                {
-                    <span class="badge badge-danger nav-badge">@UndecidedSuggestions</span>
-                }
-            </NavLink>
+                @* Kế hoạch AI là tính năng lõi nên đặt ngay dưới bảng điều khiển,
+                   kèm huy hiệu số đề xuất chưa xử lý. *@
+                <NavLink href="/ke-hoach" class="nav-link">
+                    <SparkIcon Size="17" /> Kế hoạch hằng ngày
+                    @if (UndecidedSuggestions > 0)
+                    {
+                        <span class="badge badge-danger nav-badge">@UndecidedSuggestions</span>
+                    }
+                </NavLink>
+            </AuthorizeView>
 
             <span class="label nav-group-label">Bán hàng</span>
+
+            @* Ca làm việc đứng ĐẦU: nhận két là việc đầu tiên của mỗi ca, trước
+               khi bán ly nào. Chưa ai nhận ca thì tiền thu bị tính là "ngoài ca". *@
+            <NavLink href="/ca-lam-viec" class="nav-link">
+                <ClockIcon Size="17" /> Chấm công &amp; két
+            </NavLink>
 
             @* Hai mục này là việc nhân viên làm CẢ NGÀY nên đặt trên cùng nhóm,
                trước danh sách đơn — thứ chỉ mở ra khi cần tra lại. *@
@@ -87,26 +104,30 @@
                     <span class="badge badge-accent nav-badge">@PendingOrders</span>
                 }
             </NavLink>
-            <NavLink href="/khuyen-mai" class="nav-link">
-                <TagIcon Size="17" /> Khuyến mãi
-            </NavLink>
+            <AuthorizeView Roles="Manager,Owner">
+                <NavLink href="/khuyen-mai" class="nav-link">
+                    <TagIcon Size="17" /> Khuyến mãi
+                </NavLink>
+            </AuthorizeView>
             <NavLink href="/dat-lich-workshop" class="nav-link">
                 <CupIcon Size="17" /> Đặt chỗ workshop
             </NavLink>
             @* Giá tách khỏi danh sách đặt chỗ: hai việc khác nhịp và khác quyền.
                Danh sách mở mỗi ngày bởi nhân viên trực, giá vài tuần mới đụng và
                chỉ quản lý được đụng — để cạnh nhau là sớm muộn có người bấm nhầm. *@
-            <NavLink href="/gia-workshop" class="nav-link">
-                <TagIcon Size="17" /> Giá workshop
-            </NavLink>
+            <AuthorizeView Roles="Manager,Owner">
+                <NavLink href="/gia-workshop" class="nav-link">
+                    <TagIcon Size="17" /> Giá workshop
+                </NavLink>
 
-            <span class="label nav-group-label">Thực đơn</span>
-            <NavLink href="/mon" class="nav-link">
-                <CupIcon Size="17" /> Món &amp; công thức
-            </NavLink>
-            @* Danh mục món hiếm khi thay đổi (5 nhóm cố định do seed tạo) nên
-               chưa làm màn hình quản lý riêng. Cần sửa thì dùng pgAdmin hoặc
-               thêm trang CRUD sau. *@
+                <span class="label nav-group-label">Thực đơn</span>
+                <NavLink href="/mon" class="nav-link">
+                    <CupIcon Size="17" /> Món &amp; công thức
+                </NavLink>
+                @* Danh mục món hiếm khi thay đổi (5 nhóm cố định do seed tạo) nên
+                   chưa làm màn hình quản lý riêng. Cần sửa thì dùng pgAdmin hoặc
+                   thêm trang CRUD sau. *@
+            </AuthorizeView>
 
             <span class="label nav-group-label">Kho</span>
 
@@ -131,17 +152,41 @@
                     <span class="badge badge-danger nav-badge">@CriticalLots</span>
                 }
             </NavLink>
-            <NavLink href="/nhap-kho" class="nav-link">
-                <TruckIcon Size="17" /> Nhập kho
-            </NavLink>
+            @* Nhập kho chỉ dành cho quản lý — nhân viên không còn thấy mục này. *@
+            <AuthorizeView Roles="Manager,Owner">
+                <NavLink href="/nhap-kho" class="nav-link">
+                    <TruckIcon Size="17" /> Nhập kho
+                </NavLink>
+            </AuthorizeView>
             <NavLink href="/hao-hut" class="nav-link">
                 <TrashIcon Size="17" /> Hao hụt
             </NavLink>
 
-            <span class="label nav-group-label">Báo cáo</span>
-            <NavLink href="/bao-cao" class="nav-link">
-                <ChartIcon Size="17" /> Doanh thu &amp; giá vốn
-            </NavLink>
+            <AuthorizeView Roles="Manager,Owner">
+                @* Nhân sự đứng trước Báo cáo: thêm người, chỉnh lương là việc
+                   làm ngay; bảng công là thứ xem cuối kỳ để trả lương. *@
+                <span class="label nav-group-label">Nhân sự</span>
+                <NavLink href="/nhan-su" class="nav-link">
+                    <DashboardIcon Size="17" /> Nhân viên
+                </NavLink>
+                <NavLink href="/cham-cong" class="nav-link">
+                    <ClockIcon Size="17" /> Bảng công &amp; lương
+                    @if (StaffIssuesToday > 0)
+                    {
+                        <span class="badge badge-danger nav-badge" title="Đi trễ + két lệch hôm nay">@StaffIssuesToday</span>
+                    }
+                </NavLink>
+
+                <span class="label nav-group-label">Báo cáo</span>
+                @* Đối soát ca đứng TRƯỚC báo cáo giá vốn: tiền có về đủ két hay
+                   không là câu hỏi mỗi tối; lãi gộp là câu hỏi mỗi tuần. *@
+                <NavLink href="/doi-soat-ca" class="nav-link">
+                    <ReceiptIcon Size="17" /> Đối soát ca
+                </NavLink>
+                <NavLink href="/bao-cao" class="nav-link">
+                    <ChartIcon Size="17" /> Doanh thu &amp; giá vốn
+                </NavLink>
+            </AuthorizeView>
         </nav>
 
         @* Trang bán hàng giờ là ứng dụng riêng, có thể ở tên miền khác, nên địa
@@ -166,7 +211,7 @@
         </button>
 
         <div class="stack" style="gap: 0;">
-            <h1 style="font-size: var(--text-base); font-weight: 700;">@PageTitle</h1>
+            <h1 style="font-size: var(--text-base); font-weight: 700;">@TopbarTitle</h1>
             @if (!string.IsNullOrEmpty(PageSubtitle))
             {
                 <span class="xs muted">@PageSubtitle</span>
@@ -198,7 +243,49 @@
 
 @code {
     /// <summary>Tiêu đề trang, đặt bởi từng trang qua CascadingValue.</summary>
-    [CascadingParameter(Name = "PageTitle")] public string PageTitle { get; set; } = "Bảng điều khiển";
+    [CascadingParameter(Name = "PageTitle")] public string? PageTitle { get; set; }
+
+    /// <summary>
+    /// Tiêu đề trên thanh trên cùng. Trang nào tự truyền PageTitle thì dùng của
+    /// trang; không thì suy ra từ đường dẫn, CÙNG CHỮ với mục trên thanh bên.
+    ///
+    /// Trước đây chỉ có giá trị mặc định "Bảng điều khiển" và không trang nào
+    /// truyền PageTitle xuống — nên đang ở Đơn hàng, Nguyên liệu hay Báo cáo thì
+    /// thanh trên cùng vẫn ghi "Bảng điều khiển". Layout được vẽ lại mỗi lần
+    /// chuyển trang (Body đổi), nên thuộc tính tính toán này luôn đúng trang.
+    /// </summary>
+    private string TopbarTitle => PageTitle ?? TitleForPath(Nav.ToBaseRelativePath(Nav.Uri));
+
+    // Khớp tiền tố dài trước: "gia-workshop" phải thắng trước khi xét tới "".
+    private static readonly (string Prefix, string Title)[] RouteTitles =
+    {
+        ("ke-hoach",          "Kế hoạch hằng ngày"),
+        ("ca-lam-viec",       "Chấm công & két"),
+        ("nhan-su",           "Nhân sự"),
+        ("cham-cong",         "Bảng công & lương"),
+        ("doi-soat-ca",       "Đối soát ca"),
+        ("ban-hang",          "Bán tại quầy"),
+        ("pha-che",           "Pha chế"),
+        ("don-hang",          "Đơn hàng"),
+        ("khuyen-mai",        "Khuyến mãi"),
+        ("dat-lich-workshop", "Đặt chỗ workshop"),
+        ("gia-workshop",      "Giá workshop"),
+        ("mon",               "Món & công thức"),
+        ("so-che",            "Sơ chế"),
+        ("nguyen-lieu",       "Nguyên liệu"),
+        ("lo-hang",           "Lô hàng & hạn dùng"),
+        ("nhap-kho",          "Nhập kho"),
+        ("hao-hut",           "Hao hụt"),
+        ("bao-cao",           "Doanh thu & giá vốn"),
+    };
+
+    private static string TitleForPath(string relativePath)
+    {
+        var first = relativePath.Split('?', '#')[0].Split('/')[0];
+        foreach (var (prefix, title) in RouteTitles)
+            if (string.Equals(first, prefix, StringComparison.OrdinalIgnoreCase)) return title;
+        return "Bảng điều khiển";
+    }
     [CascadingParameter(Name = "PageSubtitle")] public string? PageSubtitle { get; set; }
 
     private bool _sidebarOpen;
@@ -210,6 +297,7 @@
     private int CupsInQueue { get; set; }
     private int CriticalLots { get; set; }
     private int PrepNeeded { get; set; }
+    private int StaffIssuesToday { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -222,7 +310,12 @@
         //
         // Chỉ lộ ra khi tải lại bằng F5; bấm chuyển trang trong app thì token đã
         // gắn từ trước nên mọi thứ trông vẫn bình thường.
-        await Auth.EnsureAuthHeaderAsync();
+        //
+        // Chưa đăng nhập (mở thẳng một trang quản lý, token hết hạn) thì dừng ở
+        // đây: layout vẫn kịp dựng trong tích tắc trước khi bị chuyển sang trang
+        // đăng nhập, và gọi API lúc đó chỉ để nhận một dòng 401 đỏ. Đăng nhập
+        // xong, layout được tạo mới và chạy lại hàm này với token đầy đủ.
+        if (!await Auth.EnsureAuthHeaderAsync()) return;
 
         await LoadBadgesAsync();
 
@@ -242,6 +335,7 @@
         CriticalLots         = res.Data.CriticalLots;
         PrepNeeded           = res.Data.PrepNeeded;
         UndecidedSuggestions = res.Data.UndecidedSuggestions;
+        StaffIssuesToday     = res.Data.StaffIssuesToday;
 
         StateHasChanged();
     }
