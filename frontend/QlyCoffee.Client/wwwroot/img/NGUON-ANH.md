@@ -203,3 +203,35 @@ thì chạy lại quy trình trên, hoặc tải thẳng ảnh của quán ở `
 
 **Ảnh của quán luôn thắng.** Chụp món thật rồi tải lên là ghi đè được ngay, không
 phải sửa mã nguồn — `DrinkPhoto.PhotoFor()` ưu tiên `image_url` trước tiên.
+
+## Ảnh topping
+
+Nằm ở `QlyCoffee.Ui/wwwroot/img/` (dùng chung cho trang bán hàng và màn bán tại
+quầy), tra theo tên topping trong `QlyCoffee.Ui/Services/ToppingPhoto.cs`.
+Cắt vuông giữa ảnh, 480×480, WebP.
+
+Bộ này dùng thêm giấy phép **CC BY** và **CC BY-SA** — cả hai đều cho dùng
+thương mại, **điều kiện là ghi tác giả và giấy phép**, nên bảng dưới đây là
+NGHĨA VỤ chứ không chỉ để truy vết. Thay ảnh khác thì sửa luôn dòng tương ứng.
+Lý do mở rộng: kho CC0 gần như không có ảnh chụp thật của topping châu Á
+(sương sáo, củ năng, hạt nổ…) — kết quả toàn tranh minh hoạ hoặc ảnh sai món.
+
+| File | Topping | Giấy phép | Tác giả | Nguồn |
+|---|---|---|---|---|
+| `topping-tran-chau-den.webp` | Trân châu đen | CC0 | sam651030 from Pixabay | https://commons.wikimedia.org/w/index.php?curid=98925900 |
+| `topping-tran-chau-trang.webp` | Trân châu trắng | CC BY-SA | Jul Lllll | https://commons.wikimedia.org/w/index.php?curid=76655245 |
+| `topping-thach-nha-dam.webp` | Thạch nha đam | CC BY-SA | Gunawan Kartapranata | https://commons.wikimedia.org/w/index.php?curid=33212891 |
+| `topping-pudding-trung.webp` | Pudding trứng | CC BY | Bex.Walton | https://www.flickr.com/photos/7831824@N04/52017185277 |
+| `topping-kem-cheese.webp` | Kem cheese | CC BY-SA | Vincent60030 | https://commons.wikimedia.org/wiki/File:Regiustea_Cheese_Brown_Sugar.jpg |
+| `topping-banh-quy-nghien.webp` | Bánh quy nghiền | CC BY-SA | Pittigrilli | https://commons.wikimedia.org/w/index.php?curid=119598584 |
+| `topping-hat-no.webp` | Hạt nổ | CC BY-SA | Coldsea.eu | https://commons.wikimedia.org/w/index.php?curid=99234869 |
+| `topping-cu-nang.webp` | Củ năng (hạt lựu củ năng đỏ) | CC BY-SA | Chensiyuan at English Wikipedia | https://commons.wikimedia.org/w/index.php?curid=25366115 |
+| `topping-suong-sao.webp` | Sương sáo | CC0 | EYAMXAOLP | https://commons.wikimedia.org/w/index.php?curid=149485982 |
+| `topping-thach-ca-phe.webp` | Thạch cà phê | CC BY-SA | Lombroso | https://commons.wikimedia.org/w/index.php?curid=39747606 |
+| `topping-thach-dua.webp` | Thạch dừa | CC0 | Judgefloro | https://commons.wikimedia.org/w/index.php?curid=61428904 |
+| `topping-thach-trai-cay.webp` | Thạch trái cây | CC0 | Obsidian Soul | https://commons.wikimedia.org/w/index.php?curid=75228609 |
+
+> Ảnh "Kem cheese" CẮT từ ảnh một ly trà sữa kem cheese của thương hiệu khác: chỉ lấy
+> phần lớp kem sệt phía trên, logo in giữa thân ly nằm NGOÀI khung cắt (cắt tại
+> x=170, y=25, cạnh 640px trên bản 960px). Khi đổi ảnh, giữ nguyên quy tắc này.
+> Quán chụp được ảnh thật của mình thì thay file này trước.

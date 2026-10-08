@@ -207,7 +207,17 @@ else
                                         @onclick="() => ToggleModifier(group, m)">
                                     @if (ShowSwatch(group, m))
                                     {
-                                        <span class="swatch" style="--swatch-color: @m.ColorHex"></span>
+                                        @* Có ảnh chụp thì hiện ảnh — khách nhìn là biết topping là gì;
+                                           topping mới chưa có ảnh thì quay về chấm màu. *@
+                                        @if (ToppingPhoto.For(m.Name) is { } photo)
+                                        {
+                                            <img class="choice-photo" src="@photo" alt="" width="40" height="40"
+                                                 loading="lazy" decoding="async" />
+                                        }
+                                        else
+                                        {
+                                            <span class="swatch" style="--swatch-color: @m.ColorHex"></span>
+                                        }
                                     }
                                     @m.Name
                                     @if (m.PriceDelta > 0)

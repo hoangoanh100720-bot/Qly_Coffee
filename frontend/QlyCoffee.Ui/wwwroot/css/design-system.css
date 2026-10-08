@@ -661,6 +661,18 @@ legend { padding: 0; }
 }
 .swatch-lg { width: 20px; height: 20px; }
 
+/* Ảnh tròn nhỏ trong nút lựa chọn — ảnh chụp thật của topping, thay chấm màu.
+   Lề âm bên trái để ảnh sát mép nút, nút không phình to hơn nút chữ. */
+.choice-photo {
+  width: 40px; height: 40px; flex: none;
+  margin: calc(var(--space-1) * -1) 0 calc(var(--space-1) * -1) calc(var(--space-2) * -1);
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.choice.is-selected .choice-photo { box-shadow: 0 0 0 2px var(--accent); }
+
 /* =============================================================================
    §6  CARD
    Ưu tiên viền 1px + đổi nền thay vì đổ bóng. Bóng chỉ dành cho thứ thực sự
